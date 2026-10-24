@@ -26,18 +26,25 @@ A modern, mobile-first web application designed for group trips, vacations, and 
    npm install
    ```
 
-2. **Start Dev Server**:
+2. **Configure Backend URL (Optional)**:
+   ```bash
+   cp .env.example .env
+   # Customize VITE_API_BASE_URL if your backend is hosted remotely
+   ```
+   *Note: You can also change the backend URL directly from the app UI by tapping the connection status dot in the header!*
+
+3. **Start Dev Server**:
    ```bash
    npm run dev
    ```
    The app will run at `http://localhost:5173`.
 
-3. **Build for Production**:
+4. **Build for Production**:
    ```bash
    npm run build
    ```
 
-4. **Lint Code**:
+5. **Lint Code**:
    ```bash
    npm run lint
    ```

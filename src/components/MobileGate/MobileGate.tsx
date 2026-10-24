@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { ENV } from '../../config';
 
 interface MobileGateProps {
     children: React.ReactNode;
     breakpoint?: number;
 }
 
-export const MobileGate: React.FC<MobileGateProps> = ({ children, breakpoint = 768 }) => {
+export const MobileGate: React.FC<MobileGateProps> = ({ children, breakpoint = ENV.DESKTOP_BREAKPOINT }) => {
     const [windowWidth, setWindowWidth] = useState<number>(() => {
         return typeof window !== 'undefined' ? window.innerWidth : 1024;
     });

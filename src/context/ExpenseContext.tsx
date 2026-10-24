@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import type { AppTab } from './ExpenseContextDef';
 import { ExpenseContext } from './ExpenseContextDef';
+import { ENV } from '../config';
 
 export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [activePerson, setActivePersonState] = useState<string>(() => {
@@ -10,7 +11,7 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
         } catch {
             // fallback
         }
-        return 'Niraj';
+        return ENV.DEFAULT_ACTIVE_PERSON;
     });
 
     const [activeTab, setActiveTab] = useState<AppTab>('dashboard');
@@ -33,7 +34,7 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setToast({ message, icon, visible: true });
         setTimeout(() => {
             setToast((prev) => ({ ...prev, visible: false }));
-        }, 2800);
+        }, ENV.TOAST_DURATION_MS);
     }, []);
 
     const contextValue = useMemo(

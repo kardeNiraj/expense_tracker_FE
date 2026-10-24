@@ -2,41 +2,56 @@ import React, { useState } from 'react';
 import { useExpense } from '../../context';
 import { usePeople, useHealthCheck, useTripInfo } from '../../api';
 import { Avatar } from '../Avatar';
+import { ENV } from '../../config';
 
 export const Header: React.FC = () => {
     const { activePerson, setActivePerson } = useExpense();
     const { data: people = [] } = usePeople();
     const { data: health } = useHealthCheck();
-    const { data: tripInfo } = useTripInfo();
+    const { data: tripInfo, refetch: refetchTripInfo, isFetching: isTripInfoFetching } = useTripInfo();
     const [showSwitcher, setShowSwitcher] = useState(false);
 
     const isHealthy = health?.status === 'healthy';
-    const tripTitle = tripInfo?.title || 'Trip Expense';
-    const tripSubtitle = tripInfo?.subtitle || 'Expense & Splitter';
-    const tripIcon = tripInfo?.icon || 'landscape';
+    const tripTitle = tripInfo?.title || ENV.DEFAULT_TRIP_TITLE;
+    const tripSubtitle = tripInfo?.subtitle || ENV.DEFAULT_TRIP_SUBTITLE;
+    const tripIcon = tripInfo?.icon || ENV.DEFAULT_TRIP_ICON;
 
     return (
         <>
             <header className="fixed top-0 inset-x-0 z-50 pt-safe bg-surface/90 backdrop-blur-xl border-b border-outline-variant/20 shadow-[0_1px_8px_rgba(0,0,0,0.03)]">
                 <div className="max-w-md mx-auto h-16 px-4 flex items-center justify-between gap-2">
                     {/* Brand */}
-                    <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
                         <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-xs shrink-0">
                             <span className="material-symbols-outlined text-[20px]">
                                 {tripIcon}
                             </span>
                         </div>
-                        <div className="flex flex-col min-w-0">
+                        <div className="flex flex-col min-w-0 flex-1">
                             <div className="flex items-center gap-1.5">
-                                <span className="font-bold text-base text-on-surface tracking-tight font-headline truncate max-w-[130px] sm:max-w-none" title={tripTitle}>
+                                <span
+                                    className="font-bold text-base text-on-surface tracking-tight font-headline truncate max-w-[180px] xs:max-w-[210px] sm:max-w-none"
+                                    title={tripTitle}
+                                >
                                     {tripTitle}
                                 </span>
-                                <span
-                                    title={isHealthy ? 'Connected to API' : 'Checking API connection'}
-                                    className={`w-2 h-2 rounded-full shrink-0 ${
-                                        isHealthy ? 'bg-primary animate-pulse' : 'bg-tertiary'
-                                    }`}
-                                />
+                                <button
+                                    type="button"
+                                    onClick={() => refetchTripInfo()}
+                                    className="inline-flex items-center p-0.5 rounded-full hover:bg-surface-container transition-colors cursor-pointer group"
+                                    title={isHealthy ? 'Connected to API • Tap to refresh trip title' : 'Checking API connection'}
+                                    aria-label="Refresh trip info"
+                                >
+                                    <span
+                                        className={`w-2 h-2 rounded-full shrink-0 transition-transform group-hover:scale-125 ${
+                                            isTripInfoFetching
+                                                ? 'bg-primary animate-ping'
+                                                : isHealthy
+                                                ? 'bg-primary animate-pulse'
+                                                : 'bg-tertiary'
+                                        }`}
+                                    />
+                                </button>
                             </div>
                             <span className="text-[10px] text-primary font-semibold tracking-wider uppercase font-mono truncate">
                                 {tripSubtitle}

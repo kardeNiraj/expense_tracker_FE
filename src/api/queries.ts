@@ -19,7 +19,7 @@ export const queryKeys = {
     splitDetails: (splitId: string) => ['split', splitId] as const,
     spendings: (payee: string) => ['spendings', payee] as const,
     meta: () => ['meta'] as const,
-    tripInfo: () => ['trip-info'] as const,
+    tripInfo: (refresh = false) => ['trip-info', { refresh }] as const,
     health: () => ['health'] as const,
 };
 
@@ -108,10 +108,11 @@ export function useHealthCheck() {
 }
 
 // 9. Trip Info & Branding Query
-export function useTripInfo() {
+export function useTripInfo(refresh = false) {
     return useQuery<TripInfo>({
-        queryKey: queryKeys.tripInfo(),
-        queryFn: () => apiFetch<TripInfo>('/trip-info'),
-        staleTime: 1000 * 60 * 15, // 15 minutes
+        queryKey: queryKeys.tripInfo(refresh),
+        queryFn: () => apiFetch<TripInfo>(`/trip-info${refresh ? '?refresh=true' : ''}`),
+        staleTime: 1000 * 30, // 30 seconds
+        refetchOnWindowFocus: true, // Refresh when switching back to tab
     });
 }

@@ -2,12 +2,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ExpenseProvider, useExpense } from './context';
 import { MobileGate, Header, BottomNav, Toast } from './components';
 import { Dashboard, SplitsPage, AddPage, PeoplePage } from './pages';
+import { ENV } from './config';
 
 const queryClient = new QueryClient({
     defaultOptions: {
         queries: {
             refetchOnWindowFocus: false,
-            staleTime: 1000 * 60, // 1 minute default
+            staleTime: ENV.QUERY_STALE_TIME_MS,
             retry: 1,
         },
     },
