@@ -1,0 +1,377 @@
+{
+  "v": 12,
+  "id": "cmvca6x7j090gja1jwva7tlla",
+  "name": "Manali Expense Tracker",
+  "folders": [
+    {
+      "v": 12,
+      "id": "cmvjyczrj1kjeea1j47ux9aon",
+      "name": "Split",
+      "folders": [],
+      "requests": [
+        {
+          "v": "17",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "body": "{\n  \"amount\": 1000,\n  \"description\": \"Brunch at Mall Road\",\n  \"category\": \"Food\",\n  \"paidBy\": \"Niraj\",\n  \"createdBy\": \"Vedanti\",\n  \"contributions\": [\n    {\n      \"person\": \"Vedanti\",\n      \"amount\": 300,\n    }\n  ],\n  \"participants\": [\n    \"Ayush\",\n    \"Niraj\",\n    \"Renuka\",\n    \"Vedanti\"\n  ],\n  \"recordExpense\": true\n}\n",
+            "contentType": "application/json"
+          },
+          "name": "Add Split",
+          "method": "POST",
+          "params": [],
+          "headers": [],
+          "endpoint": "<<base_url>>/split",
+          "responses": {},
+          "testScript": "",
+          "description": null,
+          "preRequestScript": "",
+          "requestVariables": [],
+          "id": "cmvjy0lez1s22j91jbzpiuskk"
+        },
+        {
+          "v": "17",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "body": "{\n  \"person\": \"Manish\",\n  \"amount\": 500\n}\n",
+            "contentType": "application/json"
+          },
+          "name": "Add Contribution to Split",
+          "method": "POST",
+          "params": [],
+          "headers": [],
+          "endpoint": "<<base_url>>/split/<<split_id>>/contributions",
+          "responses": {},
+          "testScript": "",
+          "description": null,
+          "preRequestScript": "",
+          "requestVariables": [],
+          "id": "cmvjygsni1s2lj91j6ip7g8t1"
+        },
+        {
+          "v": "17",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "body": "{\n  \"person\": \"Ayush\"\n}\n",
+            "contentType": "application/json"
+          },
+          "name": "Mark Participant as Settled",
+          "method": "PATCH",
+          "params": [],
+          "headers": [],
+          "endpoint": "<<base_url>>/split/<<split_id>>/settle",
+          "responses": {},
+          "testScript": "",
+          "description": null,
+          "preRequestScript": "",
+          "requestVariables": [],
+          "id": "cmvjyjq2h1s2pj91j6sc5v40v"
+        },
+        {
+          "v": "17",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "body": null,
+            "contentType": null
+          },
+          "name": "List Splits",
+          "method": "GET",
+          "params": [
+            {
+              "key": "payee",
+              "value": "Niraj",
+              "active": false,
+              "description": ""
+            },
+            {
+              "key": "participant",
+              "value": "Vedanti",
+              "active": false,
+              "description": ""
+            },
+            {
+              "key": "status",
+              "value": "ACTIVE",
+              "active": true,
+              "description": ""
+            },
+            {
+              "key": "limit",
+              "value": "10",
+              "active": true,
+              "description": ""
+            }
+          ],
+          "headers": [],
+          "endpoint": "<<base_url>>/splits",
+          "responses": {},
+          "testScript": "",
+          "description": null,
+          "preRequestScript": "",
+          "requestVariables": [],
+          "id": "cmvjyl2dk1s34j91jgj9mrh9p"
+        },
+        {
+          "v": "17",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "body": null,
+            "contentType": null
+          },
+          "name": "Split Details by ID",
+          "method": "GET",
+          "params": [],
+          "headers": [],
+          "endpoint": "<<base_url>>/split/<<split_id>>",
+          "responses": {},
+          "testScript": "",
+          "description": null,
+          "preRequestScript": "",
+          "requestVariables": [],
+          "id": "cmvjypjvc1kk3ea1jjok6g57m"
+        }
+      ],
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "headers": [],
+      "variables": [],
+      "description": null,
+      "preRequestScript": "",
+      "testScript": ""
+    },
+    {
+      "v": 12,
+      "id": "cmvjyqexq1kk4ea1jtqc8cdhq",
+      "name": "People",
+      "folders": [],
+      "requests": [
+        {
+          "v": "17",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "body": null,
+            "contentType": null
+          },
+          "name": "Get People Details",
+          "method": "GET",
+          "params": [],
+          "headers": [],
+          "endpoint": "<<base_url>>/people/details",
+          "responses": {},
+          "testScript": "",
+          "description": null,
+          "preRequestScript": "",
+          "requestVariables": [],
+          "id": "cmvjyqsoj1kk5ea1j8cru0dju"
+        },
+        {
+          "v": "17",
+          "auth": {
+            "authType": "inherit",
+            "authActive": true
+          },
+          "body": {
+            "body": "{\n  \"name\": \"Vedanti\",\n  \"upiId\": \"vedanti@okaxis\"\n}\n",
+            "contentType": "application/json"
+          },
+          "name": "Update or Add UPI ID",
+          "method": "POST",
+          "params": [],
+          "headers": [],
+          "endpoint": "<<base_url>>/people/upi",
+          "responses": {},
+          "testScript": "",
+          "description": null,
+          "preRequestScript": "",
+          "requestVariables": [],
+          "id": "cmvjye2y61s2kj91jn8f6jgj4"
+        }
+      ],
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "headers": [],
+      "variables": [],
+      "description": null,
+      "preRequestScript": "",
+      "testScript": ""
+    }
+  ],
+  "requests": [
+    {
+      "v": "17",
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "body": {
+        "body": null,
+        "contentType": null
+      },
+      "name": "Health",
+      "method": "GET",
+      "params": [],
+      "headers": [],
+      "endpoint": "<<base_url>>/",
+      "responses": {},
+      "testScript": "",
+      "description": null,
+      "preRequestScript": "",
+      "requestVariables": [],
+      "id": "cmvca75cn3gx0io1jgma0m5rr"
+    },
+    {
+      "v": "17",
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "body": {
+        "body": null,
+        "contentType": null
+      },
+      "name": "Get Meta",
+      "method": "GET",
+      "params": [],
+      "headers": [],
+      "endpoint": "<<base_url>>/meta",
+      "responses": {},
+      "testScript": "",
+      "description": null,
+      "preRequestScript": "",
+      "requestVariables": [],
+      "id": "cmvcalygw090oja1jnaatq3wb"
+    },
+    {
+      "v": "17",
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "body": {
+        "body": null,
+        "contentType": null
+      },
+      "name": "Get Categories",
+      "method": "GET",
+      "params": [
+        {
+          "key": "refresh",
+          "value": "false",
+          "active": true,
+          "description": "Use ‘true’ to invalidate cache"
+        }
+      ],
+      "headers": [],
+      "endpoint": "<<base_url>>/categories",
+      "responses": {},
+      "testScript": "",
+      "description": null,
+      "preRequestScript": "",
+      "requestVariables": [],
+      "id": "cmvcdpzzh3h5gio1jsc9h7gzg"
+    },
+    {
+      "v": "17",
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "body": {
+        "body": null,
+        "contentType": null
+      },
+      "name": "Get People",
+      "method": "GET",
+      "params": [
+        {
+          "key": "refresh",
+          "value": "false",
+          "active": true,
+          "description": "Use ‘true’ to invalidate cache"
+        }
+      ],
+      "headers": [],
+      "endpoint": "<<base_url>>/people",
+      "responses": {},
+      "testScript": "",
+      "description": null,
+      "preRequestScript": "",
+      "requestVariables": [],
+      "id": "cmvceaztx09dija1jv04a5ufc"
+    },
+    {
+      "v": "17",
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "body": {
+        "body": "{\n  \"payee\": \"Ayush\",\n  \"category\": \"Water\",\n  \"amount\": 20,\n  \"description\": \"Water Bottle\"\n}",
+        "contentType": "application/json"
+      },
+      "name": "Add Expense",
+      "method": "POST",
+      "params": [],
+      "headers": [],
+      "endpoint": "<<base_url>>/add-expense",
+      "responses": {},
+      "testScript": "",
+      "description": null,
+      "preRequestScript": "",
+      "requestVariables": [],
+      "id": "cmvcfvoqr3h8iio1j3uruqqs0"
+    },
+    {
+      "v": "17",
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "body": {
+        "body": null,
+        "contentType": null
+      },
+      "name": "Spendings",
+      "method": "GET",
+      "params": [],
+      "headers": [],
+      "endpoint": "<<base_url>>/spend/<<payee>>",
+      "responses": {},
+      "testScript": "",
+      "description": null,
+      "preRequestScript": "",
+      "requestVariables": [],
+      "id": "cmvchtn4r09evja1j5usih3o3"
+    }
+  ],
+  "auth": {
+    "authType": "inherit",
+    "authActive": true
+  },
+  "headers": [],
+  "variables": [],
+  "description": null,
+  "preRequestScript": "",
+  "testScript": ""
+}
