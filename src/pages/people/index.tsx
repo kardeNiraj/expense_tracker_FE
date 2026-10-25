@@ -5,7 +5,7 @@ import { Avatar } from '../../components';
 import type { PersonDetail } from '../../api/types';
 
 export function PeoplePage() {
-    const { activePerson, setActivePerson, showToast } = useExpense();
+    const { activePerson, showToast } = useExpense();
     const { data: peopleDetails = [], isLoading, refetch } = usePeopleDetails();
     const { refetch: refetchPeople } = usePeople(true);
     const updateUpiMutation = useUpdateUpiMutation();
@@ -121,28 +121,18 @@ export function PeoplePage() {
                                     </div>
 
                                     <div className="flex items-center gap-2 shrink-0">
-                                        {!isCurrent && (
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setActivePerson(person.name);
-                                                    showToast(`Now viewing as ${person.name}`);
-                                                }}
-                                                className="h-8 px-2.5 rounded-lg bg-surface-container-low text-on-surface text-xs font-semibold hover:bg-surface-container transition-colors cursor-pointer border border-outline-variant/20"
-                                            >
-                                                Switch To
-                                            </button>
-                                        )}
-
                                         <button
                                             type="button"
                                             onClick={() => {
                                                 setEditingPerson(person);
                                                 setUpiInput(person.upiId || '');
                                             }}
-                                            className="h-8 px-2.5 rounded-lg bg-surface-container text-primary hover:bg-primary hover:text-on-primary text-xs font-semibold transition-colors cursor-pointer border border-outline-variant/20"
+                                            className="h-8 px-2.5 rounded-lg bg-surface-container text-primary hover:bg-primary hover:text-on-primary text-xs font-semibold transition-colors cursor-pointer border border-outline-variant/20 flex items-center gap-1 shadow-2xs"
                                         >
-                                            {person.upiId ? 'Edit UPI' : '+ Add UPI'}
+                                            <span className="material-symbols-outlined text-[15px]">
+                                                {person.upiId ? 'edit' : 'add'}
+                                            </span>
+                                            <span>{person.upiId ? 'Edit UPI' : 'Add UPI'}</span>
                                         </button>
                                     </div>
                                 </div>
