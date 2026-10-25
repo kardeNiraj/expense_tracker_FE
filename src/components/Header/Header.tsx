@@ -3,9 +3,22 @@ import { useExpense } from '../../context';
 import { usePeople, useHealthCheck, useTripInfo } from '../../api';
 import { Avatar } from '../Avatar';
 import { ENV } from '../../config';
+import { ProfileModal } from './ProfileModal';
 
 export const Header: React.FC = () => {
-    const { activePerson, setActivePerson } = useExpense();
+    const {
+        activePerson,
+        setActivePerson,
+        claimedPerson,
+        isDeviceClaimed,
+        claimProfile,
+        unlockProfileSwitch,
+        unclaimDevice,
+        isSwitcherUnlocked,
+        lockSwitcher,
+        showToast,
+    } = useExpense();
+
     const { data: people = [] } = usePeople();
     const { data: health } = useHealthCheck();
     const { data: tripInfo, refetch: refetchTripInfo, isFetching: isTripInfoFetching } = useTripInfo();
@@ -59,17 +72,31 @@ export const Header: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Active Member Switcher Button */}
+                    {/* Active Member Switcher / Claim Button */}
                     <div className="flex items-center gap-2">
                         <button
                             type="button"
                             onClick={() => setShowSwitcher(!showSwitcher)}
-                            className="h-9 px-3 rounded-full bg-surface-container flex items-center gap-2 text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer border border-outline-variant/30 text-xs font-semibold"
-                            title="Switch Viewing Member"
+                            className={`h-9 px-3 rounded-full flex items-center gap-2 text-on-surface transition-colors cursor-pointer border text-xs font-semibold ${
+                                isDeviceClaimed
+                                    ? 'bg-surface-container hover:bg-surface-container-high border-outline-variant/30'
+                                    : 'bg-primary/10 border-primary/40 text-primary animate-pulse'
+                            }`}
+                            title={isDeviceClaimed ? 'Device bound to ' + activePerson : 'Claim your profile'}
                         >
-                            <Avatar name={activePerson} size="sm" />
+                            <div className="relative flex items-center">
+                                <Avatar name={activePerson} size="sm" />
+                                {isDeviceClaimed && (
+                                    <span
+                                        className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-primary text-on-primary ring-1.5 ring-surface flex items-center justify-center shadow-2xs"
+                                        title="Profile locked to this device"
+                                    >
+                                        <span className="material-symbols-outlined text-[8.5px] leading-none">lock</span>
+                                    </span>
+                                )}
+                            </div>
                             <span className="truncate max-w-[80px]">
-                                {activePerson} (You)
+                                {activePerson} {isDeviceClaimed ? '(You)' : ''}
                             </span>
                             <span className="material-symbols-outlined text-on-surface-variant text-[16px]">
                                 arrow_drop_down
@@ -79,75 +106,22 @@ export const Header: React.FC = () => {
                 </div>
             </header>
 
-            {/* Quick Switcher Modal / Dropdown Backdrop */}
-            {showSwitcher && (
-                <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4 bg-black/40 backdrop-blur-xs">
-                    <div
-                        className="fixed inset-0"
-                        onClick={() => setShowSwitcher(false)}
-                        aria-hidden="true"
-                    />
-                    <div className="relative z-10 w-full max-w-sm bg-surface-container-lowest border border-outline-variant/40 rounded-2xl p-4 shadow-2xl">
-                        <div className="flex items-center justify-between pb-3 border-b border-outline-variant/20 mb-3">
-                            <div className="flex items-center gap-2">
-                                <span className="material-symbols-outlined text-primary text-[20px]">
-                                    switch_account
-                                </span>
-                                <h3 className="font-semibold text-sm text-on-surface">
-                                    Switch Active Trip Member
-                                </h3>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setShowSwitcher(false)}
-                                className="w-7 h-7 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-on-surface cursor-pointer"
-                            >
-                                <span className="material-symbols-outlined text-[16px]">
-                                    close
-                                </span>
-                            </button>
-                        </div>
-
-                        <div className="space-y-1.5 max-h-[300px] overflow-y-auto no-scrollbar">
-                            {people.map((person) => {
-                                const isCurrent = person === activePerson;
-                                return (
-                                    <button
-                                        key={person}
-                                        type="button"
-                                        onClick={() => {
-                                            setActivePerson(person);
-                                            setShowSwitcher(false);
-                                        }}
-                                        className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition-colors cursor-pointer ${
-                                            isCurrent
-                                                ? 'bg-primary-fixed/30 border border-primary/30'
-                                                : 'hover:bg-surface-container-low border border-transparent'
-                                        }`}
-                                    >
-                                        <div className="flex items-center gap-2.5 min-w-0">
-                                            <Avatar name={person} size="md" />
-                                            <div className="min-w-0">
-                                                <span className="font-semibold text-sm text-on-surface truncate block">
-                                                    {person}
-                                                </span>
-                                                <span className="text-[11px] text-on-surface-variant">
-                                                    {isCurrent ? 'Current viewer' : 'Tap to view as ' + person}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        {isCurrent && (
-                                            <span className="material-symbols-outlined text-primary text-[20px]">
-                                                check
-                                            </span>
-                                        )}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Quick Switcher / Device Claim Modal */}
+            <ProfileModal
+                isOpen={showSwitcher}
+                onClose={() => setShowSwitcher(false)}
+                people={people}
+                activePerson={activePerson}
+                claimedPerson={claimedPerson}
+                isDeviceClaimed={isDeviceClaimed}
+                isSwitcherUnlocked={isSwitcherUnlocked}
+                claimProfile={claimProfile}
+                setActivePerson={setActivePerson}
+                unlockProfileSwitch={unlockProfileSwitch}
+                unclaimDevice={unclaimDevice}
+                lockSwitcher={lockSwitcher}
+                showToast={showToast}
+            />
         </>
     );
 };

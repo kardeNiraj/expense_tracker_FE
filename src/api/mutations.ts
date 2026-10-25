@@ -65,10 +65,10 @@ export function useSettleParticipantMutation() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ splitId, from, to, settled = true }: SettleParticipantPayload) =>
+        mutationFn: ({ splitId, from, to, settled = true, confirmedBy }: SettleParticipantPayload) =>
             apiFetch<Split>(`/split/${splitId}/settle`, {
                 method: 'PATCH',
-                body: JSON.stringify({ from, to, settled }),
+                body: JSON.stringify({ from, to, settled, confirmedBy }),
             }),
         onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({ queryKey: queryKeys.splitDetails(variables.splitId) });

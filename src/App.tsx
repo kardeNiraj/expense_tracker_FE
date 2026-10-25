@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ExpenseProvider, useExpense } from './context';
 import { MobileGate, Header, BottomNav, Toast } from './components';
-import { Dashboard, SplitsPage, AddPage, PeoplePage } from './pages';
+import { Dashboard, SplitsPage, AddPage, PeoplePage, ClaimIdentityScreen } from './pages';
 import { ENV } from './config';
 
 const queryClient = new QueryClient({
@@ -15,7 +15,17 @@ const queryClient = new QueryClient({
 });
 
 function MainApp() {
-    const { activeTab } = useExpense();
+    const { activeTab, isDeviceClaimed, isSwitcherUnlocked } = useExpense();
+
+    // Show device claim & identity selection screen on first load / unclaimed device
+    if (!isDeviceClaimed && !isSwitcherUnlocked) {
+        return (
+            <div className="min-h-screen w-full bg-surface text-on-surface flex flex-col relative font-sans">
+                <ClaimIdentityScreen />
+                <Toast />
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen w-full bg-surface text-on-surface flex flex-col relative font-sans">

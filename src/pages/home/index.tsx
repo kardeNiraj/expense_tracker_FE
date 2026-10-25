@@ -140,8 +140,13 @@ export function Dashboard() {
 
     const handleSettle = async (splitId: string, fromPerson: string, toPerson: string) => {
         try {
-            await settleMutation.mutateAsync({ splitId, from: fromPerson, to: toPerson });
-            showToast(`Marked settlement between ${fromPerson} and ${toPerson} as settled!`);
+            await settleMutation.mutateAsync({
+                splitId,
+                from: fromPerson,
+                to: toPerson,
+                confirmedBy: activePerson,
+            });
+            showToast(`Confirmed receipt of payment from ${fromPerson}!`, 'check_circle');
         } catch (err: unknown) {
             showToast(`Failed to settle: ${String(err)}`, 'error');
         }
@@ -367,7 +372,7 @@ export function Dashboard() {
                     {/* What you owe */}
                     {myOwedSettlements.map((s, idx) => (
                         <div
-                            key={`owe-${idx}`}
+                            key={`owe-${s.splitId}-${s.to}-${idx}`}
                             className="bg-surface-container-lowest p-3.5 rounded-xl shadow-xs border border-outline-variant/30 flex items-center justify-between gap-3"
                         >
                             <div className="flex items-center gap-3 min-w-0">
@@ -398,22 +403,21 @@ export function Dashboard() {
                                         <span>Pay</span>
                                     </a>
                                 ) : (
-                                    <button
-                                        type="button"
-                                        onClick={() => handleSettle(s.splitId, activePerson, s.to)}
-                                        className="h-8 px-2.5 rounded-lg bg-surface-container-high text-primary text-xs font-semibold hover:bg-primary hover:text-on-primary transition-colors"
-                                    >
-                                        Settle
-                                    </button>
+                                    <span className="text-[11px] text-on-surface-variant font-medium flex items-center gap-0.5">
+                                        <span className="material-symbols-outlined text-[13px] text-tertiary">
+                                            hourglass_top
+                                        </span>
+                                        <span>Pending {s.to}</span>
+                                    </span>
                                 )}
                             </div>
                         </div>
                     ))}
 
-                    {/* What others owe you */}
+                    {/* What others owe you (You are creditor: Confirm Received) */}
                     {owedToMeSettlements.map((s, idx) => (
                         <div
-                            key={`owed-${idx}`}
+                            key={`owed-${s.splitId}-${s.from}-${idx}`}
                             className="bg-surface-container-lowest p-3.5 rounded-xl shadow-xs border border-outline-variant/30 flex items-center justify-between gap-3"
                         >
                             <div className="flex items-center gap-3 min-w-0">
@@ -434,10 +438,15 @@ export function Dashboard() {
                                 </span>
                                 <button
                                     type="button"
+                                    disabled={settleMutation.isPending}
                                     onClick={() => handleSettle(s.splitId, s.from, activePerson)}
-                                    className="h-8 px-2.5 rounded-lg bg-primary-fixed text-on-primary-fixed text-xs font-bold hover:bg-primary hover:text-on-primary transition-colors"
+                                    className="h-8 px-2.5 rounded-lg bg-primary-fixed text-on-primary-fixed text-xs font-bold hover:bg-primary hover:text-on-primary transition-colors flex items-center gap-1 shadow-2xs disabled:opacity-50 cursor-pointer"
+                                    title={`Confirm receipt of ₹${s.amount} from ${s.from}`}
                                 >
-                                    Mark Paid
+                                    <span className="material-symbols-outlined text-[14px]">
+                                        done_all
+                                    </span>
+                                    <span>Confirm Received</span>
                                 </button>
                             </div>
                         </div>

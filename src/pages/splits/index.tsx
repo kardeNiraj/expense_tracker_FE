@@ -49,11 +49,15 @@ export function SplitsPage() {
 
     const handleSettle = async (splitId: string, fromPerson: string, toPerson?: string) => {
         try {
-            await settleMutation.mutateAsync({ splitId, from: fromPerson, to: toPerson });
+            await settleMutation.mutateAsync({
+                splitId,
+                from: fromPerson,
+                to: toPerson,
+                confirmedBy: activePerson,
+            });
             showToast(
-                toPerson
-                    ? `Settlement marked complete for ${fromPerson} to ${toPerson}!`
-                    : `Settlement marked complete for ${fromPerson}!`
+                `Payment from ${fromPerson} confirmed settled!`,
+                'check_circle'
             );
         } catch (err: unknown) {
             showToast(`Failed to settle: ${String(err)}`, 'error');
@@ -316,7 +320,8 @@ export function SplitsPage() {
                                             <div className="space-y-2">
                                                 {split.settlements?.map((s, idx) => {
                                                     const isPending = s.status === 'PENDING';
-                                                    const isYouPaying = s.from.toLowerCase() === activePerson.toLowerCase();
+                                                    const isCreditor = s.to.toLowerCase() === activePerson.toLowerCase();
+                                                    const isDebtor = s.from.toLowerCase() === activePerson.toLowerCase();
 
                                                     return (
                                                         <div
@@ -350,7 +355,8 @@ export function SplitsPage() {
                                                                     ₹{s.amount.toLocaleString('en-IN')}
                                                                 </span>
 
-                                                                {isPending && s.upiIntent && isYouPaying && (
+                                                                {/* Debtor Action: Pay via UPI */}
+                                                                {isPending && s.upiIntent && isDebtor && (
                                                                     <a
                                                                         href={s.upiIntent}
                                                                         onClick={() =>
@@ -359,23 +365,46 @@ export function SplitsPage() {
                                                                                 'bolt'
                                                                             )
                                                                         }
-                                                                        className="h-7 px-2 rounded-lg bg-primary text-on-primary text-xs font-semibold flex items-center gap-0.5 shadow-xs hover:bg-primary-container"
+                                                                        className="h-7 px-2.5 rounded-lg bg-primary text-on-primary text-xs font-semibold flex items-center gap-1 shadow-xs hover:bg-primary-container"
                                                                     >
                                                                         <span className="material-symbols-outlined text-[14px]">
                                                                             bolt
                                                                         </span>
-                                                                        <span>UPI</span>
+                                                                        <span>Pay</span>
                                                                     </a>
                                                                 )}
 
-                                                                {isPending && (
+                                                                {/* Debtor Status: Waiting for creditor confirmation */}
+                                                                {isPending && isDebtor && !isCreditor && (
+                                                                    <span className="text-[10px] text-tertiary font-medium flex items-center gap-0.5">
+                                                                        <span className="material-symbols-outlined text-[13px]">
+                                                                            hourglass_top
+                                                                        </span>
+                                                                        <span>Waiting for {s.to}</span>
+                                                                    </span>
+                                                                )}
+
+                                                                {/* Creditor Action: ONLY the receiver (creditor) can confirm settlement */}
+                                                                {isPending && isCreditor && (
                                                                     <button
                                                                         type="button"
+                                                                        disabled={settleMutation.isPending}
                                                                         onClick={() => handleSettle(split.splitId, s.from, s.to)}
-                                                                        className="h-7 px-2 rounded-lg bg-surface-container-high text-primary hover:bg-primary hover:text-on-primary text-xs font-semibold transition-colors cursor-pointer"
+                                                                        className="h-7 px-2.5 rounded-lg bg-primary-fixed text-on-primary-fixed hover:bg-primary hover:text-on-primary text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-2xs disabled:opacity-50"
+                                                                        title={`Confirm you have received ₹${s.amount} from ${s.from}`}
                                                                     >
-                                                                        Mark Settled
+                                                                        <span className="material-symbols-outlined text-[14px]">
+                                                                            done_all
+                                                                        </span>
+                                                                        <span>Confirm Received</span>
                                                                     </button>
+                                                                )}
+
+                                                                {/* Third Party Viewing */}
+                                                                {isPending && !isDebtor && !isCreditor && (
+                                                                    <span className="text-[10px] text-on-surface-variant/80 italic">
+                                                                        Owed to {s.to}
+                                                                    </span>
                                                                 )}
                                                             </div>
                                                         </div>

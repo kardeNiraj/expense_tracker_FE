@@ -23,6 +23,9 @@ export const ENV = {
     DESKTOP_BREAKPOINT: Math.max(320, Number(import.meta.env.VITE_DESKTOP_BREAKPOINT) || 768),
     TOAST_DURATION_MS: Math.max(1000, Number(import.meta.env.VITE_TOAST_DURATION_MS) || 2800),
 
+    // Security / Admin Configuration
+    ADMIN_PASSCODE: import.meta.env.VITE_ADMIN_PASSCODE?.trim() || '1234',
+
     // Cache / React Query Configuration
     QUERY_STALE_TIME_MS: Math.max(1000, Number(import.meta.env.VITE_QUERY_STALE_TIME_MS) || 60000),
 } as const;

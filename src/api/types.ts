@@ -110,6 +110,7 @@ export interface SettleParticipantPayload {
     from: string;
     to?: string;
     settled?: boolean;
+    confirmedBy?: string;
 }
 
 export interface UpdateUpiPayload {
