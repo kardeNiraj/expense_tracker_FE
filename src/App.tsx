@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ExpenseProvider, useExpense } from './context';
-import { MobileGate, Header, BottomNav, Toast } from './components';
+import { MobileGate, Header, BottomNav, Toast, InstallPrompt } from './components';
 import { Dashboard, SplitsPage, AddPage, PeoplePage, ClaimIdentityScreen } from './pages';
 import { ENV } from './config';
 
@@ -21,6 +21,9 @@ function MainApp() {
     if (!isDeviceClaimed && !isSwitcherUnlocked) {
         return (
             <div className="min-h-screen w-full bg-surface text-on-surface flex flex-col relative font-sans">
+                <div className="max-w-md mx-auto w-full px-4 pt-3">
+                    <InstallPrompt />
+                </div>
                 <ClaimIdentityScreen />
                 <Toast />
             </div>
@@ -34,6 +37,7 @@ function MainApp() {
 
             {/* Main Content Area */}
             <main className="flex-1 w-full max-w-md mx-auto px-4 pt-20 pb-24 relative">
+                <InstallPrompt />
                 {activeTab === 'dashboard' && <Dashboard />}
                 {activeTab === 'splits' && <SplitsPage />}
                 {activeTab === 'add' && <AddPage />}
