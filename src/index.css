@@ -116,6 +116,7 @@
         font-family: 'Hanken Grotesk', -apple-system, sans-serif;
         color: #0b1c30;
         -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
     }
     
     .pb-safe {
@@ -124,6 +125,17 @@
     
     .pt-safe {
         padding-top: env(safe-area-inset-top, 0px);
+    }
+
+    /* Prevent mobile browsers (especially iOS Safari) from auto-zooming on input focus.
+       iOS triggers auto-zoom whenever an input font-size is below 16px. Enforcing 16px
+       on mobile form controls disables this behavior cleanly. */
+    @media screen and (max-width: 768px) {
+        input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not(.text-xl):not(.text-2xl):not(.text-3xl):not(.text-4xl),
+        select,
+        textarea {
+            font-size: 16px !important;
+        }
     }
 }
 
