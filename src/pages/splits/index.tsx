@@ -91,10 +91,119 @@ export function SplitsPage() {
         window.open(`https://api.whatsapp.com/send?text=${encoded}`, '_blank');
     };
 
-    const handleCopyText = (text?: string) => {
+    const handleCopyText = (text?: string, message = 'Summary copied to clipboard!') => {
         if (!text) return;
         navigator.clipboard.writeText(text);
-        showToast('Summary copied to clipboard!', 'content_copy');
+        showToast(message, 'content_copy');
+    };
+
+    const getCategoryIcon = (category: string) => {
+        const c = (category || '').toLowerCase();
+        if (c.includes('food') || c.includes('dine') || c.includes('snack') || c.includes('cafe') || c.includes('lunch') || c.includes('dinner')) return 'restaurant';
+        if (c.includes('water') || c.includes('drink') || c.includes('beverage') || c.includes('bar')) return 'water_drop';
+        if (c.includes('travel') || c.includes('cab') || c.includes('taxi') || c.includes('transport') || c.includes('fuel') || c.includes('toll')) return 'directions_car';
+        if (c.includes('stay') || c.includes('hotel') || c.includes('cottage') || c.includes('room') || c.includes('resort')) return 'hotel';
+        if (c.includes('activity') || c.includes('sport') || c.includes('ski') || c.includes('trek') || c.includes('adventure')) return 'snowboarding';
+        if (c.includes('shopping') || c.includes('market') || c.includes('mall') || c.includes('groceries')) return 'shopping_bag';
+        return 'receipt_long';
+    };
+
+    const formatDisplayDate = (dateStr?: string) => {
+        if (!dateStr) return '';
+        try {
+            const d = new Date(dateStr.replace(' ', 'T'));
+            if (!isNaN(d.getTime())) {
+                const today = new Date();
+                const isToday =
+                    d.getDate() === today.getDate() &&
+                    d.getMonth() === today.getMonth() &&
+                    d.getFullYear() === today.getFullYear();
+
+                if (isToday) return 'Today';
+
+                const yesterday = new Date(today);
+                yesterday.setDate(yesterday.getDate() - 1);
+                const isYesterday =
+                    d.getDate() === yesterday.getDate() &&
+                    d.getMonth() === yesterday.getMonth() &&
+                    d.getFullYear() === yesterday.getFullYear();
+
+                if (isYesterday) return 'Yesterday';
+
+                return d.toLocaleDateString('en-IN', {
+                    day: 'numeric',
+                    month: 'short',
+                });
+            }
+        } catch {
+            // fallback to raw date prefix
+        }
+        return dateStr.split(' ')[0] || dateStr;
+    };
+
+    const getUserSplitStake = (split: Split, activeUser: string) => {
+        if (!activeUser) return null;
+        const isPayer = split.paidBy.toLowerCase() === activeUser.toLowerCase();
+        const isParticipant = split.participants?.some(
+            (p) => p.toLowerCase() === activeUser.toLowerCase()
+        );
+
+        if (isPayer) {
+            const pendingReceivable =
+                split.settlements
+                    ?.filter(
+                        (s) =>
+                            s.to.toLowerCase() === activeUser.toLowerCase() &&
+                            s.status === 'PENDING'
+                    )
+                    .reduce((sum, s) => sum + s.amount, 0) || 0;
+
+            if (pendingReceivable > 0) {
+                return {
+                    text: `You get ₹${pendingReceivable.toLocaleString('en-IN')}`,
+                    badgeClass: 'bg-primary-fixed text-on-primary-fixed border border-primary/20',
+                    icon: 'call_received',
+                };
+            } else if (split.settlements && split.settlements.length > 0) {
+                return {
+                    text: 'All dues received ✓',
+                    badgeClass: 'bg-surface-container text-primary font-semibold',
+                    icon: 'task_alt',
+                };
+            }
+            return {
+                text: 'You paid',
+                badgeClass: 'bg-surface-container text-on-surface font-semibold',
+                icon: 'check',
+            };
+        }
+
+        const mySettlement = split.settlements?.find(
+            (s) => s.from.toLowerCase() === activeUser.toLowerCase()
+        );
+
+        if (mySettlement) {
+            if (mySettlement.status === 'PENDING') {
+                return {
+                    text: `You owe ₹${mySettlement.amount.toLocaleString('en-IN')}`,
+                    subtext: `to ${mySettlement.to}`,
+                    badgeClass: 'bg-tertiary-fixed text-on-tertiary-fixed font-bold border border-tertiary/20',
+                    icon: 'priority_high',
+                };
+            } else {
+                return {
+                    text: 'You settled ✓',
+                    badgeClass: 'bg-surface-container text-on-surface-variant font-medium',
+                    icon: 'check_circle',
+                };
+            }
+        }
+
+        if (!isParticipant) {
+            return null;
+        }
+
+        return null;
     };
 
     return (
@@ -176,6 +285,7 @@ export function SplitsPage() {
                         const pendingSettlements =
                             split.settlements?.filter((s) => s.status === 'PENDING').length || 0;
                         const expanded = isExpanded(split.splitId, index);
+                        const userStake = getUserSplitStake(split, activePerson);
 
                         return (
                             <div
@@ -189,7 +299,7 @@ export function SplitsPage() {
                                 {/* Split Header / Accordion Trigger */}
                                 <div
                                     onClick={() => toggleSplit(split.splitId, index)}
-                                    className={`flex items-start justify-between gap-3 cursor-pointer select-none transition-colors ${
+                                    className={`flex flex-col gap-2 cursor-pointer select-none transition-colors ${
                                         expanded ? 'pb-3 border-b border-outline-variant/20' : ''
                                     }`}
                                     role="button"
@@ -202,56 +312,120 @@ export function SplitsPage() {
                                         }
                                     }}
                                 >
-                                    <div className="min-w-0 flex-1">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-surface-container text-primary">
-                                                {split.category}
+                                    {/* Top Row: Category + Status (Left) & Total Amount + Chevron (Right) */}
+                                    <div className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-surface-container text-primary">
+                                                <span className="material-symbols-outlined text-[13px]">
+                                                    {getCategoryIcon(split.category)}
+                                                </span>
+                                                <span className="truncate max-w-[120px]">{split.category}</span>
                                             </span>
-                                            <span className="text-[11px] text-on-surface-variant font-mono">
-                                                {split.splitId}
-                                            </span>
-                                        </div>
-                                        <h3 className="font-bold text-base text-on-surface truncate mt-1">
-                                            {split.description}
-                                        </h3>
-                                        <p className="text-xs text-on-surface-variant mt-0.5 truncate">
-                                            Paid by <strong className="text-on-surface">{split.paidBy}</strong>
-                                            {split.participants ? ` • ${split.participants.length} people` : ''}
-                                            {split.timestamp ? ` • ${split.timestamp}` : ''}
-                                        </p>
-                                    </div>
 
-                                    <div className="flex items-center gap-2 shrink-0">
-                                        <div className="text-right">
-                                            <span className="text-xl font-bold text-primary font-mono block">
+                                            {/* Overall Split Status Badge */}
+                                            {split.status === 'SETTLED' ? (
+                                                <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant uppercase tracking-wider">
+                                                    <span className="material-symbols-outlined text-[12px]">done_all</span>
+                                                    <span>Settled</span>
+                                                </span>
+                                            ) : pendingSettlements === 0 ? (
+                                                <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed uppercase tracking-wider">
+                                                    <span className="material-symbols-outlined text-[12px]">check</span>
+                                                    <span>All Paid</span>
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed-variant uppercase tracking-wider">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse" />
+                                                    <span>{pendingSettlements} of {totalSettlements} due</span>
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {/* Total Amount & Chevron */}
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            <span className="text-lg sm:text-xl font-bold text-primary font-mono tracking-tight">
                                                 ₹{split.totalAmount.toLocaleString('en-IN')}
                                             </span>
-                                            <span
-                                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
-                                                    split.status === 'ACTIVE'
-                                                        ? 'bg-secondary-fixed text-on-secondary-fixed-variant'
-                                                        : 'bg-surface-container text-on-surface-variant'
-                                                }`}
-                                            >
-                                                {split.status} ({pendingSettlements} of {totalSettlements} due)
+                                            <div className="w-7 h-7 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors shrink-0">
+                                                <span
+                                                    className={`material-symbols-outlined text-[18px] transition-transform duration-200 ${
+                                                        expanded ? 'rotate-180 text-primary' : ''
+                                                    }`}
+                                                >
+                                                    keyboard_arrow_down
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Middle Row: Description */}
+                                    <h3 className="font-bold text-base text-on-surface leading-snug break-words">
+                                        {split.description}
+                                    </h3>
+
+                                    {/* Bottom Row: Metadata (Payer, participant count, date) & User Stake */}
+                                    <div className="flex items-center justify-between gap-2 text-xs text-on-surface-variant flex-wrap pt-0.5">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                            <span>
+                                                Paid by <strong className="text-on-surface font-semibold">{split.paidBy}</strong>
                                             </span>
+                                            {split.participants && (
+                                                <>
+                                                    <span className="opacity-40">•</span>
+                                                    <span>{split.participants.length} {split.participants.length === 1 ? 'person' : 'people'}</span>
+                                                </>
+                                            )}
+                                            {split.timestamp && (
+                                                <>
+                                                    <span className="opacity-40">•</span>
+                                                    <span title={split.timestamp}>{formatDisplayDate(split.timestamp)}</span>
+                                                </>
+                                            )}
                                         </div>
 
-                                        <div className="w-8 h-8 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors shrink-0">
-                                            <span
-                                                className={`material-symbols-outlined text-[20px] transition-transform duration-200 ${
-                                                    expanded ? 'rotate-180 text-primary' : ''
-                                                }`}
-                                            >
-                                                keyboard_arrow_down
+                                        {/* User Stake at-a-glance */}
+                                        {userStake && (
+                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold ${userStake.badgeClass}`}>
+                                                <span className="material-symbols-outlined text-[13px]">{userStake.icon}</span>
+                                                <span>{userStake.text}</span>
+                                                {userStake.subtext && <span className="opacity-75 font-normal ml-0.5">{userStake.subtext}</span>}
                                             </span>
-                                        </div>
+                                        )}
                                     </div>
                                 </div>
 
                                 {/* Accordion Collapsible Content */}
                                 {expanded && (
-                                    <div className="space-y-3.5 pt-0.5">
+                                    <div className="space-y-3.5 pt-1">
+                                        {/* Split ID & Reference Bar (Only displayed in expanded view) */}
+                                        <div className="flex items-center justify-between p-2.5 rounded-xl bg-surface-container-low border border-outline-variant/20 text-xs gap-2">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <span className="material-symbols-outlined text-primary text-[16px] shrink-0">
+                                                    tag
+                                                </span>
+                                                <div className="min-w-0">
+                                                    <span className="text-[10px] text-on-surface-variant uppercase font-semibold block leading-none mb-0.5">
+                                                        Split Reference ID
+                                                    </span>
+                                                    <code className="text-xs font-mono font-bold text-on-surface truncate block">
+                                                        {split.splitId}
+                                                    </code>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleCopyText(split.splitId, 'Split ID copied!');
+                                                }}
+                                                className="px-2.5 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-primary hover:text-primary-container text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors shrink-0 border border-outline-variant/20"
+                                                title="Copy Split ID"
+                                            >
+                                                <span className="material-symbols-outlined text-[14px]">content_copy</span>
+                                                <span>Copy ID</span>
+                                            </button>
+                                        </div>
+
                                         {/* Participants List */}
                                         <div className="flex items-center gap-1.5 flex-wrap">
                                             <span className="text-xs text-on-surface-variant font-medium mr-1">
@@ -318,23 +492,24 @@ export function SplitsPage() {
                                             </div>
 
                                             <div className="space-y-2">
-                                                {split.settlements?.map((s, idx) => {
+                                                {split.settlements?.map((s) => {
                                                     const isPending = s.status === 'PENDING';
                                                     const isCreditor = s.to.toLowerCase() === activePerson.toLowerCase();
                                                     const isDebtor = s.from.toLowerCase() === activePerson.toLowerCase();
 
                                                     return (
                                                         <div
-                                                            key={`${s.from}-${s.to}-${s.amount}-${idx}`}
-                                                            className="flex items-center justify-between p-2.5 rounded-xl bg-surface-container-low border border-outline-variant/20 gap-2"
+                                                            key={`${split.splitId}-settle-${s.from}-${s.to}-${s.amount}`}
+                                                            className="p-2.5 rounded-xl bg-surface-container-low border border-outline-variant/20 space-y-1.5"
                                                         >
-                                                            <div className="min-w-0">
-                                                                <div className="flex items-center gap-1.5">
+                                                            {/* Row 1: Who owes who + status tag + amount */}
+                                                            <div className="flex items-center justify-between gap-2">
+                                                                <div className="flex items-center gap-1.5 min-w-0">
                                                                     <span className="font-semibold text-xs text-on-surface truncate">
                                                                         {s.from} owes {s.to}
                                                                     </span>
                                                                     <span
-                                                                        className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+                                                                        className={`text-[10px] font-bold px-1.5 py-0.2 rounded shrink-0 ${
                                                                             isPending
                                                                                 ? 'bg-tertiary-container text-on-tertiary-container'
                                                                                 : 'bg-primary-fixed text-on-primary-fixed'
@@ -343,70 +518,73 @@ export function SplitsPage() {
                                                                         {s.status}
                                                                     </span>
                                                                 </div>
-                                                                {s.toUpiId && (
-                                                                    <span className="text-[11px] text-on-surface-variant font-mono truncate block">
-                                                                        UPI: {s.toUpiId}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-
-                                                            <div className="flex items-center gap-2 shrink-0">
-                                                                <span className="font-bold text-sm text-primary font-mono">
+                                                                <span className="font-bold text-sm text-primary font-mono shrink-0">
                                                                     ₹{s.amount.toLocaleString('en-IN')}
                                                                 </span>
-
-                                                                {/* Debtor Action: Pay via UPI */}
-                                                                {isPending && s.upiIntent && isDebtor && (
-                                                                    <a
-                                                                        href={s.upiIntent}
-                                                                        onClick={() =>
-                                                                            showToast(
-                                                                                `Launching UPI to pay ₹${s.amount}...`,
-                                                                                'bolt'
-                                                                            )
-                                                                        }
-                                                                        className="h-7 px-2.5 rounded-lg bg-primary text-on-primary text-xs font-semibold flex items-center gap-1 shadow-xs hover:bg-primary-container"
-                                                                    >
-                                                                        <span className="material-symbols-outlined text-[14px]">
-                                                                            bolt
-                                                                        </span>
-                                                                        <span>Pay</span>
-                                                                    </a>
-                                                                )}
-
-                                                                {/* Debtor Status: Waiting for creditor confirmation */}
-                                                                {isPending && isDebtor && !isCreditor && (
-                                                                    <span className="text-[10px] text-tertiary font-medium flex items-center gap-0.5">
-                                                                        <span className="material-symbols-outlined text-[13px]">
-                                                                            hourglass_top
-                                                                        </span>
-                                                                        <span>Waiting for {s.to}</span>
-                                                                    </span>
-                                                                )}
-
-                                                                {/* Creditor Action: ONLY the receiver (creditor) can confirm settlement */}
-                                                                {isPending && isCreditor && (
-                                                                    <button
-                                                                        type="button"
-                                                                        disabled={settleMutation.isPending}
-                                                                        onClick={() => handleSettle(split.splitId, s.from, s.to)}
-                                                                        className="h-7 px-2.5 rounded-lg bg-primary-fixed text-on-primary-fixed hover:bg-primary hover:text-on-primary text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-2xs disabled:opacity-50"
-                                                                        title={`Confirm you have received ₹${s.amount} from ${s.from}`}
-                                                                    >
-                                                                        <span className="material-symbols-outlined text-[14px]">
-                                                                            done_all
-                                                                        </span>
-                                                                        <span>Confirm Received</span>
-                                                                    </button>
-                                                                )}
-
-                                                                {/* Third Party Viewing */}
-                                                                {isPending && !isDebtor && !isCreditor && (
-                                                                    <span className="text-[10px] text-on-surface-variant/80 italic">
-                                                                        Owed to {s.to}
-                                                                    </span>
-                                                                )}
                                                             </div>
+
+                                                            {/* Row 2: UPI details & Action buttons (stacked cleanly, no collision!) */}
+                                                            {(s.toUpiId || (isPending && (isDebtor || isCreditor || (!isDebtor && !isCreditor)))) && (
+                                                                <div className="flex items-center justify-between gap-2 pt-1 border-t border-outline-variant/15 text-[11px] flex-wrap">
+                                                                    <span className="text-on-surface-variant font-mono truncate text-[11px]">
+                                                                        {s.toUpiId ? `UPI: ${s.toUpiId}` : ''}
+                                                                    </span>
+
+                                                                    <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+                                                                        {/* Debtor Action: Pay via UPI */}
+                                                                        {isPending && s.upiIntent && isDebtor && (
+                                                                            <a
+                                                                                href={s.upiIntent}
+                                                                                onClick={() =>
+                                                                                    showToast(
+                                                                                        `Launching UPI to pay ₹${s.amount}...`,
+                                                                                        'bolt'
+                                                                                    )
+                                                                                }
+                                                                                className="h-7 px-2.5 rounded-lg bg-primary text-on-primary text-xs font-semibold flex items-center gap-1 shadow-xs hover:bg-primary-container"
+                                                                            >
+                                                                                <span className="material-symbols-outlined text-[14px]">
+                                                                                    bolt
+                                                                                </span>
+                                                                                <span>Pay</span>
+                                                                            </a>
+                                                                        )}
+
+                                                                        {/* Debtor Status: Waiting for creditor confirmation */}
+                                                                        {isPending && isDebtor && !isCreditor && !s.upiIntent && (
+                                                                            <span className="text-[10px] text-tertiary font-medium flex items-center gap-0.5">
+                                                                                <span className="material-symbols-outlined text-[13px]">
+                                                                                    hourglass_top
+                                                                                </span>
+                                                                                <span>Waiting for {s.to}</span>
+                                                                            </span>
+                                                                        )}
+
+                                                                        {/* Creditor Action: ONLY the receiver (creditor) can confirm settlement */}
+                                                                        {isPending && isCreditor && (
+                                                                            <button
+                                                                                type="button"
+                                                                                disabled={settleMutation.isPending}
+                                                                                onClick={() => handleSettle(split.splitId, s.from, s.to)}
+                                                                                className="h-7 px-2.5 rounded-lg bg-primary-fixed text-on-primary-fixed hover:bg-primary hover:text-on-primary text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-2xs disabled:opacity-50"
+                                                                                title={`Confirm you have received ₹${s.amount} from ${s.from}`}
+                                                                            >
+                                                                                <span className="material-symbols-outlined text-[14px]">
+                                                                                    done_all
+                                                                                </span>
+                                                                                <span>Confirm Received</span>
+                                                                            </button>
+                                                                        )}
+
+                                                                        {/* Third Party Viewing */}
+                                                                        {isPending && !isDebtor && !isCreditor && (
+                                                                            <span className="text-[10px] text-on-surface-variant/80 italic">
+                                                                                Owed to {s.to}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     );
                                                 })}
