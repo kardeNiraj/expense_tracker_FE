@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useExpense } from '../../context';
+import { apiFetch } from '../../api';
 import {
     useCategories,
     usePeople,
@@ -12,7 +13,7 @@ export function AddPage() {
     const [mode, setMode] = useState<'expense' | 'split'>('split');
 
     const { data: categories = [] } = useCategories();
-    const { data: people = [] } = usePeople();
+    const { data: people = [], refetch: refetchPeople, isFetching: isPeopleFetching } = usePeople();
 
     // Quick Expense Form States
     const [expensePayee, setExpensePayee] = useState(activePerson);
@@ -246,13 +247,39 @@ export function AddPage() {
                             <span className="text-xs font-bold text-on-surface uppercase tracking-wider font-mono">
                                 Split Between ({activeParticipants.length} people)
                             </span>
-                            <button
-                                type="button"
-                                onClick={selectAllParticipants}
-                                className="text-xs font-semibold text-primary hover:underline cursor-pointer"
-                            >
-                                Select All
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        try {
+                                            await apiFetch('/people?refresh=true');
+                                            await refetchPeople();
+                                            showToast('Refreshed member list from Sheet!', 'sync');
+                                        } catch {
+                                            showToast('Failed to refresh members', 'error');
+                                        }
+                                    }}
+                                    disabled={isPeopleFetching}
+                                    className="p-1 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors cursor-pointer flex items-center gap-1 text-[11px] font-semibold"
+                                    title="Reload members from Google Sheet"
+                                >
+                                    <span
+                                        className={`material-symbols-outlined text-[15px] ${
+                                            isPeopleFetching ? 'animate-spin text-primary' : ''
+                                        }`}
+                                    >
+                                        sync
+                                    </span>
+                                    <span>Reload</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={selectAllParticipants}
+                                    className="text-xs font-semibold text-primary hover:underline cursor-pointer"
+                                >
+                                    Select All
+                                </button>
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-2">

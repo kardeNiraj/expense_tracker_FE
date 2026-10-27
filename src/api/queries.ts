@@ -28,7 +28,7 @@ export function useCategories(refresh = false) {
     return useQuery<string[]>({
         queryKey: queryKeys.categories(refresh),
         queryFn: () => apiFetch<string[]>(`/categories?refresh=${refresh}`),
-        staleTime: 1000 * 60 * 10, // 10 minutes cache
+        staleTime: 1000 * 30, // 30 seconds cache
     });
 }
 
@@ -37,16 +37,16 @@ export function usePeople(refresh = false) {
     return useQuery<string[]>({
         queryKey: queryKeys.people(refresh),
         queryFn: () => apiFetch<string[]>(`/people?refresh=${refresh}`),
-        staleTime: 1000 * 60 * 10, // 10 minutes cache
+        staleTime: 1000 * 30, // 30 seconds cache for instant sheet updates
     });
 }
 
 // 3. People Details Query (with UPI IDs)
-export function usePeopleDetails() {
+export function usePeopleDetails(refresh = false) {
     return useQuery<PersonDetail[]>({
         queryKey: queryKeys.peopleDetails(),
-        queryFn: () => apiFetch<PersonDetail[]>('/people/details'),
-        staleTime: 1000 * 60 * 5, // 5 minutes cache
+        queryFn: () => apiFetch<PersonDetail[]>(`/people/details?refresh=${refresh}`),
+        staleTime: 1000 * 30, // 30 seconds cache
     });
 }
 

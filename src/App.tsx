@@ -1,6 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ExpenseProvider, useExpense } from './context';
-import { MobileGate, Header, BottomNav, Toast, InstallPrompt } from './components';
+import { MobileGate, Header, BottomNav, Toast, InstallPrompt, PullToRefresh } from './components';
+import { useQueryClient } from '@tanstack/react-query';
+import { apiFetch } from './api';
 import { Dashboard, SplitsPage, AddPage, PeoplePage, ClaimIdentityScreen } from './pages';
 import { ENV } from './config';
 
@@ -15,7 +17,24 @@ const queryClient = new QueryClient({
 });
 
 function MainApp() {
-    const { activeTab, isDeviceClaimed, isSwitcherUnlocked } = useExpense();
+    const { activeTab, isDeviceClaimed, isSwitcherUnlocked, showToast } = useExpense();
+    const queryClient = useQueryClient();
+
+    const handleGlobalRefresh = async () => {
+        try {
+            await Promise.allSettled([
+                apiFetch('/people?refresh=true'),
+                apiFetch('/categories?refresh=true'),
+                apiFetch('/trip-info?refresh=true'),
+                apiFetch('/people/details?refresh=true'),
+            ]);
+            await queryClient.invalidateQueries();
+            await queryClient.refetchQueries({ type: 'active' });
+            showToast('Refreshed latest data from Sheet!', 'sync');
+        } catch {
+            showToast('Refreshed!', 'sync');
+        }
+    };
 
     // Show device claim & identity selection screen on first load / unclaimed device
     if (!isDeviceClaimed && !isSwitcherUnlocked) {
@@ -36,13 +55,15 @@ function MainApp() {
             <Header />
 
             {/* Main Content Area */}
-            <main className="flex-1 w-full max-w-md mx-auto px-4 pt-20 pb-24 relative">
-                <InstallPrompt />
-                {activeTab === 'dashboard' && <Dashboard />}
-                {activeTab === 'splits' && <SplitsPage />}
-                {activeTab === 'add' && <AddPage />}
-                {activeTab === 'people' && <PeoplePage />}
-            </main>
+            <PullToRefresh onRefresh={handleGlobalRefresh}>
+                <main className="flex-1 w-full max-w-md mx-auto px-4 pt-20 pb-24 relative">
+                    <InstallPrompt />
+                    {activeTab === 'dashboard' && <Dashboard />}
+                    {activeTab === 'splits' && <SplitsPage />}
+                    {activeTab === 'add' && <AddPage />}
+                    {activeTab === 'people' && <PeoplePage />}
+                </main>
+            </PullToRefresh>
 
             {/* Bottom Tab Navigation Bar */}
             <BottomNav />
