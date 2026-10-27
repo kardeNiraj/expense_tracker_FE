@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { useExpense } from '../../context';
 import { useSpendings, useSplits, useSettleParticipantMutation, useTripInfo } from '../../api';
-import { Avatar } from '../../components';
+import { Avatar, PaymentModal, type PaymentSettlementData } from '../../components';
 
 export function Dashboard() {
     const { activePerson, setActiveTab, showToast } = useExpense();
@@ -8,6 +9,7 @@ export function Dashboard() {
     const { data: allSplits = [], isLoading: isSplitsLoading } = useSplits();
     const { data: tripInfo } = useTripInfo();
     const settleMutation = useSettleParticipantMutation();
+    const [paymentSettlement, setPaymentSettlement] = useState<PaymentSettlementData | null>(null);
 
     const activeSplits = allSplits.filter((s) => s.status === 'ACTIVE');
 
@@ -100,7 +102,9 @@ export function Dashboard() {
         description: string;
         to: string;
         amount: number;
+        toUpiId?: string | null;
         upiIntent?: string;
+        appLinks?: import('../../api/types').SettlementAppLinks;
     }[] = [];
 
     const owedToMeSettlements: {
@@ -119,7 +123,9 @@ export function Dashboard() {
                         description: split.description,
                         to: s.to,
                         amount: s.amount,
+                        toUpiId: s.toUpiId,
                         upiIntent: s.upiIntent,
+                        appLinks: s.appLinks,
                     });
                 }
                 if (s.to.toLowerCase() === activePerson.toLowerCase()) {
@@ -391,17 +397,26 @@ export function Dashboard() {
                                 <span className="font-bold text-sm text-error font-mono">
                                     ₹{s.amount.toLocaleString('en-IN')}
                                 </span>
-                                {s.upiIntent ? (
-                                    <a
-                                        href={s.upiIntent}
-                                        onClick={() => showToast(`Opening UPI for ₹${s.amount}...`, 'bolt')}
-                                        className="h-8 px-2.5 rounded-lg bg-primary text-on-primary text-xs font-semibold flex items-center gap-1 shadow-xs hover:bg-primary-container"
+                                {s.upiIntent || s.toUpiId ? (
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setPaymentSettlement({
+                                                to: s.to,
+                                                amount: s.amount,
+                                                toUpiId: s.toUpiId,
+                                                upiIntent: s.upiIntent,
+                                                appLinks: s.appLinks,
+                                                description: s.description,
+                                            })
+                                        }
+                                        className="h-8 px-2.5 rounded-lg bg-primary text-on-primary text-xs font-semibold flex items-center gap-1 shadow-xs hover:bg-primary/90 transition-colors cursor-pointer"
                                     >
                                         <span className="material-symbols-outlined text-[15px]">
                                             bolt
                                         </span>
                                         <span>Pay</span>
-                                    </a>
+                                    </button>
                                 ) : (
                                     <span className="text-[11px] text-on-surface-variant font-medium flex items-center gap-0.5">
                                         <span className="material-symbols-outlined text-[13px] text-tertiary">
@@ -533,6 +548,12 @@ export function Dashboard() {
                     </div>
                 )}
             </div>
+            {/* Payment App / UPI Intent Modal */}
+            <PaymentModal
+                isOpen={!!paymentSettlement}
+                onClose={() => setPaymentSettlement(null)}
+                settlement={paymentSettlement}
+            />
         </div>
     );
 }

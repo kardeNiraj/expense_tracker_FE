@@ -15,12 +15,20 @@ export interface Contribution {
     amount: number;
 }
 
+export interface SettlementAppLinks {
+    standard?: string;
+    phonepe?: string;
+    gpay?: string;
+    paytm?: string;
+}
+
 export interface Settlement {
     from: string;
     to: string;
     amount: number;
     toUpiId?: string | null;
     upiIntent?: string;
+    appLinks?: SettlementAppLinks;
     status: 'PENDING' | 'SETTLED';
 }
 

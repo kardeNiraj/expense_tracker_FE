@@ -5,12 +5,13 @@ import {
     useSettleParticipantMutation,
     useAddContributionMutation,
 } from '../../api';
-import { Avatar } from '../../components';
+import { Avatar, PaymentModal, type PaymentSettlementData } from '../../components';
 import type { Split } from '../../api/types';
 
 export function SplitsPage() {
     const { activePerson, showToast } = useExpense();
     const [statusFilter, setStatusFilter] = useState<'ACTIVE' | 'SETTLED'>('ACTIVE');
+    const [paymentSettlement, setPaymentSettlement] = useState<PaymentSettlementData | null>(null);
     const [selectedSplitForContribution, setSelectedSplitForContribution] = useState<Split | null>(null);
     const [contributionAmount, setContributionAmount] = useState('');
     const [contributionPerson, setContributionPerson] = useState('');
@@ -531,27 +532,31 @@ export function SplitsPage() {
                                                                     </span>
 
                                                                     <div className="flex items-center gap-1.5 shrink-0 ml-auto">
-                                                                        {/* Debtor Action: Pay via UPI */}
-                                                                        {isPending && s.upiIntent && isDebtor && (
-                                                                            <a
-                                                                                href={s.upiIntent}
+                                                                        {/* Debtor Action: Pay via UPI (Opens Payment Modal) */}
+                                                                        {isPending && isDebtor && (s.upiIntent || s.toUpiId) && (
+                                                                            <button
+                                                                                type="button"
                                                                                 onClick={() =>
-                                                                                    showToast(
-                                                                                        `Launching UPI to pay ₹${s.amount}...`,
-                                                                                        'bolt'
-                                                                                    )
+                                                                                    setPaymentSettlement({
+                                                                                        to: s.to,
+                                                                                        amount: s.amount,
+                                                                                        toUpiId: s.toUpiId,
+                                                                                        upiIntent: s.upiIntent,
+                                                                                        appLinks: s.appLinks,
+                                                                                        description: split.description,
+                                                                                    })
                                                                                 }
-                                                                                className="h-7 px-2.5 rounded-lg bg-primary text-on-primary text-xs font-semibold flex items-center gap-1 shadow-xs hover:bg-primary-container"
+                                                                                className="h-7 px-2.5 rounded-lg bg-primary text-on-primary text-xs font-semibold flex items-center gap-1 shadow-xs hover:bg-primary/90 transition-colors cursor-pointer"
                                                                             >
                                                                                 <span className="material-symbols-outlined text-[14px]">
                                                                                     bolt
                                                                                 </span>
                                                                                 <span>Pay</span>
-                                                                            </a>
+                                                                            </button>
                                                                         )}
 
                                                                         {/* Debtor Status: Waiting for creditor confirmation */}
-                                                                        {isPending && isDebtor && !isCreditor && !s.upiIntent && (
+                                                                        {isPending && isDebtor && !isCreditor && !s.upiIntent && !s.toUpiId && (
                                                                             <span className="text-[10px] text-tertiary font-medium flex items-center gap-0.5">
                                                                                 <span className="material-symbols-outlined text-[13px]">
                                                                                     hourglass_top
@@ -720,6 +725,12 @@ export function SplitsPage() {
                     </div>
                 </div>
             )}
+            {/* Payment App / UPI Intent Modal */}
+            <PaymentModal
+                isOpen={!!paymentSettlement}
+                onClose={() => setPaymentSettlement(null)}
+                settlement={paymentSettlement}
+            />
         </div>
     );
 }
