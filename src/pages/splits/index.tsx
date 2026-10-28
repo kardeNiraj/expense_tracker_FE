@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { useExpense } from '../../context';
 import {
     useSplits,
+    useTripInfo,
     useSettleParticipantMutation,
     useAddContributionMutation,
+    useDeleteSplitMutation,
 } from '../../api';
-import { Avatar, PaymentModal, type PaymentSettlementData } from '../../components';
+import { Avatar, PaymentModal, type PaymentSettlementData, CollectQrModal, type CollectQrModalData } from '../../components';
 import type { Split } from '../../api/types';
 import { triggerHaptic } from '../../utils/haptics';
 
@@ -13,14 +15,18 @@ export function SplitsPage() {
     const { activePerson, showToast } = useExpense();
     const [statusFilter, setStatusFilter] = useState<'ACTIVE' | 'SETTLED'>('ACTIVE');
     const [paymentSettlement, setPaymentSettlement] = useState<PaymentSettlementData | null>(null);
+    const [collectSettlement, setCollectSettlement] = useState<CollectQrModalData | null>(null);
     const [selectedSplitForContribution, setSelectedSplitForContribution] = useState<Split | null>(null);
+    const [splitToDelete, setSplitToDelete] = useState<Split | null>(null);
     const [contributionAmount, setContributionAmount] = useState('');
     const [contributionPerson, setContributionPerson] = useState('');
     const [expandedSplits, setExpandedSplits] = useState<Record<string, boolean>>({});
 
     const { data: splits = [], isLoading } = useSplits({ status: statusFilter });
+    const { data: tripInfo } = useTripInfo();
     const settleMutation = useSettleParticipantMutation();
     const contributeMutation = useAddContributionMutation();
+    const deleteMutation = useDeleteSplitMutation();
 
     const isExpanded = (splitId: string, index: number) => {
         if (expandedSplits[splitId] !== undefined) {
@@ -96,6 +102,42 @@ export function SplitsPage() {
         triggerHaptic('light');
         const encoded = encodeURIComponent(text);
         window.open(`https://api.whatsapp.com/send?text=${encoded}`, '_blank');
+    };
+
+    const handleShareGroupTripSummary = () => {
+        triggerHaptic('medium');
+        const activeSplits = splits.filter((s) => s.status === 'ACTIVE');
+        const allPendingSettlements = activeSplits
+            .flatMap((s) => s.settlements || [])
+            .filter((st) => st.status === 'PENDING');
+
+        if (allPendingSettlements.length === 0) {
+            showToast('No pending dues to settle across the group!', 'check_circle');
+            return;
+        }
+
+        // Pairwise aggregation across all splits
+        const pairwiseNet: Record<string, { from: string; to: string; amount: number; toUpiId?: string | null }> = {};
+        allPendingSettlements.forEach((s) => {
+            const key = `${s.from}->${s.to}`;
+            if (!pairwiseNet[key]) {
+                pairwiseNet[key] = { from: s.from, to: s.to, amount: 0, toUpiId: s.toUpiId };
+            }
+            pairwiseNet[key].amount += s.amount;
+        });
+
+        const tripTitle = tripInfo?.title || 'Trip';
+        const totalTripSpend = activeSplits.reduce((sum, s) => sum + s.totalAmount, 0);
+
+        const lines = Object.values(pairwiseNet).map(
+            (item) => `• *${item.from}* owes *₹${item.amount.toLocaleString('en-IN')}* to *${item.to}*${item.toUpiId ? ` (UPI: ${item.toUpiId})` : ''}`
+        );
+
+        const summaryText = `🏕️ *${tripTitle} - Group Settle-Up Summary* 🏕️\n\n📊 *Total Active Spend:* ₹${totalTripSpend.toLocaleString('en-IN')}\n\n*Pending Dues:*\n${lines.join('\n')}\n\n📲 *View & settle on SplitNest:* ${window.location.origin}`;
+
+        const waUrl = `https://wa.me/?text=${encodeURIComponent(summaryText)}`;
+        window.open(waUrl, '_blank', 'noopener,noreferrer');
+        showToast('Trip settle-up summary opened in WhatsApp!', 'chat');
     };
 
     const handleCopyText = (text?: string, message = 'Summary copied to clipboard!') => {
@@ -253,6 +295,28 @@ export function SplitsPage() {
                     Settled Splits
                 </button>
             </div>
+
+            {/* 1-Tap Group WhatsApp Summary (Step 6) */}
+            {statusFilter === 'ACTIVE' && splits.length > 0 && (
+                <button
+                    type="button"
+                    onClick={handleShareGroupTripSummary}
+                    className="w-full h-11 px-3.5 rounded-xl bg-surface-container-low border border-outline-variant/30 text-xs font-semibold text-on-surface flex items-center justify-between hover:bg-surface-container transition-all active:scale-[0.99] cursor-pointer shadow-xs"
+                >
+                    <div className="flex items-center gap-2 min-w-0">
+                        <span className="w-6 h-6 rounded-full bg-[#25D366]/15 flex items-center justify-center shrink-0">
+                            <span className="material-symbols-outlined text-[#25D366] text-[16px]">
+                                chat
+                            </span>
+                        </span>
+                        <span className="truncate">Share Group Debt Summary to WhatsApp</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-[11px] font-bold text-primary shrink-0">
+                        <span>Send</span>
+                        <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                    </div>
+                </button>
+            )}
 
             {/* Splits List */}
             {isLoading ? (
@@ -576,18 +640,37 @@ export function SplitsPage() {
 
                                                                         {/* Creditor Action: ONLY the receiver (creditor) can confirm settlement */}
                                                                         {isPending && isCreditor && (
-                                                                            <button
-                                                                                type="button"
-                                                                                disabled={settleMutation.isPending}
-                                                                                onClick={() => handleSettle(split.splitId, s.from, s.to)}
-                                                                                className="h-7 px-2.5 rounded-lg bg-primary-fixed text-on-primary-fixed hover:bg-primary hover:text-on-primary text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-2xs disabled:opacity-50"
-                                                                                title={`Confirm you have received ₹${s.amount} from ${s.from}`}
-                                                                            >
-                                                                                <span className="material-symbols-outlined text-[14px]">
-                                                                                    done_all
-                                                                                </span>
-                                                                                <span>Confirm Received</span>
-                                                                            </button>
+                                                                            <div className="flex items-center gap-1.5">
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() =>
+                                                                                        setCollectSettlement({
+                                                                                            debtorName: s.from,
+                                                                                            amount: s.amount,
+                                                                                            splitId: split.splitId,
+                                                                                            description: split.description,
+                                                                                        })
+                                                                                    }
+                                                                                    className="h-7 w-7 rounded-lg bg-surface-container-highest text-on-surface hover:bg-surface-variant transition-colors cursor-pointer flex items-center justify-center border border-outline-variant/30"
+                                                                                    title={`Show QR code to collect ₹${s.amount} from ${s.from}`}
+                                                                                >
+                                                                                    <span className="material-symbols-outlined text-[16px] text-primary">
+                                                                                        qr_code_2
+                                                                                    </span>
+                                                                                </button>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    disabled={settleMutation.isPending}
+                                                                                    onClick={() => handleSettle(split.splitId, s.from, s.to)}
+                                                                                    className="h-7 px-2.5 rounded-lg bg-primary-fixed text-on-primary-fixed hover:bg-primary hover:text-on-primary text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-2xs disabled:opacity-50"
+                                                                                    title={`Confirm you have received ₹${s.amount} from ${s.from}`}
+                                                                                >
+                                                                                    <span className="material-symbols-outlined text-[14px]">
+                                                                                        done_all
+                                                                                    </span>
+                                                                                    <span>Confirm Received</span>
+                                                                                </button>
+                                                                            </div>
                                                                         )}
 
                                                                         {/* Third Party Viewing */}
@@ -635,6 +718,43 @@ export function SplitsPage() {
                                                 </button>
                                             </div>
                                         )}
+
+                                        {/* Owner Management / Delete Split (Step 5) */}
+                                        {(() => {
+                                            const isOwner =
+                                                split.createdBy?.toLowerCase() === activePerson.toLowerCase() ||
+                                                split.paidBy?.toLowerCase() === activePerson.toLowerCase();
+                                            const canDelete =
+                                                isOwner && (split.settlements?.every((s) => s.status === 'PENDING') ?? true);
+
+                                            if (!isOwner) return null;
+
+                                            return (
+                                                <div className="pt-2 border-t border-outline-variant/15 flex items-center justify-between">
+                                                    {canDelete ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setSplitToDelete(split);
+                                                            }}
+                                                            className="text-xs text-error hover:text-error/80 flex items-center gap-1 font-semibold p-1 rounded-lg hover:bg-error/10 transition-colors cursor-pointer"
+                                                        >
+                                                            <span className="material-symbols-outlined text-[16px]">delete</span>
+                                                            <span>Delete Split</span>
+                                                        </button>
+                                                    ) : (
+                                                        <span className="text-[11px] text-on-surface-variant/70 italic flex items-center gap-1">
+                                                            <span className="material-symbols-outlined text-[13px]">lock</span>
+                                                            <span>Cannot delete (dues settled)</span>
+                                                        </span>
+                                                    )}
+                                                    <span className="text-[10px] text-on-surface-variant font-mono">
+                                                        By {split.createdBy || split.paidBy}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })()}
 
                                         {/* Bottom Shrink Button */}
                                         <button
@@ -740,6 +860,77 @@ export function SplitsPage() {
                 onClose={() => setPaymentSettlement(null)}
                 settlement={paymentSettlement}
             />
+
+            {/* Creditor's Collect via QR Modal */}
+            <CollectQrModal
+                isOpen={!!collectSettlement}
+                onClose={() => setCollectSettlement(null)}
+                data={collectSettlement}
+            />
+
+            {/* Delete Confirmation Modal (Step 5) */}
+            {splitToDelete && (
+                <div
+                    className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+                    onClick={() => setSplitToDelete(null)}
+                >
+                    <div
+                        className="w-full max-w-sm bg-surface-container-lowest rounded-t-3xl sm:rounded-2xl border border-outline-variant/30 p-5 shadow-2xl space-y-4 animate-in slide-in-from-bottom duration-200"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center gap-3 text-error">
+                            <div className="w-10 h-10 rounded-full bg-error/10 flex items-center justify-center shrink-0">
+                                <span className="material-symbols-outlined text-[22px]">delete_forever</span>
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-base text-on-surface">Delete Split?</h3>
+                                <p className="text-xs text-on-surface-variant">This action cannot be undone.</p>
+                            </div>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-surface-container-low text-xs space-y-1">
+                            <div className="font-semibold text-on-surface">{splitToDelete.description}</div>
+                            <div className="text-on-surface-variant">
+                                Total: <span className="font-mono font-bold text-on-surface">₹{splitToDelete.totalAmount.toLocaleString('en-IN')}</span> • Paid by {splitToDelete.paidBy}
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-1">
+                            <button
+                                type="button"
+                                onClick={() => setSplitToDelete(null)}
+                                className="flex-1 h-11 rounded-xl border border-outline-variant/40 text-xs font-semibold text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                disabled={deleteMutation.isPending}
+                                onClick={async () => {
+                                    try {
+                                        await deleteMutation.mutateAsync({
+                                            splitId: splitToDelete.splitId,
+                                            requestedBy: activePerson,
+                                        });
+                                        triggerHaptic('success');
+                                        showToast('Split deleted successfully!', 'delete');
+                                        setSplitToDelete(null);
+                                    } catch (err: unknown) {
+                                        triggerHaptic('warning');
+                                        showToast(`Failed to delete split: ${String(err)}`, 'error');
+                                    }
+                                }}
+                                className="flex-1 h-11 rounded-xl bg-error text-on-error text-xs font-bold shadow-xs hover:bg-error/90 transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            >
+                                <span className="material-symbols-outlined text-[16px]">
+                                    {deleteMutation.isPending ? 'hourglass_top' : 'delete'}
+                                </span>
+                                <span>{deleteMutation.isPending ? 'Deleting...' : 'Delete'}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

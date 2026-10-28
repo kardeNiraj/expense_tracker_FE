@@ -7,6 +7,7 @@ import {
     useAddExpenseMutation,
     useAddSplitMutation,
 } from '../../api';
+import { Avatar } from '../../components';
 import { triggerHaptic } from '../../utils/haptics';
 
 const QUICK_INCREMENTS = [50, 100, 200, 500];
@@ -66,6 +67,10 @@ export function AddPage() {
     const [contributionPerson, setContributionPerson] = useState('');
     const [contributionAmt, setContributionAmt] = useState('');
 
+    // Step 4: Split Distribution Mode (Equal vs Shares/Weights)
+    const [splitDistributionMode, setSplitDistributionMode] = useState<'EQUAL' | 'SHARES'>('EQUAL');
+    const [shares, setShares] = useState<Record<string, number>>({});
+
     const addExpenseMutation = useAddExpenseMutation();
     const addSplitMutation = useAddSplitMutation();
 
@@ -75,6 +80,40 @@ export function AddPage() {
     const activeSplitPaidBy = splitPaidBy || activePerson;
     const activeParticipants = selectedParticipants.length > 0 ? selectedParticipants : people;
     const activeContributionPerson = contributionPerson || people[0] || '';
+
+    const adjustShare = (person: string, delta: number) => {
+        triggerHaptic('light');
+        setShares((prev) => {
+            const current = prev[person] !== undefined ? prev[person] : 1;
+            const next = Math.max(0, Math.min(10, current + delta));
+            return { ...prev, [person]: next };
+        });
+    };
+
+    // Calculate shares and penny-perfect distribution
+    const splitAmountNum = parseFloat(splitAmount) || 0;
+    const totalShares = activeParticipants.reduce(
+        (sum, p) => sum + (shares[p] !== undefined ? shares[p] : 1),
+        0
+    );
+
+    const computedShares: Record<string, number> = {};
+    if (totalShares > 0 && splitAmountNum > 0) {
+        let distributedSum = 0;
+        const participating = activeParticipants.filter(
+            (p) => (shares[p] !== undefined ? shares[p] : 1) > 0
+        );
+        participating.forEach((p, idx) => {
+            const weight = shares[p] !== undefined ? shares[p] : 1;
+            if (idx === participating.length - 1) {
+                computedShares[p] = Math.max(0, Math.round((splitAmountNum - distributedSum) * 100) / 100);
+            } else {
+                const shareAmt = Math.round(((weight / totalShares) * splitAmountNum) * 100) / 100;
+                computedShares[p] = shareAmt;
+                distributedSum += shareAmt;
+            }
+        });
+    }
 
     const handleAmountInput = (val: string, setter: (v: string) => void) => {
         const cleaned = val.replace(/[^0-9.]/g, '');
@@ -126,14 +165,18 @@ export function AddPage() {
         }
 
         try {
-            await addExpenseMutation.mutateAsync({
+            const res = await addExpenseMutation.mutateAsync({
                 payee: expensePayee || activePerson,
                 category: activeExpenseCategory,
                 amount: amt,
                 description: expenseDesc,
             });
             triggerHaptic('success');
-            showToast(`Recorded expense of ₹${amt} for ${expenseDesc}!`);
+            if ((res as { offline?: boolean })?.offline || !navigator.onLine) {
+                showToast(`Saved ₹${amt} offline! Will sync automatically when connected.`, 'cloud_off');
+            } else {
+                showToast(`Recorded expense of ₹${amt} for ${expenseDesc}!`);
+            }
             setExpenseAmount('');
             setExpenseDesc('');
             setIsExpenseCategoryManual(false);
@@ -152,24 +195,45 @@ export function AddPage() {
             return;
         }
 
+        const isSharesMode = splitDistributionMode === 'SHARES';
+        const participatingPeople = isSharesMode
+            ? activeParticipants.filter((p) => (shares[p] !== undefined ? shares[p] : 1) > 0)
+            : activeParticipants;
+
+        if (participatingPeople.length === 0) {
+            triggerHaptic('warning');
+            showToast('Please select at least one participant with a share > 0', 'warning');
+            return;
+        }
+
+        const customShares = isSharesMode
+            ? participatingPeople.map((p) => ({ person: p, share: computedShares[p] || 0 }))
+            : undefined;
+
         const contributions =
             hasContribution && contributionAmt && activeContributionPerson
                 ? [{ person: activeContributionPerson, amount: parseFloat(contributionAmt) }]
                 : [];
 
         try {
-            await addSplitMutation.mutateAsync({
+            const res = await addSplitMutation.mutateAsync({
                 amount: amt,
                 description: splitDesc,
                 category: activeSplitCategory,
                 paidBy: activeSplitPaidBy,
                 createdBy: activePerson,
-                participants: activeParticipants,
+                participants: participatingPeople,
                 contributions,
                 recordExpense,
+                splitMode: isSharesMode ? 'CUSTOM' : 'EQUAL',
+                customShares,
             });
             triggerHaptic('success');
-            showToast(`Created split for ${splitDesc} (₹${amt})!`);
+            if (res.splitId.startsWith('offline_') || !navigator.onLine) {
+                showToast(`Split saved offline! Will sync automatically when connected.`, 'cloud_off');
+            } else {
+                showToast(`Created split for ${splitDesc} (₹${amt})!`);
+            }
             setSplitAmount('');
             setSplitDesc('');
             setHasContribution(false);
@@ -373,7 +437,7 @@ export function AddPage() {
                         </div>
                     </div>
 
-                    {/* Participants Checklist */}
+                    {/* Participants & Split Distribution Mode */}
                     <div className="bg-surface-container-lowest rounded-2xl p-4 shadow-xs border border-outline-variant/30 space-y-3">
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-bold text-on-surface uppercase tracking-wider font-mono">
@@ -404,40 +468,143 @@ export function AddPage() {
                                     </span>
                                     <span>Reload</span>
                                 </button>
-                                <button
-                                    type="button"
-                                    onClick={selectAllParticipants}
-                                    className="text-xs font-semibold text-primary hover:underline cursor-pointer"
-                                >
-                                    Select All
-                                </button>
+                                {splitDistributionMode === 'EQUAL' && (
+                                    <button
+                                        type="button"
+                                        onClick={selectAllParticipants}
+                                        className="text-xs font-semibold text-primary hover:underline cursor-pointer"
+                                    >
+                                        Select All
+                                    </button>
+                                )}
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2">
-                            {people.map((person) => {
-                                const isChecked = activeParticipants.includes(person);
-                                return (
-                                    <button
-                                        key={person}
-                                        type="button"
-                                        onClick={() => toggleParticipant(person)}
-                                        className={`p-2.5 rounded-xl flex items-center justify-between text-xs font-semibold transition-colors cursor-pointer border ${
-                                            isChecked
-                                                ? 'bg-primary-fixed/30 border-primary/40 text-on-surface'
-                                                : 'bg-surface-container-low border-outline-variant/20 text-on-surface-variant'
-                                        }`}
-                                    >
-                                        <span>{person}</span>
-                                        {isChecked && (
-                                            <span className="material-symbols-outlined text-primary text-[18px]">
-                                                check
-                                            </span>
-                                        )}
-                                    </button>
-                                );
-                            })}
+                        {/* Split Mode Segmented Switcher */}
+                        <div className="flex rounded-xl bg-surface-container p-1 border border-outline-variant/20">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    triggerHaptic('light');
+                                    setSplitDistributionMode('EQUAL');
+                                }}
+                                className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                                    splitDistributionMode === 'EQUAL'
+                                        ? 'bg-surface-container-lowest text-on-surface shadow-xs'
+                                        : 'text-on-surface-variant hover:text-on-surface'
+                                }`}
+                            >
+                                <span className="material-symbols-outlined text-[16px]">equal</span>
+                                <span>Equal Split</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    triggerHaptic('light');
+                                    setSplitDistributionMode('SHARES');
+                                }}
+                                className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                                    splitDistributionMode === 'SHARES'
+                                        ? 'bg-surface-container-lowest text-primary shadow-xs'
+                                        : 'text-on-surface-variant hover:text-on-surface'
+                                }`}
+                            >
+                                <span className="material-symbols-outlined text-[16px]">pie_chart</span>
+                                <span>Shares / Weights</span>
+                            </button>
                         </div>
+
+                        {splitDistributionMode === 'EQUAL' ? (
+                            /* Equal Split: 2-column checklist */
+                            <div className="grid grid-cols-2 gap-2">
+                                {people.map((person) => {
+                                    const isChecked = activeParticipants.includes(person);
+                                    return (
+                                        <button
+                                            key={person}
+                                            type="button"
+                                            onClick={() => toggleParticipant(person)}
+                                            className={`p-2.5 rounded-xl flex items-center justify-between text-xs font-semibold transition-colors cursor-pointer border ${
+                                                isChecked
+                                                    ? 'bg-primary-fixed/30 border-primary/40 text-on-surface'
+                                                    : 'bg-surface-container-low border-outline-variant/20 text-on-surface-variant'
+                                            }`}
+                                        >
+                                            <span>{person}</span>
+                                            {isChecked && (
+                                                <span className="material-symbols-outlined text-primary text-[18px]">
+                                                    check
+                                                </span>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            /* Shares / Weights: Stepper for couples, kids, unequal */
+                            <div className="space-y-2">
+                                {splitAmountNum > 0 && totalShares > 0 && (
+                                    <div className="px-3 py-2 rounded-xl bg-secondary-fixed/20 border border-secondary/20 flex items-center justify-between text-xs text-on-secondary-fixed font-medium">
+                                        <span>Total: {totalShares} shares</span>
+                                        <span className="font-mono font-bold">
+                                            ₹{(splitAmountNum / totalShares).toFixed(2)} / share
+                                        </span>
+                                    </div>
+                                )}
+
+                                {people.map((person) => {
+                                    const weight = shares[person] !== undefined ? shares[person] : 1;
+                                    const isExcluded = weight === 0;
+                                    const amountForPerson = computedShares[person] || 0;
+
+                                    return (
+                                        <div
+                                            key={person}
+                                            className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 transition-all ${
+                                                isExcluded
+                                                    ? 'bg-surface-container-low/50 border-outline-variant/20 opacity-60'
+                                                    : 'bg-surface-container-low border-outline-variant/30'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                                <Avatar name={person} size="sm" />
+                                                <div className="min-w-0">
+                                                    <span className="font-semibold text-xs text-on-surface block truncate">
+                                                        {person}
+                                                    </span>
+                                                    <span className="text-[11px] text-on-surface-variant font-mono">
+                                                        {isExcluded ? '0 shares (Excluded)' : `₹${amountForPerson.toLocaleString('en-IN')}`}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {/* Stepper [-] [ 1x ] [+] */}
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                <button
+                                                    type="button"
+                                                    disabled={weight <= 0}
+                                                    onClick={() => adjustShare(person, -1)}
+                                                    className="w-8 h-8 rounded-lg bg-surface-container-highest text-on-surface hover:bg-surface-container flex items-center justify-center transition-colors disabled:opacity-30 cursor-pointer"
+                                                >
+                                                    <span className="material-symbols-outlined text-[16px]">remove</span>
+                                                </button>
+                                                <span className="w-8 text-center font-mono font-bold text-xs text-on-surface">
+                                                    {weight}x
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    disabled={weight >= 10}
+                                                    onClick={() => adjustShare(person, 1)}
+                                                    className="w-8 h-8 rounded-lg bg-primary-fixed text-on-primary-fixed hover:bg-primary hover:text-on-primary flex items-center justify-center transition-colors disabled:opacity-30 cursor-pointer"
+                                                >
+                                                    <span className="material-symbols-outlined text-[16px]">add</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
 
                     {/* Optional Advance Contribution */}

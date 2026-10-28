@@ -14,6 +14,7 @@ export interface PaymentSettlementData {
     appLinks?: SettlementAppLinks;
     description?: string;
     splitId?: string;
+    splitIds?: string[];
 }
 
 export interface PaymentModalProps {
@@ -196,33 +197,38 @@ const PaymentModalContent: React.FC<PaymentModalContentProps> = ({
 
                 {/* Post-Payment Return Confirmation Banner (Auto-prompted after returning from UPI app) */}
                 {showReturnPrompt && (
-                    <div className="p-3.5 rounded-2xl bg-primary-fixed/30 border border-primary/30 space-y-2 animate-in fade-in zoom-in-95">
-                        <div className="flex items-center gap-1.5 text-primary font-bold text-xs">
-                            <span className="material-symbols-outlined text-[17px]">
-                                task_alt
+                    <div className="p-3.5 rounded-2xl bg-primary-fixed/35 border-2 border-primary/40 space-y-2.5 animate-in fade-in zoom-in-95 shadow-xs">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5 text-primary font-bold text-xs">
+                                <span className="material-symbols-outlined text-[18px]">
+                                    task_alt
+                                </span>
+                                <span>Payment Sent to {settlement.to}?</span>
+                            </div>
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                                App Return
                             </span>
-                            <span>Did your payment succeed?</span>
                         </div>
-                        <p className="text-[11px] text-on-surface-variant leading-relaxed">
-                            If you completed ₹{settlement.amount} in your UPI app, send a quick confirmation note to {settlement.to} so they can confirm receipt!
+                        <p className="text-[11px] text-on-surface leading-relaxed">
+                            Only <strong>{settlement.to}</strong> can confirm receiving the money to officially settle this split. Ping them with 1 tap so they can confirm it!
                         </p>
                         <div className="flex items-center gap-2 pt-0.5">
                             <button
                                 type="button"
                                 onClick={handleNotifyPaidOnWhatsapp}
-                                className="flex-1 h-8 rounded-xl bg-primary text-on-primary text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs hover:bg-primary-container transition-colors cursor-pointer"
+                                className="flex-1 h-9 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs active:scale-95 transition-all cursor-pointer"
                             >
-                                <span className="material-symbols-outlined text-[15px]">
-                                    send
+                                <span className="material-symbols-outlined text-[16px]">
+                                    chat
                                 </span>
-                                <span>Notify {settlement.to}</span>
+                                <span>Notify {settlement.to} via WhatsApp</span>
                             </button>
                             <button
                                 type="button"
-                                onClick={() => setShowReturnPrompt(false)}
-                                className="h-8 px-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-xs font-semibold text-on-surface-variant transition-colors cursor-pointer"
+                                onClick={onClose}
+                                className="h-9 px-3 rounded-xl bg-surface-container hover:bg-surface-container-high text-xs font-semibold text-on-surface-variant transition-colors cursor-pointer"
                             >
-                                Dismiss
+                                Done
                             </button>
                         </div>
                     </div>
@@ -415,11 +421,15 @@ const PaymentModalContent: React.FC<PaymentModalContentProps> = ({
                         </div>
                         <div className="space-y-0.5">
                             <p className="text-xs font-bold text-on-surface">
-                                Scan with any UPI app
+                                Scan to Pay {settlement.to}
                             </p>
-                            <p className="text-[11px] text-on-surface-variant max-w-[220px]">
-                                Point Google Pay, PhonePe, or Paytm scanner at this code to pay ₹{settlement.amount}
+                            <p className="text-[11px] text-on-surface-variant max-w-[240px]">
+                                Point Google Pay, PhonePe, or Paytm scanner at this screen to transfer <strong>₹{settlement.amount}</strong>
                             </p>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-surface-container-low border border-outline-variant/20 text-[11px] text-on-surface-variant text-center w-full">
+                            <span>Once transferred, <strong>{settlement.to}</strong> will confirm receipt in SplitNest to settle the balance.</span>
                         </div>
                     </div>
                 )}

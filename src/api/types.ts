@@ -105,6 +105,8 @@ export interface AddSplitPayload {
     contributions?: Contribution[];
     participants: string[];
     recordExpense?: boolean;
+    splitMode?: 'EQUAL' | 'CUSTOM';
+    customShares?: { person: string; share: number }[];
 }
 
 export interface AddContributionPayload {

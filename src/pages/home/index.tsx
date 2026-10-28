@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useExpense } from '../../context';
 import { useSpendings, useSplits, useSettleParticipantMutation, useTripInfo } from '../../api';
-import { Avatar, PaymentModal, type PaymentSettlementData } from '../../components';
+import { Avatar, PaymentModal, type PaymentSettlementData, CollectQrModal, type CollectQrModalData } from '../../components';
 import { triggerHaptic } from '../../utils/haptics';
 
 export function Dashboard() {
@@ -11,6 +11,9 @@ export function Dashboard() {
     const { data: tripInfo } = useTripInfo();
     const settleMutation = useSettleParticipantMutation();
     const [paymentSettlement, setPaymentSettlement] = useState<PaymentSettlementData | null>(null);
+    const [collectSettlement, setCollectSettlement] = useState<CollectQrModalData | null>(null);
+    const [expandedOwed, setExpandedOwed] = useState<Record<string, boolean>>({});
+    const [expandedOwedToMe, setExpandedOwedToMe] = useState<Record<string, boolean>>({});
 
     const activeSplits = allSplits.filter((s) => s.status === 'ACTIVE');
 
@@ -145,6 +148,74 @@ export function Dashboard() {
     const totalOwedToYou = owedToMeSettlements.reduce((sum, s) => sum + s.amount, 0);
     const netBalance = totalOwedToYou - totalYouOwe;
 
+    // Consolidated Pairwise Grouping for Step 3
+    interface GroupedOwedSettlement {
+        to: string;
+        totalAmount: number;
+        toUpiId?: string | null;
+        upiIntent?: string;
+        appLinks?: import('../../api/types').SettlementAppLinks;
+        splits: {
+            splitId: string;
+            description: string;
+            amount: number;
+        }[];
+    }
+
+    interface GroupedOwedToMeSettlement {
+        from: string;
+        totalAmount: number;
+        splits: {
+            splitId: string;
+            description: string;
+            amount: number;
+        }[];
+    }
+
+    const groupedOwedList = Object.values(
+        myOwedSettlements.reduce<Record<string, GroupedOwedSettlement>>((acc, s) => {
+            if (!acc[s.to]) {
+                acc[s.to] = {
+                    to: s.to,
+                    totalAmount: 0,
+                    toUpiId: s.toUpiId,
+                    upiIntent: s.upiIntent,
+                    appLinks: s.appLinks,
+                    splits: [],
+                };
+            }
+            acc[s.to].totalAmount += s.amount;
+            if (!acc[s.to].toUpiId && s.toUpiId) acc[s.to].toUpiId = s.toUpiId;
+            if (!acc[s.to].upiIntent && s.upiIntent) acc[s.to].upiIntent = s.upiIntent;
+            if (!acc[s.to].appLinks && s.appLinks) acc[s.to].appLinks = s.appLinks;
+            acc[s.to].splits.push({
+                splitId: s.splitId,
+                description: s.description,
+                amount: s.amount,
+            });
+            return acc;
+        }, {})
+    );
+
+    const groupedOwedToMeList = Object.values(
+        owedToMeSettlements.reduce<Record<string, GroupedOwedToMeSettlement>>((acc, s) => {
+            if (!acc[s.from]) {
+                acc[s.from] = {
+                    from: s.from,
+                    totalAmount: 0,
+                    splits: [],
+                };
+            }
+            acc[s.from].totalAmount += s.amount;
+            acc[s.from].splits.push({
+                splitId: s.splitId,
+                description: s.description,
+                amount: s.amount,
+            });
+            return acc;
+        }, {})
+    );
+
     const handleSettle = async (splitId: string, fromPerson: string, toPerson: string) => {
         try {
             await settleMutation.mutateAsync({
@@ -153,6 +224,24 @@ export function Dashboard() {
                 to: toPerson,
                 confirmedBy: activePerson,
             });
+            triggerHaptic('success');
+            showToast(`Confirmed receipt of payment from ${fromPerson}!`, 'check_circle');
+        } catch (err: unknown) {
+            triggerHaptic('warning');
+            showToast(`Failed to settle: ${String(err)}`, 'error');
+        }
+    };
+
+    const handleSettleMultiple = async (splitIds: string[], fromPerson: string, toPerson: string) => {
+        try {
+            for (const sId of splitIds) {
+                await settleMutation.mutateAsync({
+                    splitId: sId,
+                    from: fromPerson,
+                    to: toPerson,
+                    confirmedBy: activePerson,
+                });
+            }
             triggerHaptic('success');
             showToast(`Confirmed receipt of payment from ${fromPerson}!`, 'check_circle');
         } catch (err: unknown) {
@@ -378,98 +467,292 @@ export function Dashboard() {
                         </span>
                     </div>
 
-                    {/* What you owe */}
-                    {myOwedSettlements.map((s, idx) => (
-                        <div
-                            key={`owe-${s.splitId}-${s.to}-${idx}`}
-                            className="bg-surface-container-lowest p-3.5 rounded-xl shadow-xs border border-outline-variant/30 flex items-center justify-between gap-3"
-                        >
-                            <div className="flex items-center gap-3 min-w-0">
-                                <Avatar name={s.to} size="md" />
-                                <div className="min-w-0">
-                                    <h4 className="font-semibold text-sm text-on-surface truncate">
-                                        Pay {s.to}
-                                    </h4>
-                                    <p className="text-xs text-on-surface-variant truncate">
-                                        For {s.description}
-                                    </p>
-                                </div>
-                            </div>
+                    {/* What you owe (Grouped / Consolidated Pairwise) */}
+                    {groupedOwedList.map((group, idx) => {
+                        const isMulti = group.splits.length > 1;
+                        const isExpanded = !!expandedOwed[group.to];
 
-                            <div className="flex items-center gap-2 shrink-0">
-                                <span className="font-bold text-sm text-error font-mono">
-                                    ₹{s.amount.toLocaleString('en-IN')}
-                                </span>
-                                {s.upiIntent || s.toUpiId ? (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setPaymentSettlement({
-                                                to: s.to,
-                                                from: activePerson,
-                                                amount: s.amount,
-                                                toUpiId: s.toUpiId,
-                                                upiIntent: s.upiIntent,
-                                                appLinks: s.appLinks,
-                                                description: s.description,
-                                            });
-                                        }}
-                                        className="h-8 px-2.5 rounded-lg bg-primary text-on-primary text-xs font-semibold flex items-center gap-1 shadow-xs hover:bg-primary/90 transition-colors cursor-pointer"
-                                    >
-                                        <span className="material-symbols-outlined text-[15px]">
-                                            bolt
+                        return (
+                            <div
+                                key={`owe-group-${group.to}-${idx}`}
+                                className="bg-surface-container-lowest p-3.5 rounded-xl shadow-xs border border-outline-variant/30 space-y-2.5"
+                            >
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <Avatar name={group.to} size="md" />
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <h4 className="font-semibold text-sm text-on-surface truncate">
+                                                    Pay {group.to}
+                                                </h4>
+                                                {isMulti && (
+                                                    <span className="px-1.5 py-0.2 rounded-md bg-secondary-fixed/50 text-on-secondary-fixed text-[10px] font-bold">
+                                                        {group.splits.length} splits
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-on-surface-variant truncate">
+                                                {isMulti
+                                                    ? group.splits.map((s) => s.description).join(', ')
+                                                    : `For ${group.splits[0].description}`}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <span className="font-bold text-sm text-error font-mono">
+                                            ₹{group.totalAmount.toLocaleString('en-IN')}
                                         </span>
-                                        <span>Pay</span>
-                                    </button>
-                                ) : (
-                                    <span className="text-[11px] text-on-surface-variant font-medium flex items-center gap-0.5">
-                                        <span className="material-symbols-outlined text-[13px] text-tertiary">
-                                            hourglass_top
-                                        </span>
-                                        <span>Pending {s.to}</span>
-                                    </span>
+                                        {group.upiIntent || group.toUpiId ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setPaymentSettlement({
+                                                        to: group.to,
+                                                        from: activePerson,
+                                                        splitId: isMulti ? undefined : group.splits[0].splitId,
+                                                        splitIds: isMulti ? group.splits.map((s) => s.splitId) : undefined,
+                                                        amount: group.totalAmount,
+                                                        toUpiId: group.toUpiId,
+                                                        upiIntent: group.upiIntent,
+                                                        appLinks: group.appLinks,
+                                                        description: isMulti
+                                                            ? `Consolidated payoff (${group.splits.length} splits)`
+                                                            : group.splits[0].description,
+                                                    });
+                                                }}
+                                                className="h-8 px-2.5 rounded-lg bg-primary text-on-primary text-xs font-semibold flex items-center gap-1 shadow-xs hover:bg-primary/90 transition-colors cursor-pointer"
+                                            >
+                                                <span className="material-symbols-outlined text-[15px]">
+                                                    bolt
+                                                </span>
+                                                <span>{isMulti ? 'Pay All' : 'Pay'}</span>
+                                            </button>
+                                        ) : (
+                                            <span className="text-[11px] text-on-surface-variant font-medium flex items-center gap-0.5">
+                                                <span className="material-symbols-outlined text-[13px] text-tertiary">
+                                                    hourglass_top
+                                                </span>
+                                                <span>Pending {group.to}</span>
+                                            </span>
+                                        )}
+
+                                        {isMulti && (
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setExpandedOwed((prev) => ({
+                                                        ...prev,
+                                                        [group.to]: !prev[group.to],
+                                                    }))
+                                                }
+                                                className="w-7 h-7 rounded-lg text-on-surface-variant hover:bg-surface-container flex items-center justify-center transition-colors cursor-pointer"
+                                                title={isExpanded ? 'Collapse breakdown' : 'Expand breakdown'}
+                                            >
+                                                <span className="material-symbols-outlined text-[18px]">
+                                                    {isExpanded ? 'expand_less' : 'expand_more'}
+                                                </span>
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Consolidated Breakdown Sub-list */}
+                                {isMulti && isExpanded && (
+                                    <div className="pt-2 border-t border-outline-variant/20 space-y-1.5 pl-2">
+                                        {group.splits.map((s) => (
+                                            <div
+                                                key={`owed-sub-${s.splitId}`}
+                                                className="flex items-center justify-between text-xs py-1 px-2 rounded-lg bg-surface-container-low"
+                                            >
+                                                <span className="text-on-surface truncate font-medium">
+                                                    {s.description}
+                                                </span>
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    <span className="font-mono text-error font-semibold">
+                                                        ₹{s.amount.toLocaleString('en-IN')}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setPaymentSettlement({
+                                                                to: group.to,
+                                                                from: activePerson,
+                                                                splitId: s.splitId,
+                                                                amount: s.amount,
+                                                                toUpiId: group.toUpiId,
+                                                                description: s.description,
+                                                            });
+                                                        }}
+                                                        className="px-2 py-0.5 rounded bg-surface-container-high text-primary hover:bg-primary/10 text-[11px] font-bold cursor-pointer"
+                                                    >
+                                                        Pay
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 )}
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
 
-                    {/* What others owe you (You are creditor: Confirm Received) */}
-                    {owedToMeSettlements.map((s, idx) => (
-                        <div
-                            key={`owed-${s.splitId}-${s.from}-${idx}`}
-                            className="bg-surface-container-lowest p-3.5 rounded-xl shadow-xs border border-outline-variant/30 flex items-center justify-between gap-3"
-                        >
-                            <div className="flex items-center gap-3 min-w-0">
-                                <Avatar name={s.from} size="md" />
-                                <div className="min-w-0">
-                                    <h4 className="font-semibold text-sm text-on-surface truncate">
-                                        {s.from} owes you
-                                    </h4>
-                                    <p className="text-xs text-on-surface-variant truncate">
-                                        For {s.description}
-                                    </p>
+                    {/* What others owe you (Creditor: Collect via QR or Settle) */}
+                    {groupedOwedToMeList.map((group, idx) => {
+                        const isMulti = group.splits.length > 1;
+                        const isExpanded = !!expandedOwedToMe[group.from];
+
+                        return (
+                            <div
+                                key={`owed-to-me-group-${group.from}-${idx}`}
+                                className="bg-surface-container-lowest p-3.5 rounded-xl shadow-xs border border-outline-variant/30 space-y-2.5"
+                            >
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <Avatar name={group.from} size="md" />
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <h4 className="font-semibold text-sm text-on-surface truncate">
+                                                    {group.from} owes you
+                                                </h4>
+                                                {isMulti && (
+                                                    <span className="px-1.5 py-0.2 rounded-md bg-primary-fixed text-on-primary-fixed text-[10px] font-bold">
+                                                        {group.splits.length} splits
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-on-surface-variant truncate">
+                                                {isMulti
+                                                    ? group.splits.map((s) => s.description).join(', ')
+                                                    : `For ${group.splits[0].description}`}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        <span className="font-bold text-sm text-primary font-mono mr-1">
+                                            ₹{group.totalAmount.toLocaleString('en-IN')}
+                                        </span>
+
+                                        {/* Collect via QR button */}
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setCollectSettlement({
+                                                    debtorName: group.from,
+                                                    amount: group.totalAmount,
+                                                    splitId: isMulti ? undefined : group.splits[0].splitId,
+                                                    splitIds: isMulti ? group.splits.map((s) => s.splitId) : undefined,
+                                                    description: isMulti
+                                                        ? `${group.splits.length} splits combined`
+                                                        : group.splits[0].description,
+                                                });
+                                            }}
+                                            className="h-8 px-2 rounded-lg bg-surface-container-high text-on-surface hover:bg-surface-container-highest transition-colors flex items-center justify-center border border-outline-variant/40 cursor-pointer"
+                                            title={`Show QR code to collect ₹${group.totalAmount} from ${group.from}`}
+                                        >
+                                            <span className="material-symbols-outlined text-[17px] text-primary">
+                                                qr_code_2
+                                            </span>
+                                            {isMulti && <span className="text-[11px] font-bold ml-1">QR</span>}
+                                        </button>
+
+                                        {/* Confirm Received button */}
+                                        <button
+                                            type="button"
+                                            disabled={settleMutation.isPending}
+                                            onClick={() =>
+                                                isMulti
+                                                    ? handleSettleMultiple(
+                                                          group.splits.map((s) => s.splitId),
+                                                          group.from,
+                                                          activePerson
+                                                      )
+                                                    : handleSettle(
+                                                          group.splits[0].splitId,
+                                                          group.from,
+                                                          activePerson
+                                                      )
+                                            }
+                                            className="h-8 px-2.5 rounded-lg bg-primary-fixed text-on-primary-fixed text-xs font-bold hover:bg-primary hover:text-on-primary transition-colors flex items-center gap-1 shadow-2xs disabled:opacity-50 cursor-pointer"
+                                            title={`Confirm receipt of ₹${group.totalAmount} from ${group.from}`}
+                                        >
+                                            <span className="material-symbols-outlined text-[14px]">
+                                                done_all
+                                            </span>
+                                            <span>{isMulti ? 'Confirm All' : 'Confirm'}</span>
+                                        </button>
+
+                                        {isMulti && (
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setExpandedOwedToMe((prev) => ({
+                                                        ...prev,
+                                                        [group.from]: !prev[group.from],
+                                                    }))
+                                                }
+                                                className="w-7 h-7 rounded-lg text-on-surface-variant hover:bg-surface-container flex items-center justify-center transition-colors cursor-pointer"
+                                                title={isExpanded ? 'Collapse breakdown' : 'Expand breakdown'}
+                                            >
+                                                <span className="material-symbols-outlined text-[18px]">
+                                                    {isExpanded ? 'expand_less' : 'expand_more'}
+                                                </span>
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
 
-                            <div className="flex items-center gap-2 shrink-0">
-                                <span className="font-bold text-sm text-primary font-mono">
-                                    ₹{s.amount.toLocaleString('en-IN')}
-                                </span>
-                                <button
-                                    type="button"
-                                    disabled={settleMutation.isPending}
-                                    onClick={() => handleSettle(s.splitId, s.from, activePerson)}
-                                    className="h-8 px-2.5 rounded-lg bg-primary-fixed text-on-primary-fixed text-xs font-bold hover:bg-primary hover:text-on-primary transition-colors flex items-center gap-1 shadow-2xs disabled:opacity-50 cursor-pointer"
-                                    title={`Confirm receipt of ₹${s.amount} from ${s.from}`}
-                                >
-                                    <span className="material-symbols-outlined text-[14px]">
-                                        done_all
-                                    </span>
-                                    <span>Confirm Received</span>
-                                </button>
+                                {/* Consolidated Breakdown Sub-list */}
+                                {isMulti && isExpanded && (
+                                    <div className="pt-2 border-t border-outline-variant/20 space-y-1.5 pl-2">
+                                        {group.splits.map((s) => (
+                                            <div
+                                                key={`owed-to-me-sub-${s.splitId}`}
+                                                className="flex items-center justify-between text-xs py-1 px-2 rounded-lg bg-surface-container-low"
+                                            >
+                                                <span className="text-on-surface truncate font-medium">
+                                                    {s.description}
+                                                </span>
+                                                <div className="flex items-center gap-1.5 shrink-0">
+                                                    <span className="font-mono text-primary font-semibold">
+                                                        ₹{s.amount.toLocaleString('en-IN')}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setCollectSettlement({
+                                                                debtorName: group.from,
+                                                                amount: s.amount,
+                                                                splitId: s.splitId,
+                                                                description: s.description,
+                                                            });
+                                                        }}
+                                                        className="p-1 rounded bg-surface-container-high text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+                                                        title="Show QR for this item"
+                                                    >
+                                                        <span className="material-symbols-outlined text-[15px]">
+                                                            qr_code_2
+                                                        </span>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        disabled={settleMutation.isPending}
+                                                        onClick={() =>
+                                                            handleSettle(s.splitId, group.from, activePerson)
+                                                        }
+                                                        className="px-2 py-0.5 rounded bg-primary-fixed text-on-primary-fixed hover:bg-primary hover:text-on-primary text-[11px] font-bold cursor-pointer disabled:opacity-50"
+                                                    >
+                                                        Confirm
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
 
@@ -557,6 +840,13 @@ export function Dashboard() {
                 isOpen={!!paymentSettlement}
                 onClose={() => setPaymentSettlement(null)}
                 settlement={paymentSettlement}
+            />
+
+            {/* Creditor's Collect via QR Modal */}
+            <CollectQrModal
+                isOpen={!!collectSettlement}
+                onClose={() => setCollectSettlement(null)}
+                data={collectSettlement}
             />
         </div>
     );
