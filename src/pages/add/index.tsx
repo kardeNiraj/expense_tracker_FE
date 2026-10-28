@@ -1,12 +1,42 @@
 import React, { useState } from 'react';
 import { useExpense } from '../../context';
-import { apiFetch } from '../../api';
 import {
+    apiFetch,
     useCategories,
     usePeople,
     useAddExpenseMutation,
     useAddSplitMutation,
 } from '../../api';
+import { triggerHaptic } from '../../utils/haptics';
+
+const QUICK_INCREMENTS = [50, 100, 200, 500];
+
+const CATEGORY_KEYWORDS: Record<string, string[]> = {
+    Food: ['food', 'lunch', 'dinner', 'breakfast', 'brunch', 'cafe', 'coffee', 'chai', 'tea', 'pizza', 'burger', 'restaurant', 'biryani', 'snack', 'snacks', 'sweets', 'bakery', 'meal', 'maggi', 'momo', 'momos', 'roti', 'thali', 'paneer', 'dosa'],
+    Drinks: ['beer', 'wine', 'alcohol', 'drinks', 'water', 'bottle', 'beverage', 'bar', 'cocktail', 'whiskey', 'vodka', 'rum', 'soda', 'coke', 'juice'],
+    Travel: ['cab', 'uber', 'ola', 'taxi', 'auto', 'fuel', 'petrol', 'diesel', 'toll', 'parking', 'flight', 'train', 'bus', 'metro', 'fare', 'rapido'],
+    Stay: ['hotel', 'resort', 'room', 'airbnb', 'stay', 'hostel', 'lodge', 'camp', 'tent', 'cottage'],
+    Activities: ['ticket', 'paragliding', 'rafting', 'trek', 'skiing', 'ski', 'entry', 'safari', 'pass', 'rental', 'bike', 'scooter', 'cable car', 'ropeway', 'boating'],
+    Shopping: ['shopping', 'market', 'mall', 'souvenir', 'clothes', 'groceries', 'mart', 'store'],
+};
+
+function detectCategory(description: string, availableCategories: string[]): string | null {
+    if (!description.trim() || availableCategories.length === 0) return null;
+    const lower = description.toLowerCase();
+    for (const [catName, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+        const matchedKeyword = keywords.find((kw) => lower.includes(kw));
+        if (matchedKeyword) {
+            const matchedCat = availableCategories.find(
+                (c) =>
+                    c.toLowerCase() === catName.toLowerCase() ||
+                    c.toLowerCase().includes(catName.toLowerCase()) ||
+                    catName.toLowerCase().includes(c.toLowerCase())
+            );
+            if (matchedCat) return matchedCat;
+        }
+    }
+    return null;
+}
 
 export function AddPage() {
     const { activePerson, setActiveTab, showToast } = useExpense();
@@ -18,6 +48,7 @@ export function AddPage() {
     // Quick Expense Form States
     const [expensePayee, setExpensePayee] = useState(activePerson);
     const [expenseCategory, setExpenseCategory] = useState('');
+    const [isExpenseCategoryManual, setIsExpenseCategoryManual] = useState(false);
     const [expenseAmount, setExpenseAmount] = useState('');
     const [expenseDesc, setExpenseDesc] = useState('');
 
@@ -25,6 +56,7 @@ export function AddPage() {
     const [splitAmount, setSplitAmount] = useState('');
     const [splitDesc, setSplitDesc] = useState('');
     const [splitCategory, setSplitCategory] = useState('');
+    const [isSplitCategoryManual, setIsSplitCategoryManual] = useState(false);
     const [splitPaidBy, setSplitPaidBy] = useState(activePerson);
     const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
     const [recordExpense, setRecordExpense] = useState(true);
@@ -44,10 +76,54 @@ export function AddPage() {
     const activeParticipants = selectedParticipants.length > 0 ? selectedParticipants : people;
     const activeContributionPerson = contributionPerson || people[0] || '';
 
+    const handleAmountInput = (val: string, setter: (v: string) => void) => {
+        const cleaned = val.replace(/[^0-9.]/g, '');
+        const parts = cleaned.split('.');
+        if (parts.length > 2) return;
+        if (parts[1] && parts[1].length > 2) return;
+        setter(cleaned);
+    };
+
+    const handleQuickIncrement = (inc: number, currentVal: string, setter: (v: string) => void) => {
+        triggerHaptic('light');
+        const current = parseFloat(currentVal) || 0;
+        setter((current + inc).toString());
+    };
+
+    const handleClearAmount = (setter: (v: string) => void) => {
+        triggerHaptic('light');
+        setter('');
+    };
+
+    const handleSplitDescChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newDesc = e.target.value;
+        setSplitDesc(newDesc);
+        if (!isSplitCategoryManual) {
+            const detected = detectCategory(newDesc, categories);
+            if (detected && detected !== splitCategory) {
+                setSplitCategory(detected);
+            }
+        }
+    };
+
+    const handleExpenseDescChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newDesc = e.target.value;
+        setExpenseDesc(newDesc);
+        if (!isExpenseCategoryManual) {
+            const detected = detectCategory(newDesc, categories);
+            if (detected && detected !== expenseCategory) {
+                setExpenseCategory(detected);
+            }
+        }
+    };
+
     const handleQuickExpenseSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const amt = parseFloat(expenseAmount);
-        if (!amt || !expenseDesc || !activeExpenseCategory) return;
+        if (!amt || !expenseDesc || !activeExpenseCategory) {
+            triggerHaptic('warning');
+            return;
+        }
 
         try {
             await addExpenseMutation.mutateAsync({
@@ -56,11 +132,14 @@ export function AddPage() {
                 amount: amt,
                 description: expenseDesc,
             });
+            triggerHaptic('success');
             showToast(`Recorded expense of ₹${amt} for ${expenseDesc}!`);
             setExpenseAmount('');
             setExpenseDesc('');
+            setIsExpenseCategoryManual(false);
             setActiveTab('dashboard');
         } catch (err: unknown) {
+            triggerHaptic('warning');
             showToast(`Error adding expense: ${String(err)}`, 'error');
         }
     };
@@ -68,7 +147,10 @@ export function AddPage() {
     const handleGroupSplitSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const amt = parseFloat(splitAmount);
-        if (!amt || !splitDesc || !activeSplitCategory || activeParticipants.length === 0) return;
+        if (!amt || !splitDesc || !activeSplitCategory || activeParticipants.length === 0) {
+            triggerHaptic('warning');
+            return;
+        }
 
         const contributions =
             hasContribution && contributionAmt && activeContributionPerson
@@ -86,18 +168,22 @@ export function AddPage() {
                 contributions,
                 recordExpense,
             });
+            triggerHaptic('success');
             showToast(`Created split for ${splitDesc} (₹${amt})!`);
             setSplitAmount('');
             setSplitDesc('');
             setHasContribution(false);
             setContributionAmt('');
+            setIsSplitCategoryManual(false);
             setActiveTab('splits');
         } catch (err: unknown) {
+            triggerHaptic('warning');
             showToast(`Error creating split: ${String(err)}`, 'error');
         }
     };
 
     const toggleParticipant = (person: string) => {
+        triggerHaptic('light');
         const currentList = selectedParticipants.length > 0 ? selectedParticipants : people;
         if (currentList.includes(person)) {
             if (currentList.length > 1) {
@@ -109,7 +195,13 @@ export function AddPage() {
     };
 
     const selectAllParticipants = () => {
+        triggerHaptic('light');
         setSelectedParticipants(people);
+    };
+
+    const handleModeSwitch = (newMode: 'expense' | 'split') => {
+        triggerHaptic('medium');
+        setMode(newMode);
     };
 
     return (
@@ -128,7 +220,7 @@ export function AddPage() {
             <div className="grid grid-cols-2 gap-2 bg-surface-container-low p-1 rounded-xl border border-outline-variant/30">
                 <button
                     type="button"
-                    onClick={() => setMode('split')}
+                    onClick={() => handleModeSwitch('split')}
                     className={`h-10 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                         mode === 'split'
                             ? 'bg-surface-container-lowest text-primary shadow-xs'
@@ -142,7 +234,7 @@ export function AddPage() {
                 </button>
                 <button
                     type="button"
-                    onClick={() => setMode('expense')}
+                    onClick={() => handleModeSwitch('expense')}
                     className={`h-10 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                         mode === 'expense'
                             ? 'bg-surface-container-lowest text-primary shadow-xs'
@@ -159,9 +251,9 @@ export function AddPage() {
             {/* MODE 1: Group Split Form */}
             {mode === 'split' && (
                 <form onSubmit={handleGroupSplitSubmit} className="space-y-4">
-                    {/* Amount Input */}
-                    <div className="bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-outline-variant/30 flex flex-col items-center justify-center text-center">
-                        <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider font-mono mb-1">
+                    {/* Amount Input with Quick-Add Chips */}
+                    <div className="bg-surface-container-lowest rounded-2xl p-4 shadow-xs border border-outline-variant/30 flex flex-col items-center justify-center text-center space-y-3">
+                        <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider font-mono">
                             Total Bill Amount
                         </span>
                         <div className="flex items-center justify-center gap-1.5 w-full">
@@ -169,26 +261,59 @@ export function AddPage() {
                                 ₹
                             </span>
                             <input
-                                type="number"
-                                min="1"
+                                type="text"
+                                inputMode="decimal"
                                 value={splitAmount}
-                                onChange={(e) => setSplitAmount(e.target.value)}
+                                onChange={(e) => handleAmountInput(e.target.value, setSplitAmount)}
                                 placeholder="0"
                                 className="text-3xl font-bold text-on-surface bg-transparent text-center focus:outline-none w-48 tracking-tight font-mono"
                                 required
                             />
                         </div>
+
+                        {/* Quick-add Chips */}
+                        <div className="flex items-center gap-1.5 flex-wrap justify-center pt-1 border-t border-outline-variant/15 w-full">
+                            {QUICK_INCREMENTS.map((inc) => (
+                                <button
+                                    key={inc}
+                                    type="button"
+                                    onClick={() => handleQuickIncrement(inc, splitAmount, setSplitAmount)}
+                                    className="px-2.5 py-1 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-mono text-xs font-semibold border border-outline-variant/20 transition-all active:scale-95 cursor-pointer"
+                                >
+                                    +₹{inc}
+                                </button>
+                            ))}
+                            {splitAmount && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleClearAmount(setSplitAmount)}
+                                    className="px-2.5 py-1 rounded-lg bg-error-container/30 hover:bg-error-container/50 text-error font-mono text-xs font-semibold border border-error/20 transition-all active:scale-95 cursor-pointer"
+                                >
+                                    Clear
+                                </button>
+                            )}
+                        </div>
                     </div>
 
-                    {/* Description */}
+                    {/* Description with Smart Auto-detection */}
                     <div className="bg-surface-container-lowest rounded-2xl p-4 shadow-xs border border-outline-variant/30 space-y-1.5">
-                        <label className="text-xs font-semibold text-on-surface-variant block">
-                            Description
-                        </label>
+                        <div className="flex items-center justify-between">
+                            <label className="text-xs font-semibold text-on-surface-variant block">
+                                Description
+                            </label>
+                            {detectCategory(splitDesc, categories) && !isSplitCategoryManual && (
+                                <span className="text-[10px] text-primary font-semibold flex items-center gap-0.5 animate-in fade-in">
+                                    <span className="material-symbols-outlined text-[13px]">
+                                        auto_awesome
+                                    </span>
+                                    <span>Category: {activeSplitCategory}</span>
+                                </span>
+                            )}
+                        </div>
                         <input
                             type="text"
                             value={splitDesc}
-                            onChange={(e) => setSplitDesc(e.target.value)}
+                            onChange={handleSplitDescChange}
                             placeholder="e.g. Brunch at Mall Road, Paragliding, Cab"
                             className="w-full h-11 px-3 rounded-xl bg-surface-container-low text-sm text-on-surface focus:outline-none border border-outline-variant/20"
                             required
@@ -205,7 +330,11 @@ export function AddPage() {
                                 <button
                                     key={cat}
                                     type="button"
-                                    onClick={() => setSplitCategory(cat)}
+                                    onClick={() => {
+                                        triggerHaptic('light');
+                                        setIsSplitCategoryManual(true);
+                                        setSplitCategory(cat);
+                                    }}
                                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
                                         activeSplitCategory === cat
                                             ? 'bg-primary text-on-primary border-primary shadow-2xs'
@@ -228,7 +357,10 @@ export function AddPage() {
                                 <button
                                     key={person}
                                     type="button"
-                                    onClick={() => setSplitPaidBy(person)}
+                                    onClick={() => {
+                                        triggerHaptic('light');
+                                        setSplitPaidBy(person);
+                                    }}
                                     className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer border ${
                                         activeSplitPaidBy === person
                                             ? 'bg-primary text-on-primary border-primary shadow-2xs'
@@ -379,9 +511,9 @@ export function AddPage() {
             {/* MODE 2: Quick Expense Form */}
             {mode === 'expense' && (
                 <form onSubmit={handleQuickExpenseSubmit} className="space-y-4">
-                    {/* Amount Input */}
-                    <div className="bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-outline-variant/30 flex flex-col items-center justify-center text-center">
-                        <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider font-mono mb-1">
+                    {/* Amount Input with Quick-Add Chips */}
+                    <div className="bg-surface-container-lowest rounded-2xl p-4 shadow-xs border border-outline-variant/30 flex flex-col items-center justify-center text-center space-y-3">
+                        <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider font-mono">
                             Expense Amount
                         </span>
                         <div className="flex items-center justify-center gap-1.5 w-full">
@@ -389,26 +521,59 @@ export function AddPage() {
                                 ₹
                             </span>
                             <input
-                                type="number"
-                                min="1"
+                                type="text"
+                                inputMode="decimal"
                                 value={expenseAmount}
-                                onChange={(e) => setExpenseAmount(e.target.value)}
+                                onChange={(e) => handleAmountInput(e.target.value, setExpenseAmount)}
                                 placeholder="0"
                                 className="text-3xl font-bold text-on-surface bg-transparent text-center focus:outline-none w-48 tracking-tight font-mono"
                                 required
                             />
                         </div>
+
+                        {/* Quick-add Chips */}
+                        <div className="flex items-center gap-1.5 flex-wrap justify-center pt-1 border-t border-outline-variant/15 w-full">
+                            {QUICK_INCREMENTS.map((inc) => (
+                                <button
+                                    key={inc}
+                                    type="button"
+                                    onClick={() => handleQuickIncrement(inc, expenseAmount, setExpenseAmount)}
+                                    className="px-2.5 py-1 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-mono text-xs font-semibold border border-outline-variant/20 transition-all active:scale-95 cursor-pointer"
+                                >
+                                    +₹{inc}
+                                </button>
+                            ))}
+                            {expenseAmount && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleClearAmount(setExpenseAmount)}
+                                    className="px-2.5 py-1 rounded-lg bg-error-container/30 hover:bg-error-container/50 text-error font-mono text-xs font-semibold border border-error/20 transition-all active:scale-95 cursor-pointer"
+                                >
+                                    Clear
+                                </button>
+                            )}
+                        </div>
                     </div>
 
-                    {/* Description */}
+                    {/* Description with Smart Auto-detection */}
                     <div className="bg-surface-container-lowest rounded-2xl p-4 shadow-xs border border-outline-variant/30 space-y-1.5">
-                        <label className="text-xs font-semibold text-on-surface-variant block">
-                            What was this for?
-                        </label>
+                        <div className="flex items-center justify-between">
+                            <label className="text-xs font-semibold text-on-surface-variant block">
+                                What was this for?
+                            </label>
+                            {detectCategory(expenseDesc, categories) && !isExpenseCategoryManual && (
+                                <span className="text-[10px] text-primary font-semibold flex items-center gap-0.5 animate-in fade-in">
+                                    <span className="material-symbols-outlined text-[13px]">
+                                        auto_awesome
+                                    </span>
+                                    <span>Category: {activeExpenseCategory}</span>
+                                </span>
+                            )}
+                        </div>
                         <input
                             type="text"
                             value={expenseDesc}
-                            onChange={(e) => setExpenseDesc(e.target.value)}
+                            onChange={handleExpenseDescChange}
                             placeholder="e.g. Water Bottle, Snacks, Entry Ticket"
                             className="w-full h-11 px-3 rounded-xl bg-surface-container-low text-sm text-on-surface focus:outline-none border border-outline-variant/20"
                             required
@@ -425,7 +590,11 @@ export function AddPage() {
                                 <button
                                     key={cat}
                                     type="button"
-                                    onClick={() => setExpenseCategory(cat)}
+                                    onClick={() => {
+                                        triggerHaptic('light');
+                                        setIsExpenseCategoryManual(true);
+                                        setExpenseCategory(cat);
+                                    }}
                                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
                                         activeExpenseCategory === cat
                                             ? 'bg-primary text-on-primary border-primary shadow-2xs'
@@ -448,7 +617,10 @@ export function AddPage() {
                                 <button
                                     key={person}
                                     type="button"
-                                    onClick={() => setExpensePayee(person)}
+                                    onClick={() => {
+                                        triggerHaptic('light');
+                                        setExpensePayee(person);
+                                    }}
                                     className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer border ${
                                         (expensePayee || activePerson) === person
                                             ? 'bg-primary text-on-primary border-primary shadow-2xs'

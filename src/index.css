@@ -117,6 +117,7 @@
         color: #0b1c30;
         -webkit-tap-highlight-color: transparent;
         touch-action: manipulation;
+        overscroll-behavior-y: contain;
     }
     
     .pb-safe {

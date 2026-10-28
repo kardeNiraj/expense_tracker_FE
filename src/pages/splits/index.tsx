@@ -7,6 +7,7 @@ import {
 } from '../../api';
 import { Avatar, PaymentModal, type PaymentSettlementData } from '../../components';
 import type { Split } from '../../api/types';
+import { triggerHaptic } from '../../utils/haptics';
 
 export function SplitsPage() {
     const { activePerson, showToast } = useExpense();
@@ -56,11 +57,13 @@ export function SplitsPage() {
                 to: toPerson,
                 confirmedBy: activePerson,
             });
+            triggerHaptic('success');
             showToast(
                 `Payment from ${fromPerson} confirmed settled!`,
                 'check_circle'
             );
         } catch (err: unknown) {
+            triggerHaptic('warning');
             showToast(`Failed to settle: ${String(err)}`, 'error');
         }
     };
@@ -77,23 +80,27 @@ export function SplitsPage() {
                 person: contributionPerson,
                 amount: amt,
             });
+            triggerHaptic('success');
             showToast(`Added contribution of ₹${amt} by ${contributionPerson}!`);
             setSelectedSplitForContribution(null);
             setContributionAmount('');
             setContributionPerson('');
         } catch (err: unknown) {
+            triggerHaptic('warning');
             showToast(`Failed to add contribution: ${String(err)}`, 'error');
         }
     };
 
     const handleShareWhatsapp = (text?: string) => {
         if (!text) return;
+        triggerHaptic('light');
         const encoded = encodeURIComponent(text);
         window.open(`https://api.whatsapp.com/send?text=${encoded}`, '_blank');
     };
 
     const handleCopyText = (text?: string, message = 'Summary copied to clipboard!') => {
         if (!text) return;
+        triggerHaptic('light');
         navigator.clipboard.writeText(text);
         showToast(message, 'content_copy');
     };
@@ -539,11 +546,13 @@ export function SplitsPage() {
                                                                                 onClick={() =>
                                                                                     setPaymentSettlement({
                                                                                         to: s.to,
+                                                                                        from: s.from,
                                                                                         amount: s.amount,
                                                                                         toUpiId: s.toUpiId,
                                                                                         upiIntent: s.upiIntent,
                                                                                         appLinks: s.appLinks,
                                                                                         description: split.description,
+                                                                                        splitId: split.splitId,
                                                                                     })
                                                                                 }
                                                                                 className="h-7 px-2.5 rounded-lg bg-primary text-on-primary text-xs font-semibold flex items-center gap-1 shadow-xs hover:bg-primary/90 transition-colors cursor-pointer"

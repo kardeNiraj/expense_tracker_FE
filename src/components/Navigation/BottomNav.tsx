@@ -1,9 +1,15 @@
 import React from 'react';
 import { useExpense } from '../../context';
 import type { AppTab } from '../../context/ExpenseContextDef';
+import { triggerHaptic } from '../../utils/haptics';
 
 export const BottomNav: React.FC = () => {
     const { activeTab, setActiveTab } = useExpense();
+
+    const handleTabClick = (tabId: AppTab) => {
+        triggerHaptic('light');
+        setActiveTab(tabId);
+    };
 
     const tabs: { id: AppTab; label: string; icon: string; isAdd?: boolean }[] = [
         { id: 'dashboard', label: 'Overview', icon: 'dashboard' },
@@ -26,7 +32,7 @@ export const BottomNav: React.FC = () => {
                             <button
                                 key={tab.id}
                                 type="button"
-                                onClick={() => setActiveTab(tab.id)}
+                                onClick={() => handleTabClick(tab.id)}
                                 className="flex flex-col items-center justify-center gap-0.5 min-w-[56px] min-h-[44px] group cursor-pointer"
                             >
                                 <div
@@ -55,7 +61,7 @@ export const BottomNav: React.FC = () => {
                         <button
                             key={tab.id}
                             type="button"
-                            onClick={() => setActiveTab(tab.id)}
+                            onClick={() => handleTabClick(tab.id)}
                             className={`flex flex-col items-center justify-center gap-0.5 min-w-[56px] min-h-[44px] transition-colors cursor-pointer ${
                                 isActive
                                     ? 'text-primary font-bold'

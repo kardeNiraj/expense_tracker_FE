@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useExpense } from '../../context';
 import { useSpendings, useSplits, useSettleParticipantMutation, useTripInfo } from '../../api';
 import { Avatar, PaymentModal, type PaymentSettlementData } from '../../components';
+import { triggerHaptic } from '../../utils/haptics';
 
 export function Dashboard() {
     const { activePerson, setActiveTab, showToast } = useExpense();
@@ -152,8 +153,10 @@ export function Dashboard() {
                 to: toPerson,
                 confirmedBy: activePerson,
             });
+            triggerHaptic('success');
             showToast(`Confirmed receipt of payment from ${fromPerson}!`, 'check_circle');
         } catch (err: unknown) {
+            triggerHaptic('warning');
             showToast(`Failed to settle: ${String(err)}`, 'error');
         }
     };
@@ -400,16 +403,17 @@ export function Dashboard() {
                                 {s.upiIntent || s.toUpiId ? (
                                     <button
                                         type="button"
-                                        onClick={() =>
+                                        onClick={() => {
                                             setPaymentSettlement({
                                                 to: s.to,
+                                                from: activePerson,
                                                 amount: s.amount,
                                                 toUpiId: s.toUpiId,
                                                 upiIntent: s.upiIntent,
                                                 appLinks: s.appLinks,
                                                 description: s.description,
-                                            })
-                                        }
+                                            });
+                                        }}
                                         className="h-8 px-2.5 rounded-lg bg-primary text-on-primary text-xs font-semibold flex items-center gap-1 shadow-xs hover:bg-primary/90 transition-colors cursor-pointer"
                                     >
                                         <span className="material-symbols-outlined text-[15px]">
