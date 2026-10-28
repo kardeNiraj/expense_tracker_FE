@@ -11,6 +11,7 @@ import type {
     AddContributionPayload,
     SettleParticipantPayload,
     UpdateUpiPayload,
+    UpdateSplitPayload,
     Split,
     SpendingsData,
 } from './types';
@@ -366,3 +367,41 @@ export function useDeleteSplitMutation() {
         },
     });
 }
+
+// 7. UPDATE SPLIT MUTATION WITH OPTIMISTIC CACHE UPDATE
+export function useUpdateSplitMutation() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (payload: UpdateSplitPayload) => {
+            return await apiFetch<{ success: boolean; data: Split }>(`/split/${payload.splitId}`, {
+                method: 'PUT',
+                body: JSON.stringify(payload),
+            });
+        },
+        onMutate: async (payload) => {
+            await queryClient.cancelQueries({ queryKey: ['splits'] });
+
+            // Optimistically update split in cache
+            queryClient.setQueriesData<Split[]>({ queryKey: ['splits'] }, (old) => {
+                if (!old) return old;
+                return old.map((s) => {
+                    if (s.splitId !== payload.splitId) return s;
+                    return {
+                        ...s,
+                        description: payload.description ?? s.description,
+                        category: payload.category ?? s.category,
+                        totalAmount: payload.amount ?? s.totalAmount,
+                        participants: payload.participants ?? s.participants,
+                    };
+                });
+            });
+        },
+        onSuccess: (_data, variables) => {
+            queryClient.invalidateQueries({ queryKey: queryKeys.splitDetails(variables.splitId) });
+            queryClient.invalidateQueries({ queryKey: ['splits'] });
+            queryClient.invalidateQueries({ queryKey: ['spendings'] });
+        },
+    });
+}
+

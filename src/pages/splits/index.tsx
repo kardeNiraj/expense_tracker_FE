@@ -7,7 +7,14 @@ import {
     useAddContributionMutation,
     useDeleteSplitMutation,
 } from '../../api';
-import { Avatar, PaymentModal, type PaymentSettlementData, CollectQrModal, type CollectQrModalData } from '../../components';
+import {
+    Avatar,
+    PaymentModal,
+    type PaymentSettlementData,
+    CollectQrModal,
+    type CollectQrModalData,
+    EditSplitModal,
+} from '../../components';
 import type { Split } from '../../api/types';
 import { triggerHaptic } from '../../utils/haptics';
 
@@ -18,6 +25,7 @@ export function SplitsPage() {
     const [collectSettlement, setCollectSettlement] = useState<CollectQrModalData | null>(null);
     const [selectedSplitForContribution, setSelectedSplitForContribution] = useState<Split | null>(null);
     const [splitToDelete, setSplitToDelete] = useState<Split | null>(null);
+    const [splitToEdit, setSplitToEdit] = useState<Split | null>(null);
     const [contributionAmount, setContributionAmount] = useState('');
     const [contributionPerson, setContributionPerson] = useState('');
     const [expandedSplits, setExpandedSplits] = useState<Record<string, boolean>>({});
@@ -358,6 +366,9 @@ export function SplitsPage() {
                             split.settlements?.filter((s) => s.status === 'PENDING').length || 0;
                         const expanded = isExpanded(split.splitId, index);
                         const userStake = getUserSplitStake(split, activePerson);
+                        const isOwner =
+                            split.createdBy?.toLowerCase() === activePerson.toLowerCase() ||
+                            split.paidBy?.toLowerCase() === activePerson.toLowerCase();
 
                         return (
                             <div
@@ -413,11 +424,25 @@ export function SplitsPage() {
                                             )}
                                         </div>
 
-                                        {/* Total Amount & Chevron */}
+                                        {/* Total Amount & Edit & Chevron */}
                                         <div className="flex items-center gap-1.5 shrink-0">
                                             <span className="text-lg sm:text-xl font-bold text-primary font-mono tracking-tight">
                                                 ₹{split.totalAmount.toLocaleString('en-IN')}
                                             </span>
+                                            {isOwner && (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSplitToEdit(split);
+                                                    }}
+                                                    className="w-7 h-7 rounded-full bg-surface-container-low hover:bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer shrink-0"
+                                                    title="Edit split details"
+                                                    aria-label="Edit split"
+                                                >
+                                                    <span className="material-symbols-outlined text-[15px]">edit</span>
+                                                </button>
+                                            )}
                                             <div className="w-7 h-7 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors shrink-0">
                                                 <span
                                                     className={`material-symbols-outlined text-[18px] transition-transform duration-200 ${
@@ -719,11 +744,8 @@ export function SplitsPage() {
                                             </div>
                                         )}
 
-                                        {/* Owner Management / Delete Split (Step 5) */}
+                                        {/* Owner Management: Edit & Delete Split */}
                                         {(() => {
-                                            const isOwner =
-                                                split.createdBy?.toLowerCase() === activePerson.toLowerCase() ||
-                                                split.paidBy?.toLowerCase() === activePerson.toLowerCase();
                                             const canDelete =
                                                 isOwner && (split.settlements?.every((s) => s.status === 'PENDING') ?? true);
 
@@ -731,24 +753,37 @@ export function SplitsPage() {
 
                                             return (
                                                 <div className="pt-2 border-t border-outline-variant/15 flex items-center justify-between">
-                                                    {canDelete ? (
+                                                    <div className="flex items-center gap-2">
                                                         <button
                                                             type="button"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                setSplitToDelete(split);
+                                                                setSplitToEdit(split);
                                                             }}
-                                                            className="text-xs text-error hover:text-error/80 flex items-center gap-1 font-semibold p-1 rounded-lg hover:bg-error/10 transition-colors cursor-pointer"
+                                                            className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 font-semibold p-1 rounded-lg hover:bg-primary/10 transition-colors cursor-pointer"
                                                         >
-                                                            <span className="material-symbols-outlined text-[16px]">delete</span>
-                                                            <span>Delete Split</span>
+                                                            <span className="material-symbols-outlined text-[16px]">edit</span>
+                                                            <span>Edit Split</span>
                                                         </button>
-                                                    ) : (
-                                                        <span className="text-[11px] text-on-surface-variant/70 italic flex items-center gap-1">
-                                                            <span className="material-symbols-outlined text-[13px]">lock</span>
-                                                            <span>Cannot delete (dues settled)</span>
-                                                        </span>
-                                                    )}
+                                                        {canDelete ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setSplitToDelete(split);
+                                                                }}
+                                                                className="text-xs text-error hover:text-error/80 flex items-center gap-1 font-semibold p-1 rounded-lg hover:bg-error/10 transition-colors cursor-pointer"
+                                                            >
+                                                                <span className="material-symbols-outlined text-[16px]">delete</span>
+                                                                <span>Delete Split</span>
+                                                            </button>
+                                                        ) : (
+                                                            <span className="text-[11px] text-on-surface-variant/70 italic flex items-center gap-1">
+                                                                <span className="material-symbols-outlined text-[13px]">lock</span>
+                                                                <span>Cannot delete (dues settled)</span>
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     <span className="text-[10px] text-on-surface-variant font-mono">
                                                         By {split.createdBy || split.paidBy}
                                                     </span>
@@ -866,6 +901,13 @@ export function SplitsPage() {
                 isOpen={!!collectSettlement}
                 onClose={() => setCollectSettlement(null)}
                 data={collectSettlement}
+            />
+
+            {/* Edit Split Modal */}
+            <EditSplitModal
+                isOpen={!!splitToEdit}
+                onClose={() => setSplitToEdit(null)}
+                split={splitToEdit}
             />
 
             {/* Delete Confirmation Modal (Step 5) */}

@@ -127,3 +127,15 @@ export interface UpdateUpiPayload {
     name: string;
     upiId: string;
 }
+
+export interface UpdateSplitPayload {
+    splitId: string;
+    amount?: number;
+    description?: string;
+    category?: string;
+    participants?: string[];
+    splitMode?: 'EQUAL' | 'CUSTOM';
+    customShares?: { person: string; share: number }[];
+    requestedBy?: string;
+}
+

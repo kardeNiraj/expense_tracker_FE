@@ -50,15 +50,28 @@ This roadmap tracks the 6 key user friction improvements agreed upon for the pro
 - **Status**: ✅ Completed & Verified.
 
 ### Step 5: Edit & Delete Splits (Mistake Recovery)
-- **Goal**: Allow creators/payers to delete mistaken splits while protecting accounting integrity.
+- **Goal**: Allow creators/payers to edit details or delete mistaken splits while protecting accounting integrity.
 - **Components involved**:
-  - Backend: `DELETE /split/:id` in `index.js`, `deleteSplit` in `helpers/extensions/split.extension.js`.
-  - Safety Guards:
-    - Authorization: Only `createdBy` or `paidBy` can delete.
-    - Ledger Guard: Rejects deletion if any settlement share has already been paid (`status: 'SETTLED'`).
-  - Unit tests: Added to `tests/split.test.js` (16/16 passing).
-  - Frontend: `useDeleteSplitMutation` in `src/api/mutations.ts` with optimistic cache removal.
-  - UI: Delete split action & confirmation modal in `src/pages/splits/index.tsx`.
+  - Backend:
+    - `PUT /split/:id` in `index.js`, `updateSplit` in `helpers/extensions/split.extension.js`.
+    - `DELETE /split/:id` in `index.js`, `deleteSplit` in `helpers/extensions/split.extension.js`.
+    - Safety Guards:
+      - Authorization: Only `createdBy` or `paidBy` can edit or delete.
+      - Ledger Guard: If any share is `SETTLED`, split cannot be deleted, and amount/participants cannot be modified (description/category can still be updated). If all shares are `PENDING`, amount and participants are recalculated cleanly with penny-perfect rounding.
+    - Unit tests: Added to `tests/split.test.js` (17/17 passing).
+  - Frontend:
+    - `useUpdateSplitMutation` and `useDeleteSplitMutation` in `src/api/mutations.ts` with optimistic cache updates.
+    - `EditSplitModal` in `src/components/EditSplitModal/EditSplitModal.tsx`: Mobile bottom sheet with prefilled values, quick-increment chips, participant toggle, and live validation.
+    - UI: Quick `[ ✏️ ]` icon button on split cards and `[Edit Split]` button alongside `[Delete Split]` in `src/pages/splits/index.tsx`.
+- **Status**: ✅ Completed & Verified.
+
+### Bonus / Foundation: Profile Switcher Modal Mobile Sheet & Scroll Fix
+- **Goal**: Resolve profile switcher UX issues (sheet styling, list scrolling, and admin mode loop traps).
+- **Components involved**:
+  - `src/components/Header/ProfileModal.tsx`:
+    - Converted to mobile bottom sheet (`items-end sm:items-center`, `rounded-t-3xl sm:rounded-2xl`, top drag handle).
+    - Fixed list scrolling with `max-h-[55vh] overflow-y-auto overscroll-contain` and `e.stopPropagation()` on the dialog.
+    - Separated active viewer switching from device profile claiming in Admin Mode (`[Set Owner]`, `[Unbind]`, `[Lock & Exit]`).
 - **Status**: ✅ Completed & Verified.
 
 ### Step 6: 1-Tap Group WhatsApp Summary (Social Friction)
