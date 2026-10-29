@@ -3,6 +3,7 @@ import { useExpense } from '../../context';
 import { useSpendings, useSplits, useSettleParticipantMutation, useTripInfo } from '../../api';
 import { Avatar, PaymentModal, type PaymentSettlementData, CollectQrModal, type CollectQrModalData } from '../../components';
 import { triggerHaptic } from '../../utils/haptics';
+import { parseCustomDate, formatPurchaseTime, getCategoryMeta } from '../../utils/formatters';
 
 export function Dashboard() {
     const { activePerson, setActiveTab, showToast } = useExpense();
@@ -12,18 +13,22 @@ export function Dashboard() {
     const settleMutation = useSettleParticipantMutation();
     const [paymentSettlement, setPaymentSettlement] = useState<PaymentSettlementData | null>(null);
     const [collectSettlement, setCollectSettlement] = useState<CollectQrModalData | null>(null);
+    const [settlingKey, setSettlingKey] = useState<string | null>(null);
     const [expandedOwed, setExpandedOwed] = useState<Record<string, boolean>>({});
     const [expandedOwedToMe, setExpandedOwedToMe] = useState<Record<string, boolean>>({});
 
     const activeSplits = allSplits.filter((s) => s.status === 'ACTIVE');
 
-    // Date checker for today (matches YYYY-MM-DD or DD/MM/YYYY)
+    // Date checker for today
     const isTodayDate = (dateStr?: string) => {
-        if (!dateStr) return false;
+        const d = parseCustomDate(dateStr);
+        if (!d) return false;
         const now = new Date();
-        const todayYMD = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-        const todayDMY = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
-        return dateStr.startsWith(todayYMD) || dateStr.startsWith(todayDMY);
+        return (
+            d.getDate() === now.getDate() &&
+            d.getMonth() === now.getMonth() &&
+            d.getFullYear() === now.getFullYear()
+        );
     };
 
     // 1. Direct personal expenses logged by activePerson (excluding auto-recorded split rows)
@@ -98,7 +103,11 @@ export function Dashboard() {
             paidBy: s.paidBy,
             totalBill: s.totalAmount,
         })),
-    ].sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+    ].sort((a, b) => {
+        const timeA = parseCustomDate(a.timestamp)?.getTime() || 0;
+        const timeB = parseCustomDate(b.timestamp)?.getTime() || 0;
+        return timeB - timeA;
+    });
 
     // Calculate personal settlements from active splits
     const myOwedSettlements: {
@@ -216,10 +225,31 @@ export function Dashboard() {
         }, {})
     );
 
+    const resolveSplitId = (splitId: string): string => {
+        if (!splitId.startsWith('offline_')) return splitId;
+        const currentSplit = allSplits.find((s) => s.splitId === splitId);
+        if (currentSplit) {
+            const matchedServerSplit = allSplits.find(
+                (s) =>
+                    !s.splitId.startsWith('offline_') &&
+                    s.description === currentSplit.description &&
+                    s.totalAmount === currentSplit.totalAmount &&
+                    s.paidBy.toLowerCase() === currentSplit.paidBy.toLowerCase()
+            );
+            if (matchedServerSplit) {
+                return matchedServerSplit.splitId;
+            }
+        }
+        return splitId;
+    };
+
     const handleSettle = async (splitId: string, fromPerson: string, toPerson: string) => {
+        const targetSplitId = resolveSplitId(splitId);
+        const key = `${splitId}_${fromPerson}`;
+        setSettlingKey(key);
         try {
             await settleMutation.mutateAsync({
-                splitId,
+                splitId: targetSplitId,
                 from: fromPerson,
                 to: toPerson,
                 confirmedBy: activePerson,
@@ -229,14 +259,19 @@ export function Dashboard() {
         } catch (err: unknown) {
             triggerHaptic('warning');
             showToast(`Failed to settle: ${String(err)}`, 'error');
+        } finally {
+            setSettlingKey(null);
         }
     };
 
     const handleSettleMultiple = async (splitIds: string[], fromPerson: string, toPerson: string) => {
+        const key = `multi_${fromPerson}`;
+        setSettlingKey(key);
         try {
             for (const sId of splitIds) {
+                const targetSplitId = resolveSplitId(sId);
                 await settleMutation.mutateAsync({
-                    splitId: sId,
+                    splitId: targetSplitId,
                     from: fromPerson,
                     to: toPerson,
                     confirmedBy: activePerson,
@@ -247,6 +282,8 @@ export function Dashboard() {
         } catch (err: unknown) {
             triggerHaptic('warning');
             showToast(`Failed to settle: ${String(err)}`, 'error');
+        } finally {
+            setSettlingKey(null);
         }
     };
 
@@ -275,19 +312,18 @@ export function Dashboard() {
 
                 {/* Net Standing Pill */}
                 <div
-                    className={`px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-2xs shrink-0 border ${
-                        netBalance > 0
+                    className={`px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-2xs shrink-0 border ${netBalance > 0
                             ? 'bg-primary-fixed/60 border-primary/20 text-on-primary-fixed'
                             : netBalance < 0
-                            ? 'bg-error-container/40 border-error/30 text-error'
-                            : 'bg-surface-container border-outline-variant/30 text-on-surface-variant'
-                    }`}
+                                ? 'bg-error-container/40 border-error/30 text-error'
+                                : 'bg-surface-container border-outline-variant/30 text-on-surface-variant'
+                        }`}
                     title={
                         netBalance > 0
                             ? `You are to receive ₹${netBalance.toLocaleString('en-IN')} net after all settlements`
                             : netBalance < 0
-                            ? `You owe ₹${Math.abs(netBalance).toLocaleString('en-IN')} net after all settlements`
-                            : 'All your settlements are cleared'
+                                ? `You owe ₹${Math.abs(netBalance).toLocaleString('en-IN')} net after all settlements`
+                                : 'All your settlements are cleared'
                     }
                 >
                     <span className="material-symbols-outlined text-[16px]">
@@ -297,8 +333,8 @@ export function Dashboard() {
                         {netBalance > 0
                             ? `+₹${netBalance.toLocaleString('en-IN')} to receive`
                             : netBalance < 0
-                            ? `-₹${Math.abs(netBalance).toLocaleString('en-IN')} to pay`
-                            : '₹0 all settled'}
+                                ? `-₹${Math.abs(netBalance).toLocaleString('en-IN')} to pay`
+                                : '₹0 all settled'}
                     </span>
                 </div>
             </div>
@@ -336,11 +372,10 @@ export function Dashboard() {
                             YOU OWE
                         </span>
                         <div
-                            className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                                totalYouOwe > 0
+                            className={`w-6 h-6 rounded-full flex items-center justify-center ${totalYouOwe > 0
                                     ? 'bg-error-container text-error'
                                     : 'bg-surface-container text-on-surface-variant'
-                            }`}
+                                }`}
                         >
                             <span className="material-symbols-outlined text-[15px]">
                                 arrow_upward
@@ -349,9 +384,8 @@ export function Dashboard() {
                     </div>
                     <div>
                         <p
-                            className={`text-xl font-bold tracking-tight font-mono ${
-                                totalYouOwe > 0 ? 'text-error' : 'text-on-surface'
-                            }`}
+                            className={`text-xl font-bold tracking-tight font-mono ${totalYouOwe > 0 ? 'text-error' : 'text-on-surface'
+                                }`}
                         >
                             ₹{totalYouOwe.toLocaleString('en-IN')}
                         </p>
@@ -475,23 +509,24 @@ export function Dashboard() {
                         return (
                             <div
                                 key={`owe-group-${group.to}-${idx}`}
-                                className="bg-surface-container-lowest p-3.5 rounded-xl shadow-xs border border-outline-variant/30 space-y-2.5"
+                                className="bg-surface-container-lowest p-3.5 rounded-2xl shadow-xs border border-outline-variant/30 space-y-3"
                             >
+                                {/* Top Details Row: Avatar + Name + Subtitle (Left), Amount + Chevron (Right) */}
                                 <div className="flex items-center justify-between gap-3">
                                     <div className="flex items-center gap-3 min-w-0">
                                         <Avatar name={group.to} size="md" />
                                         <div className="min-w-0">
-                                            <div className="flex items-center gap-1.5 flex-wrap">
-                                                <h4 className="font-semibold text-sm text-on-surface truncate">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <h4 className="font-bold text-sm text-on-surface truncate">
                                                     Pay {group.to}
                                                 </h4>
                                                 {isMulti && (
-                                                    <span className="px-1.5 py-0.2 rounded-md bg-secondary-fixed/50 text-on-secondary-fixed text-[10px] font-bold">
+                                                    <span className="px-2 py-0.5 rounded-full bg-secondary-fixed/60 text-on-secondary-fixed text-[10px] font-bold shrink-0">
                                                         {group.splits.length} splits
                                                     </span>
                                                 )}
                                             </div>
-                                            <p className="text-xs text-on-surface-variant truncate">
+                                            <p className="text-xs text-on-surface-variant truncate mt-0.5">
                                                 {isMulti
                                                     ? group.splits.map((s) => s.description).join(', ')
                                                     : `For ${group.splits[0].description}`}
@@ -499,44 +534,10 @@ export function Dashboard() {
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center gap-2 shrink-0">
-                                        <span className="font-bold text-sm text-error font-mono">
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        <span className="font-bold text-base sm:text-lg text-error font-mono tracking-tight">
                                             ₹{group.totalAmount.toLocaleString('en-IN')}
                                         </span>
-                                        {group.upiIntent || group.toUpiId ? (
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setPaymentSettlement({
-                                                        to: group.to,
-                                                        from: activePerson,
-                                                        splitId: isMulti ? undefined : group.splits[0].splitId,
-                                                        splitIds: isMulti ? group.splits.map((s) => s.splitId) : undefined,
-                                                        amount: group.totalAmount,
-                                                        toUpiId: group.toUpiId,
-                                                        upiIntent: group.upiIntent,
-                                                        appLinks: group.appLinks,
-                                                        description: isMulti
-                                                            ? `Consolidated payoff (${group.splits.length} splits)`
-                                                            : group.splits[0].description,
-                                                    });
-                                                }}
-                                                className="h-8 px-2.5 rounded-lg bg-primary text-on-primary text-xs font-semibold flex items-center gap-1 shadow-xs hover:bg-primary/90 transition-colors cursor-pointer"
-                                            >
-                                                <span className="material-symbols-outlined text-[15px]">
-                                                    bolt
-                                                </span>
-                                                <span>{isMulti ? 'Pay All' : 'Pay'}</span>
-                                            </button>
-                                        ) : (
-                                            <span className="text-[11px] text-on-surface-variant font-medium flex items-center gap-0.5">
-                                                <span className="material-symbols-outlined text-[13px] text-tertiary">
-                                                    hourglass_top
-                                                </span>
-                                                <span>Pending {group.to}</span>
-                                            </span>
-                                        )}
-
                                         {isMulti && (
                                             <button
                                                 type="button"
@@ -546,10 +547,10 @@ export function Dashboard() {
                                                         [group.to]: !prev[group.to],
                                                     }))
                                                 }
-                                                className="w-7 h-7 rounded-lg text-on-surface-variant hover:bg-surface-container flex items-center justify-center transition-colors cursor-pointer"
+                                                className="w-7 h-7 rounded-lg text-on-surface-variant hover:bg-surface-container-high flex items-center justify-center transition-colors cursor-pointer"
                                                 title={isExpanded ? 'Collapse breakdown' : 'Expand breakdown'}
                                             >
-                                                <span className="material-symbols-outlined text-[18px]">
+                                                <span className="material-symbols-outlined text-[20px]">
                                                     {isExpanded ? 'expand_less' : 'expand_more'}
                                                 </span>
                                             </button>
@@ -557,19 +558,22 @@ export function Dashboard() {
                                     </div>
                                 </div>
 
-                                {/* Consolidated Breakdown Sub-list */}
+                                {/* Consolidated Breakdown Sub-list (if expanded) */}
                                 {isMulti && isExpanded && (
-                                    <div className="pt-2 border-t border-outline-variant/20 space-y-1.5 pl-2">
+                                    <div className="pt-2 border-t border-outline-variant/15 space-y-1.5">
+                                        <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block px-1">
+                                            Included Splits Breakdown
+                                        </span>
                                         {group.splits.map((s) => (
                                             <div
                                                 key={`owed-sub-${s.splitId}`}
-                                                className="flex items-center justify-between text-xs py-1 px-2 rounded-lg bg-surface-container-low"
+                                                className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-xl bg-surface-container-low border border-outline-variant/15"
                                             >
-                                                <span className="text-on-surface truncate font-medium">
+                                                <span className="text-on-surface truncate font-medium pr-2">
                                                     {s.description}
                                                 </span>
                                                 <div className="flex items-center gap-2 shrink-0">
-                                                    <span className="font-mono text-error font-semibold">
+                                                    <span className="font-mono text-error font-bold">
                                                         ₹{s.amount.toLocaleString('en-IN')}
                                                     </span>
                                                     <button
@@ -584,7 +588,7 @@ export function Dashboard() {
                                                                 description: s.description,
                                                             });
                                                         }}
-                                                        className="px-2 py-0.5 rounded bg-surface-container-high text-primary hover:bg-primary/10 text-[11px] font-bold cursor-pointer"
+                                                        className="px-2.5 py-1 rounded-lg bg-surface-container-high text-primary hover:bg-primary/10 text-[11px] font-bold cursor-pointer transition-colors"
                                                     >
                                                         Pay
                                                     </button>
@@ -593,6 +597,53 @@ export function Dashboard() {
                                         ))}
                                     </div>
                                 )}
+
+                                {/* Action Row / Footer */}
+                                <div className="pt-2 border-t border-outline-variant/15 flex items-center justify-between gap-2">
+                                    {group.toUpiId ? (
+                                        <span className="text-[11px] text-on-surface-variant font-mono truncate">
+                                            UPI: {group.toUpiId}
+                                        </span>
+                                    ) : (
+                                        <span className="text-[11px] text-on-surface-variant/80 truncate">
+                                            Instant UPI Payment
+                                        </span>
+                                    )}
+
+                                    {group.upiIntent || group.toUpiId ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setPaymentSettlement({
+                                                    to: group.to,
+                                                    from: activePerson,
+                                                    splitId: isMulti ? undefined : group.splits[0].splitId,
+                                                    splitIds: isMulti ? group.splits.map((s) => s.splitId) : undefined,
+                                                    amount: group.totalAmount,
+                                                    toUpiId: group.toUpiId,
+                                                    upiIntent: group.upiIntent,
+                                                    appLinks: group.appLinks,
+                                                    description: isMulti
+                                                        ? `Consolidated payoff (${group.splits.length} splits)`
+                                                        : group.splits[0].description,
+                                                });
+                                            }}
+                                            className="h-9 px-4 rounded-xl bg-primary text-on-primary text-xs font-semibold flex items-center gap-1.5 shadow-xs hover:bg-primary/90 transition-all cursor-pointer active:scale-[0.99] shrink-0"
+                                        >
+                                            <span className="material-symbols-outlined text-[16px]">
+                                                bolt
+                                            </span>
+                                            <span>{isMulti ? 'Pay All' : 'Pay via UPI'}</span>
+                                        </button>
+                                    ) : (
+                                        <span className="text-[11px] text-on-surface-variant font-medium flex items-center gap-1 shrink-0">
+                                            <span className="material-symbols-outlined text-[14px] text-tertiary">
+                                                hourglass_top
+                                            </span>
+                                            <span>Pending {group.to}</span>
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         );
                     })}
@@ -605,23 +656,24 @@ export function Dashboard() {
                         return (
                             <div
                                 key={`owed-to-me-group-${group.from}-${idx}`}
-                                className="bg-surface-container-lowest p-3.5 rounded-xl shadow-xs border border-outline-variant/30 space-y-2.5"
+                                className="bg-surface-container-lowest p-3.5 rounded-2xl shadow-xs border border-outline-variant/30 space-y-3"
                             >
+                                {/* Top Details Row: Avatar + Name + Subtitle (Left), Amount + Chevron (Right) */}
                                 <div className="flex items-center justify-between gap-3">
                                     <div className="flex items-center gap-3 min-w-0">
                                         <Avatar name={group.from} size="md" />
                                         <div className="min-w-0">
-                                            <div className="flex items-center gap-1.5 flex-wrap">
-                                                <h4 className="font-semibold text-sm text-on-surface truncate">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <h4 className="font-bold text-sm text-on-surface truncate">
                                                     {group.from} owes you
                                                 </h4>
                                                 {isMulti && (
-                                                    <span className="px-1.5 py-0.2 rounded-md bg-primary-fixed text-on-primary-fixed text-[10px] font-bold">
+                                                    <span className="px-2 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed text-[10px] font-bold shrink-0">
                                                         {group.splits.length} splits
                                                     </span>
                                                 )}
                                             </div>
-                                            <p className="text-xs text-on-surface-variant truncate">
+                                            <p className="text-xs text-on-surface-variant truncate mt-0.5">
                                                 {isMulti
                                                     ? group.splits.map((s) => s.description).join(', ')
                                                     : `For ${group.splits[0].description}`}
@@ -630,59 +682,9 @@ export function Dashboard() {
                                     </div>
 
                                     <div className="flex items-center gap-1.5 shrink-0">
-                                        <span className="font-bold text-sm text-primary font-mono mr-1">
+                                        <span className="font-bold text-base sm:text-lg text-primary font-mono tracking-tight">
                                             ₹{group.totalAmount.toLocaleString('en-IN')}
                                         </span>
-
-                                        {/* Collect via QR button */}
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setCollectSettlement({
-                                                    debtorName: group.from,
-                                                    amount: group.totalAmount,
-                                                    splitId: isMulti ? undefined : group.splits[0].splitId,
-                                                    splitIds: isMulti ? group.splits.map((s) => s.splitId) : undefined,
-                                                    description: isMulti
-                                                        ? `${group.splits.length} splits combined`
-                                                        : group.splits[0].description,
-                                                });
-                                            }}
-                                            className="h-8 px-2 rounded-lg bg-surface-container-high text-on-surface hover:bg-surface-container-highest transition-colors flex items-center justify-center border border-outline-variant/40 cursor-pointer"
-                                            title={`Show QR code to collect ₹${group.totalAmount} from ${group.from}`}
-                                        >
-                                            <span className="material-symbols-outlined text-[17px] text-primary">
-                                                qr_code_2
-                                            </span>
-                                            {isMulti && <span className="text-[11px] font-bold ml-1">QR</span>}
-                                        </button>
-
-                                        {/* Confirm Received button */}
-                                        <button
-                                            type="button"
-                                            disabled={settleMutation.isPending}
-                                            onClick={() =>
-                                                isMulti
-                                                    ? handleSettleMultiple(
-                                                          group.splits.map((s) => s.splitId),
-                                                          group.from,
-                                                          activePerson
-                                                      )
-                                                    : handleSettle(
-                                                          group.splits[0].splitId,
-                                                          group.from,
-                                                          activePerson
-                                                      )
-                                            }
-                                            className="h-8 px-2.5 rounded-lg bg-primary-fixed text-on-primary-fixed text-xs font-bold hover:bg-primary hover:text-on-primary transition-colors flex items-center gap-1 shadow-2xs disabled:opacity-50 cursor-pointer"
-                                            title={`Confirm receipt of ₹${group.totalAmount} from ${group.from}`}
-                                        >
-                                            <span className="material-symbols-outlined text-[14px]">
-                                                done_all
-                                            </span>
-                                            <span>{isMulti ? 'Confirm All' : 'Confirm'}</span>
-                                        </button>
-
                                         {isMulti && (
                                             <button
                                                 type="button"
@@ -692,10 +694,10 @@ export function Dashboard() {
                                                         [group.from]: !prev[group.from],
                                                     }))
                                                 }
-                                                className="w-7 h-7 rounded-lg text-on-surface-variant hover:bg-surface-container flex items-center justify-center transition-colors cursor-pointer"
+                                                className="w-7 h-7 rounded-lg text-on-surface-variant hover:bg-surface-container-high flex items-center justify-center transition-colors cursor-pointer"
                                                 title={isExpanded ? 'Collapse breakdown' : 'Expand breakdown'}
                                             >
-                                                <span className="material-symbols-outlined text-[18px]">
+                                                <span className="material-symbols-outlined text-[20px]">
                                                     {isExpanded ? 'expand_less' : 'expand_more'}
                                                 </span>
                                             </button>
@@ -703,19 +705,22 @@ export function Dashboard() {
                                     </div>
                                 </div>
 
-                                {/* Consolidated Breakdown Sub-list */}
+                                {/* Consolidated Breakdown Sub-list (if expanded) */}
                                 {isMulti && isExpanded && (
-                                    <div className="pt-2 border-t border-outline-variant/20 space-y-1.5 pl-2">
+                                    <div className="pt-2 border-t border-outline-variant/15 space-y-1.5">
+                                        <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block px-1">
+                                            Included Splits Breakdown
+                                        </span>
                                         {group.splits.map((s) => (
                                             <div
                                                 key={`owed-to-me-sub-${s.splitId}`}
-                                                className="flex items-center justify-between text-xs py-1 px-2 rounded-lg bg-surface-container-low"
+                                                className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-xl bg-surface-container-low border border-outline-variant/15"
                                             >
-                                                <span className="text-on-surface truncate font-medium">
+                                                <span className="text-on-surface truncate font-medium pr-2">
                                                     {s.description}
                                                 </span>
                                                 <div className="flex items-center gap-1.5 shrink-0">
-                                                    <span className="font-mono text-primary font-semibold">
+                                                    <span className="font-mono text-primary font-bold">
                                                         ₹{s.amount.toLocaleString('en-IN')}
                                                     </span>
                                                     <button
@@ -728,7 +733,7 @@ export function Dashboard() {
                                                                 description: s.description,
                                                             });
                                                         }}
-                                                        className="p-1 rounded bg-surface-container-high text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+                                                        className="flex items-center p-1 rounded-md bg-surface-container-high text-primary hover:bg-primary/10 transition-colors cursor-pointer"
                                                         title="Show QR for this item"
                                                     >
                                                         <span className="material-symbols-outlined text-[15px]">
@@ -737,11 +742,11 @@ export function Dashboard() {
                                                     </button>
                                                     <button
                                                         type="button"
-                                                        disabled={settleMutation.isPending}
+                                                        disabled={settlingKey === `${s.splitId}_${group.from}` || settlingKey === `multi_${group.from}`}
                                                         onClick={() =>
                                                             handleSettle(s.splitId, group.from, activePerson)
                                                         }
-                                                        className="px-2 py-0.5 rounded bg-primary-fixed text-on-primary-fixed hover:bg-primary hover:text-on-primary text-[11px] font-bold cursor-pointer disabled:opacity-50"
+                                                        className="px-2 py-0.5 rounded-md bg-primary-fixed text-on-primary-fixed hover:bg-primary hover:text-on-primary text-[11px] font-bold cursor-pointer disabled:opacity-50 transition-colors"
                                                     >
                                                         Confirm
                                                     </button>
@@ -750,6 +755,59 @@ export function Dashboard() {
                                         ))}
                                     </div>
                                 )}
+
+                                {/* Actions Row: Show QR & Confirm All / Confirm */}
+                                <div className="pt-2 border-t border-outline-variant/15 flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setCollectSettlement({
+                                                debtorName: group.from,
+                                                amount: group.totalAmount,
+                                                splitId: isMulti ? undefined : group.splits[0].splitId,
+                                                splitIds: isMulti ? group.splits.map((s) => s.splitId) : undefined,
+                                                description: isMulti
+                                                    ? `${group.splits.length} splits combined`
+                                                    : group.splits[0].description,
+                                            });
+                                        }}
+                                        className="flex-1 h-9 px-3 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors border border-outline-variant/30 cursor-pointer active:scale-[0.99]"
+                                        title={`Show QR code to collect ₹${group.totalAmount} from ${group.from}`}
+                                    >
+                                        <span className="material-symbols-outlined text-[18px] text-primary">
+                                            qr_code_2
+                                        </span>
+                                        <span>Show QR</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        disabled={
+                                            settlingKey === `multi_${group.from}` ||
+                                            (group.splits.length === 1 && settlingKey === `${group.splits[0].splitId}_${group.from}`)
+                                        }
+                                        onClick={() =>
+                                            isMulti
+                                                ? handleSettleMultiple(
+                                                    group.splits.map((s) => s.splitId),
+                                                    group.from,
+                                                    activePerson
+                                                )
+                                                : handleSettle(
+                                                    group.splits[0].splitId,
+                                                    group.from,
+                                                    activePerson
+                                                )
+                                        }
+                                        className="flex-1 h-9 px-3 rounded-xl bg-primary-fixed hover:bg-primary text-on-primary-fixed hover:text-on-primary text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs disabled:opacity-50 cursor-pointer active:scale-[0.99]"
+                                        title={`Confirm receipt of ₹${group.totalAmount} from ${group.from}`}
+                                    >
+                                        <span className="material-symbols-outlined text-[16px]">
+                                            done_all
+                                        </span>
+                                        <span>{isMulti ? 'Confirm All' : 'Confirm'}</span>
+                                    </button>
+                                </div>
                             </div>
                         );
                     })}
@@ -776,62 +834,99 @@ export function Dashboard() {
                         No expenses or split shares recorded for {activePerson} yet.
                     </div>
                 ) : (
-                    <div className="space-y-2">
-                        {combinedRecentItems.map((item) => (
-                            <div
-                                key={item.id}
-                                className="bg-surface-container-lowest p-3.5 rounded-xl shadow-xs border border-outline-variant/30 flex items-center justify-between gap-3"
-                            >
-                                <div className="flex items-center gap-3 min-w-0">
-                                    <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-primary shrink-0">
-                                        <span className="material-symbols-outlined text-[20px]">
-                                            {item.category.toLowerCase().includes('food')
-                                                ? 'restaurant'
-                                                : item.category.toLowerCase().includes('water')
-                                                ? 'water_drop'
-                                                : item.category.toLowerCase().includes('travel')
-                                                ? 'directions_car'
-                                                : item.category.toLowerCase().includes('activity')
-                                                ? 'snowboarding'
-                                                : 'receipt_long'}
-                                        </span>
-                                    </div>
-                                    <div className="min-w-0">
-                                        <div className="flex items-center gap-1.5 flex-wrap">
-                                            <h4 className="font-semibold text-sm text-on-surface truncate">
-                                                {item.description}
-                                            </h4>
-                                            <span
-                                                className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
-                                                    item.isSplitShare
-                                                        ? 'bg-primary-fixed text-on-primary-fixed'
-                                                        : 'bg-surface-container-high text-on-surface-variant'
-                                                }`}
+                    <div className="space-y-2.5">
+                        {combinedRecentItems.map((item) => {
+                            const catMeta = getCategoryMeta(item.category);
+                            const timeInfo = formatPurchaseTime(item.timestamp);
+                            const isPaidByMe = item.paidBy?.toLowerCase() === activePerson.toLowerCase();
+
+                            return (
+                                <div
+                                    key={item.id}
+                                    className="bg-surface-container-lowest p-3.5 rounded-2xl shadow-2xs border border-outline-variant/30 hover:border-outline-variant/50 transition-all flex flex-col gap-2.5"
+                                >
+                                    {/* Top Row: Category Icon, Description, Category & Badge, and Amount */}
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="flex items-start gap-3 min-w-0">
+                                            {/* Category Icon with Category-Tuned Color */}
+                                            <div
+                                                className={`w-10 h-10 rounded-xl ${catMeta.bgClass} flex items-center justify-center shrink-0 mt-0.5`}
                                             >
-                                                {item.badge}
+                                                <span
+                                                    className={`material-symbols-outlined text-[20px] ${catMeta.textClass}`}
+                                                >
+                                                    {catMeta.icon}
+                                                </span>
+                                            </div>
+
+                                            {/* Description & Category / Type Badges */}
+                                            <div className="min-w-0">
+                                                <h4 className="font-bold text-sm text-on-surface truncate leading-snug">
+                                                    {item.description}
+                                                </h4>
+                                                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                                    <span className="text-[11px] font-semibold text-on-surface-variant">
+                                                        {item.category}
+                                                    </span>
+                                                    <span className="opacity-40 text-[10px]">•</span>
+                                                    <span
+                                                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                                                            item.isSplitShare
+                                                                ? 'bg-primary-fixed text-on-primary-fixed'
+                                                                : 'bg-surface-container-high text-on-surface-variant'
+                                                        }`}
+                                                    >
+                                                        {item.badge}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Amount & Total Bill Reference */}
+                                        <div className="text-right shrink-0">
+                                            <p className="font-bold text-base font-mono text-on-surface tracking-tight">
+                                                ₹{item.amount.toLocaleString('en-IN')}
+                                            </p>
+                                            {item.isSplitShare && item.totalBill && (
+                                                <span className="text-[10px] text-on-surface-variant font-mono block mt-0.5">
+                                                    of ₹{item.totalBill.toLocaleString('en-IN')} bill
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Bottom Metadata Row: Payer Context & Prominent Time of Purchase */}
+                                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-outline-variant/15 text-xs text-on-surface-variant">
+                                        {/* Payer Context */}
+                                        <div className="flex items-center gap-1.5 min-w-0 text-[11px]">
+                                            <span className="material-symbols-outlined text-[14px] text-primary/70 shrink-0">
+                                                {item.isSplitShare ? 'group' : 'person'}
+                                            </span>
+                                            <span className="truncate">
+                                                {item.isSplitShare && item.paidBy
+                                                    ? isPaidByMe
+                                                        ? 'Paid by you for group'
+                                                        : `Paid by ${item.paidBy}`
+                                                    : 'Personal spend'}
                                             </span>
                                         </div>
-                                        <p className="text-xs text-outline truncate mt-0.5">
-                                            {item.category}{' '}
-                                            {item.isSplitShare && item.paidBy
-                                                ? `• Bill paid by ${item.paidBy}`
-                                                : ''}{' '}
-                                            {item.timestamp ? `• ${item.timestamp}` : ''}
-                                        </p>
+
+                                        {/* Time of Purchase Badge */}
+                                        {timeInfo.full && (
+                                            <div
+                                                className="flex items-center gap-1 text-[11px] font-mono font-semibold text-on-surface bg-surface-container/70 px-2 py-0.5 rounded-lg border border-outline-variant/25 shrink-0 shadow-2xs"
+                                                title={`Recorded at: ${timeInfo.raw}`}
+                                            >
+                                                <span className="material-symbols-outlined text-[13px] text-primary">
+                                                    schedule
+                                                </span>
+                                                <span>{timeInfo.full}</span>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
-                                <div className="text-right shrink-0">
-                                    <p className="font-bold text-sm font-mono text-primary">
-                                        ₹{item.amount.toLocaleString('en-IN')}
-                                    </p>
-                                    {item.isSplitShare && item.totalBill && (
-                                        <span className="text-[10px] text-on-surface-variant font-mono block">
-                                            of ₹{item.totalBill.toLocaleString('en-IN')}
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>

@@ -3,6 +3,7 @@ import type { Split } from '../../api/types';
 import { useCategories, usePeople, useUpdateSplitMutation } from '../../api';
 import { useExpense } from '../../context';
 import { triggerHaptic } from '../../utils/haptics';
+import { DEFAULT_CATEGORIES } from '../../config';
 
 export interface EditSplitModalProps {
     isOpen: boolean;
@@ -19,7 +20,8 @@ const QUICK_INCREMENTS = [50, 100, 200, 500];
 
 const EditSplitContent: React.FC<EditSplitContentProps> = ({ split, onClose }) => {
     const { activePerson, showToast } = useExpense();
-    const { data: categories = [] } = useCategories();
+    const { data: rawCategories = [] } = useCategories();
+    const categories = rawCategories.length > 0 ? rawCategories : DEFAULT_CATEGORIES;
     const { data: people = [] } = usePeople();
     const updateMutation = useUpdateSplitMutation();
 

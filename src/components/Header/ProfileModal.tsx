@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Avatar } from '../Avatar';
 import { ENV } from '../../config';
 import { triggerHaptic } from '../../utils/haptics';
+import { reloadApp } from '../../utils/pwaReload';
 
 interface ProfileModalProps {
     isOpen: boolean;
@@ -17,6 +18,7 @@ interface ProfileModalProps {
     unclaimDevice: (passcode: string) => boolean;
     lockSwitcher: () => void;
     showToast: (message: string, icon?: string) => void;
+    onOpenSyncStatus?: () => void;
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({
@@ -33,6 +35,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     unclaimDevice,
     lockSwitcher,
     showToast,
+    onOpenSyncStatus,
 }) => {
     const [passcodeInput, setPasscodeInput] = useState('');
     const [unlockError, setUnlockError] = useState(false);
@@ -336,8 +339,77 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                     )}
                 </div>
 
-                {/* Footer Bar */}
-                <div className="p-3 border-t border-outline-variant/20 bg-surface-container-lowest shrink-0 flex items-center justify-end">
+                {/* Footer Bar: Sync Status, PWA Reload & Close */}
+                <div className="p-3 border-t border-outline-variant/20 bg-surface-container-lowest shrink-0 space-y-2">
+                    {onOpenSyncStatus && (
+                        <div className="flex items-center justify-between text-xs px-0.5 pb-1 border-b border-outline-variant/15">
+                            <div className="flex items-center gap-1.5 text-on-surface-variant min-w-0">
+                                <span className="material-symbols-outlined text-primary text-[17px] shrink-0">
+                                    cloud_sync
+                                </span>
+                                <div className="min-w-0">
+                                    <span className="font-bold text-on-surface block text-[11px] leading-tight">
+                                        Offline Sync & Queues
+                                    </span>
+                                    <span className="text-[10px] text-on-surface-variant block truncate">
+                                        Per-split queues & backoff retries
+                                    </span>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    handleClose();
+                                    onOpenSyncStatus();
+                                }}
+                                className="h-8 px-2.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors active:scale-95"
+                            >
+                                <span>Status</span>
+                                <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+                            </button>
+                        </div>
+                    )}
+
+                    <div className="flex items-center justify-between text-xs px-0.5">
+                        <div className="flex items-center gap-1.5 text-on-surface-variant min-w-0">
+                            <span className="material-symbols-outlined text-primary text-[17px] shrink-0">
+                                cached
+                            </span>
+                            <div className="min-w-0">
+                                <span className="font-bold text-on-surface block text-[11px] leading-tight">
+                                    App Version & PWA
+                                </span>
+                                <span className="text-[10px] text-on-surface-variant block truncate">
+                                    Safe: Claims & offline queue are preserved
+                                </span>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => reloadApp(false)}
+                                className="h-8 px-2.5 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-primary text-xs font-bold border border-outline-variant/30 flex items-center gap-1 cursor-pointer transition-colors active:scale-95 shadow-2xs"
+                                title="Check for SW updates and reload frontend"
+                            >
+                                <span className="material-symbols-outlined text-[15px]">
+                                    refresh
+                                </span>
+                                <span>Reload</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => reloadApp(true)}
+                                className="h-8 px-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-medium border border-outline-variant/20 flex items-center gap-1 cursor-pointer transition-colors active:scale-95"
+                                title="Purge static bundle cache and reload. Your user claim and offline data remain safe in localStorage."
+                            >
+                                <span className="material-symbols-outlined text-[15px] text-secondary">
+                                    restart_alt
+                                </span>
+                                <span>Hard Reload</span>
+                            </button>
+                        </div>
+                    </div>
+
                     <button
                         type="button"
                         onClick={handleClose}

@@ -9,6 +9,7 @@ import {
 } from '../../api';
 import { Avatar } from '../../components';
 import { triggerHaptic } from '../../utils/haptics';
+import { DEFAULT_CATEGORIES } from '../../config';
 
 const QUICK_INCREMENTS = [50, 100, 200, 500];
 
@@ -43,7 +44,8 @@ export function AddPage() {
     const { activePerson, setActiveTab, showToast } = useExpense();
     const [mode, setMode] = useState<'expense' | 'split'>('split');
 
-    const { data: categories = [] } = useCategories();
+    const { data: rawCategories = [] } = useCategories();
+    const categories = rawCategories.length > 0 ? rawCategories : DEFAULT_CATEGORIES;
     const { data: people = [], refetch: refetchPeople, isFetching: isPeopleFetching } = usePeople();
 
     // Quick Expense Form States
@@ -216,7 +218,7 @@ export function AddPage() {
                 : [];
 
         try {
-            const res = await addSplitMutation.mutateAsync({
+            await addSplitMutation.mutateAsync({
                 amount: amt,
                 description: splitDesc,
                 category: activeSplitCategory,
@@ -229,7 +231,7 @@ export function AddPage() {
                 customShares,
             });
             triggerHaptic('success');
-            if (res.splitId.startsWith('offline_') || !navigator.onLine) {
+            if (typeof navigator !== 'undefined' && !navigator.onLine) {
                 showToast(`Split saved offline! Will sync automatically when connected.`, 'cloud_off');
             } else {
                 showToast(`Created split for ${splitDesc} (₹${amt})!`);

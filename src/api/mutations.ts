@@ -49,8 +49,12 @@ function createOptimisticSplit(payload: AddSplitPayload): Split {
             }));
     }
 
+    const splitId =
+        payload.splitId ||
+        `split_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
     return {
-        splitId: `offline_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        splitId,
         description: payload.description,
         category: payload.category,
         totalAmount: payload.amount,
@@ -69,6 +73,7 @@ export function useAddExpenseMutation() {
     const queryClient = useQueryClient();
 
     return useMutation({
+        networkMode: 'always',
         mutationFn: async (payload: AddExpensePayload) => {
             if (typeof navigator !== 'undefined' && !navigator.onLine) {
                 enqueueOfflineMutation('ADD_EXPENSE', payload);
@@ -137,7 +142,12 @@ export function useAddSplitMutation() {
     const queryClient = useQueryClient();
 
     return useMutation({
+        networkMode: 'always',
         mutationFn: async (payload: AddSplitPayload) => {
+            if (!payload.splitId) {
+                payload.splitId = `split_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+            }
+
             if (typeof navigator !== 'undefined' && !navigator.onLine) {
                 enqueueOfflineMutation('ADD_SPLIT', payload);
                 return createOptimisticSplit(payload);
@@ -157,6 +167,10 @@ export function useAddSplitMutation() {
             }
         },
         onMutate: async (newSplitPayload) => {
+            if (!newSplitPayload.splitId) {
+                newSplitPayload.splitId = `split_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+            }
+
             await queryClient.cancelQueries({ queryKey: ['splits'] });
             await queryClient.cancelQueries({ queryKey: ['spendings'] });
 
@@ -196,12 +210,10 @@ export function useAddSplitMutation() {
 
             return { optimisticSplit };
         },
-        onSuccess: (data, variables) => {
-            if (!data.splitId.startsWith('offline_')) {
-                queryClient.invalidateQueries({ queryKey: ['splits'] });
-                queryClient.invalidateQueries({ queryKey: queryKeys.spendings(variables.paidBy) });
-                queryClient.invalidateQueries({ queryKey: ['spendings'] });
-            }
+        onSuccess: (_data, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['splits'] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.spendings(variables.paidBy) });
+            queryClient.invalidateQueries({ queryKey: ['spendings'] });
         },
     });
 }
@@ -211,6 +223,7 @@ export function useAddContributionMutation() {
     const queryClient = useQueryClient();
 
     return useMutation({
+        networkMode: 'always',
         mutationFn: async ({ splitId, person, amount }: AddContributionPayload) => {
             const payload: AddContributionPayload = { splitId, person, amount };
 
@@ -245,6 +258,7 @@ export function useSettleParticipantMutation() {
     const queryClient = useQueryClient();
 
     return useMutation({
+        networkMode: 'always',
         mutationFn: async (payload: SettleParticipantPayload) => {
             if (typeof navigator !== 'undefined' && !navigator.onLine) {
                 enqueueOfflineMutation('SETTLE_PARTICIPANT', payload);
@@ -280,8 +294,8 @@ export function useSettleParticipantMutation() {
 
                     const updatedSettlements = s.settlements.map((settle) => {
                         const match =
-                            settle.from === variables.from &&
-                            (!variables.to || settle.to === variables.to);
+                            settle.from.trim().toLowerCase() === variables.from.trim().toLowerCase() &&
+                            (!variables.to || settle.to.trim().toLowerCase() === variables.to.trim().toLowerCase());
                         if (match) {
                             return { ...settle, status: 'SETTLED' as const };
                         }
@@ -313,6 +327,7 @@ export function useUpdateUpiMutation() {
     const queryClient = useQueryClient();
 
     return useMutation({
+        networkMode: 'always',
         mutationFn: async ({ name, upiId }: UpdateUpiPayload) => {
             const payload = { name, upiId };
             if (typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -344,6 +359,7 @@ export function useDeleteSplitMutation() {
     const queryClient = useQueryClient();
 
     return useMutation({
+        networkMode: 'always',
         mutationFn: async ({ splitId, requestedBy }: { splitId: string; requestedBy?: string }) => {
             return await apiFetch<{ success: boolean; message: string }>(
                 `/split/${splitId}?requestedBy=${encodeURIComponent(requestedBy || '')}`,
@@ -373,6 +389,7 @@ export function useUpdateSplitMutation() {
     const queryClient = useQueryClient();
 
     return useMutation({
+        networkMode: 'always',
         mutationFn: async (payload: UpdateSplitPayload) => {
             return await apiFetch<{ success: boolean; data: Split }>(`/split/${payload.splitId}`, {
                 method: 'PUT',

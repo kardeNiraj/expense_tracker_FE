@@ -97,6 +97,7 @@ export interface AddExpensePayload {
 }
 
 export interface AddSplitPayload {
+    splitId?: string;
     amount: number;
     description: string;
     category: string;

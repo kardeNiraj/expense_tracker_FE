@@ -29,6 +29,7 @@ export function SplitsPage() {
     const [contributionAmount, setContributionAmount] = useState('');
     const [contributionPerson, setContributionPerson] = useState('');
     const [expandedSplits, setExpandedSplits] = useState<Record<string, boolean>>({});
+    const [settlingKey, setSettlingKey] = useState<string | null>(null);
 
     const { data: splits = [], isLoading } = useSplits({ status: statusFilter });
     const { data: tripInfo } = useTripInfo();
@@ -64,9 +65,29 @@ export function SplitsPage() {
     };
 
     const handleSettle = async (splitId: string, fromPerson: string, toPerson?: string) => {
+        let targetSplitId = splitId;
+        // If splitId was an offline temporary ID, resolve to real synced splitId if available
+        if (targetSplitId.startsWith('offline_')) {
+            const currentSplit = splits.find((s) => s.splitId === splitId);
+            if (currentSplit) {
+                const matchedServerSplit = splits.find(
+                    (s) =>
+                        !s.splitId.startsWith('offline_') &&
+                        s.description === currentSplit.description &&
+                        s.totalAmount === currentSplit.totalAmount &&
+                        s.paidBy.toLowerCase() === currentSplit.paidBy.toLowerCase()
+                );
+                if (matchedServerSplit) {
+                    targetSplitId = matchedServerSplit.splitId;
+                }
+            }
+        }
+
+        const key = `${splitId}_${fromPerson}`;
+        setSettlingKey(key);
         try {
             await settleMutation.mutateAsync({
-                splitId,
+                splitId: targetSplitId,
                 from: fromPerson,
                 to: toPerson,
                 confirmedBy: activePerson,
@@ -79,6 +100,8 @@ export function SplitsPage() {
         } catch (err: unknown) {
             triggerHaptic('warning');
             showToast(`Failed to settle: ${String(err)}`, 'error');
+        } finally {
+            setSettlingKey(null);
         }
     };
 
@@ -283,22 +306,20 @@ export function SplitsPage() {
                 <button
                     type="button"
                     onClick={() => setStatusFilter('ACTIVE')}
-                    className={`h-9 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        statusFilter === 'ACTIVE'
+                    className={`h-9 rounded-lg text-xs font-bold transition-all cursor-pointer ${statusFilter === 'ACTIVE'
                             ? 'bg-surface-container-lowest text-primary shadow-xs'
                             : 'text-on-surface-variant hover:text-on-surface'
-                    }`}
+                        }`}
                 >
                     Active Splits
                 </button>
                 <button
                     type="button"
                     onClick={() => setStatusFilter('SETTLED')}
-                    className={`h-9 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        statusFilter === 'SETTLED'
+                    className={`h-9 rounded-lg text-xs font-bold transition-all cursor-pointer ${statusFilter === 'SETTLED'
                             ? 'bg-surface-container-lowest text-primary shadow-xs'
                             : 'text-on-surface-variant hover:text-on-surface'
-                    }`}
+                        }`}
                 >
                     Settled Splits
                 </button>
@@ -373,18 +394,16 @@ export function SplitsPage() {
                         return (
                             <div
                                 key={split.splitId}
-                                className={`bg-surface-container-lowest rounded-2xl border transition-all ${
-                                    expanded
+                                className={`bg-surface-container-lowest rounded-2xl border transition-all ${expanded
                                         ? 'p-4 border-outline-variant/40 space-y-3.5 shadow-sm'
                                         : 'p-3.5 border-outline-variant/30 hover:border-primary/40 hover:bg-surface-container-lowest/80 shadow-xs'
-                                }`}
+                                    }`}
                             >
                                 {/* Split Header / Accordion Trigger */}
                                 <div
                                     onClick={() => toggleSplit(split.splitId, index)}
-                                    className={`flex flex-col gap-2 cursor-pointer select-none transition-colors ${
-                                        expanded ? 'pb-3 border-b border-outline-variant/20' : ''
-                                    }`}
+                                    className={`flex flex-col gap-2 cursor-pointer select-none transition-colors ${expanded ? 'pb-3 border-b border-outline-variant/20' : ''
+                                        }`}
                                     role="button"
                                     aria-expanded={expanded}
                                     tabIndex={0}
@@ -445,9 +464,8 @@ export function SplitsPage() {
                                             )}
                                             <div className="w-7 h-7 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors shrink-0">
                                                 <span
-                                                    className={`material-symbols-outlined text-[18px] transition-transform duration-200 ${
-                                                        expanded ? 'rotate-180 text-primary' : ''
-                                                    }`}
+                                                    className={`material-symbols-outlined text-[18px] transition-transform duration-200 ${expanded ? 'rotate-180 text-primary' : ''
+                                                        }`}
                                                 >
                                                     keyboard_arrow_down
                                                 </span>
@@ -597,115 +615,117 @@ export function SplitsPage() {
                                                     return (
                                                         <div
                                                             key={`${split.splitId}-settle-${s.from}-${s.to}-${s.amount}`}
-                                                            className="p-2.5 rounded-xl bg-surface-container-low border border-outline-variant/20 space-y-1.5"
+                                                            className="p-3 rounded-2xl bg-surface-container-low border border-outline-variant/25 space-y-2.5"
                                                         >
                                                             {/* Row 1: Who owes who + status tag + amount */}
                                                             <div className="flex items-center justify-between gap-2">
-                                                                <div className="flex items-center gap-1.5 min-w-0">
-                                                                    <span className="font-semibold text-xs text-on-surface truncate">
+                                                                <div className="flex items-center gap-2 min-w-0">
+                                                                    <span className="font-semibold text-xs sm:text-sm text-on-surface truncate">
                                                                         {s.from} owes {s.to}
                                                                     </span>
                                                                     <span
-                                                                        className={`text-[10px] font-bold px-1.5 py-0.2 rounded shrink-0 ${
-                                                                            isPending
+                                                                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${isPending
                                                                                 ? 'bg-tertiary-container text-on-tertiary-container'
                                                                                 : 'bg-primary-fixed text-on-primary-fixed'
-                                                                        }`}
+                                                                            }`}
                                                                     >
                                                                         {s.status}
                                                                     </span>
                                                                 </div>
-                                                                <span className="font-bold text-sm text-primary font-mono shrink-0">
+                                                                <span className="font-bold text-sm sm:text-base text-primary font-mono shrink-0">
                                                                     ₹{s.amount.toLocaleString('en-IN')}
                                                                 </span>
                                                             </div>
 
-                                                            {/* Row 2: UPI details & Action buttons (stacked cleanly, no collision!) */}
-                                                            {(s.toUpiId || (isPending && (isDebtor || isCreditor || (!isDebtor && !isCreditor)))) && (
-                                                                <div className="flex items-center justify-between gap-2 pt-1 border-t border-outline-variant/15 text-[11px] flex-wrap">
-                                                                    <span className="text-on-surface-variant font-mono truncate text-[11px]">
-                                                                        {s.toUpiId ? `UPI: ${s.toUpiId}` : ''}
-                                                                    </span>
+                                                            {/* Row 2: UPI details (if available) */}
+                                                            {s.toUpiId && (
+                                                                <div className="text-[11px] text-on-surface-variant font-mono">
+                                                                    UPI: {s.toUpiId}
+                                                                </div>
+                                                            )}
 
-                                                                    <div className="flex items-center gap-1.5 shrink-0 ml-auto">
-                                                                        {/* Debtor Action: Pay via UPI (Opens Payment Modal) */}
-                                                                        {isPending && isDebtor && (s.upiIntent || s.toUpiId) && (
+                                                            {/* Row 3: Action Buttons (Dedicated Line Below Details) */}
+                                                            {isPending && (
+                                                                <>
+                                                                    {/* Creditor: Collect via QR & Confirm Received */}
+                                                                    {isCreditor && (
+                                                                        <div className="pt-2 border-t border-outline-variant/15 flex items-center gap-2">
                                                                             <button
                                                                                 type="button"
                                                                                 onClick={() =>
-                                                                                    setPaymentSettlement({
-                                                                                        to: s.to,
-                                                                                        from: s.from,
+                                                                                    setCollectSettlement({
+                                                                                        debtorName: s.from,
                                                                                         amount: s.amount,
-                                                                                        toUpiId: s.toUpiId,
-                                                                                        upiIntent: s.upiIntent,
-                                                                                        appLinks: s.appLinks,
-                                                                                        description: split.description,
                                                                                         splitId: split.splitId,
+                                                                                        description: split.description,
                                                                                     })
                                                                                 }
-                                                                                className="h-7 px-2.5 rounded-lg bg-primary text-on-primary text-xs font-semibold flex items-center gap-1 shadow-xs hover:bg-primary/90 transition-colors cursor-pointer"
+                                                                                className="flex-1 h-8.5 px-3 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors border border-outline-variant/30 cursor-pointer active:scale-[0.99]"
+                                                                                title={`Show QR code to collect ₹${s.amount} from ${s.from}`}
                                                                             >
-                                                                                <span className="material-symbols-outlined text-[14px]">
-                                                                                    bolt
+                                                                                <span className="material-symbols-outlined text-[17px] text-primary">
+                                                                                    qr_code_2
                                                                                 </span>
-                                                                                <span>Pay</span>
+                                                                                <span>Show QR</span>
                                                                             </button>
-                                                                        )}
-
-                                                                        {/* Debtor Status: Waiting for creditor confirmation */}
-                                                                        {isPending && isDebtor && !isCreditor && !s.upiIntent && !s.toUpiId && (
-                                                                            <span className="text-[10px] text-tertiary font-medium flex items-center gap-0.5">
-                                                                                <span className="material-symbols-outlined text-[13px]">
-                                                                                    hourglass_top
+                                                                            <button
+                                                                                type="button"
+                                                                                disabled={settlingKey === `${split.splitId}_${s.from}`}
+                                                                                onClick={() => handleSettle(split.splitId, s.from, s.to)}
+                                                                                className="flex-1 h-8.5 px-3 rounded-xl bg-primary-fixed hover:bg-primary text-on-primary-fixed hover:text-on-primary text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs disabled:opacity-50 cursor-pointer active:scale-[0.99]"
+                                                                                title={`Confirm you have received ₹${s.amount} from ${s.from}`}
+                                                                            >
+                                                                                <span className="material-symbols-outlined text-[15px]">
+                                                                                    done_all
                                                                                 </span>
-                                                                                <span>Waiting for {s.to}</span>
-                                                                            </span>
-                                                                        )}
+                                                                                <span>Confirm Received</span>
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
 
-                                                                        {/* Creditor Action: ONLY the receiver (creditor) can confirm settlement */}
-                                                                        {isPending && isCreditor && (
-                                                                            <div className="flex items-center gap-1.5">
+                                                                    {/* Debtor: Pay via UPI or Waiting */}
+                                                                    {isDebtor && (
+                                                                        <div className="pt-2 border-t border-outline-variant/15 flex items-center gap-2">
+                                                                            {s.upiIntent || s.toUpiId ? (
                                                                                 <button
                                                                                     type="button"
                                                                                     onClick={() =>
-                                                                                        setCollectSettlement({
-                                                                                            debtorName: s.from,
+                                                                                        setPaymentSettlement({
+                                                                                            to: s.to,
+                                                                                            from: s.from,
                                                                                             amount: s.amount,
-                                                                                            splitId: split.splitId,
+                                                                                            toUpiId: s.toUpiId,
+                                                                                            upiIntent: s.upiIntent,
+                                                                                            appLinks: s.appLinks,
                                                                                             description: split.description,
+                                                                                            splitId: split.splitId,
                                                                                         })
                                                                                     }
-                                                                                    className="h-7 w-7 rounded-lg bg-surface-container-highest text-on-surface hover:bg-surface-variant transition-colors cursor-pointer flex items-center justify-center border border-outline-variant/30"
-                                                                                    title={`Show QR code to collect ₹${s.amount} from ${s.from}`}
+                                                                                    className="w-full h-8.5 px-3 rounded-xl bg-primary text-on-primary text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs hover:bg-primary/90 transition-all cursor-pointer active:scale-[0.99]"
                                                                                 >
-                                                                                    <span className="material-symbols-outlined text-[16px] text-primary">
-                                                                                        qr_code_2
+                                                                                    <span className="material-symbols-outlined text-[16px]">
+                                                                                        bolt
                                                                                     </span>
+                                                                                    <span>Pay ₹{s.amount.toLocaleString('en-IN')} via UPI</span>
                                                                                 </button>
-                                                                                <button
-                                                                                    type="button"
-                                                                                    disabled={settleMutation.isPending}
-                                                                                    onClick={() => handleSettle(split.splitId, s.from, s.to)}
-                                                                                    className="h-7 px-2.5 rounded-lg bg-primary-fixed text-on-primary-fixed hover:bg-primary hover:text-on-primary text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-2xs disabled:opacity-50"
-                                                                                    title={`Confirm you have received ₹${s.amount} from ${s.from}`}
-                                                                                >
-                                                                                    <span className="material-symbols-outlined text-[14px]">
-                                                                                        done_all
+                                                                            ) : (
+                                                                                <div className="w-full flex items-center justify-center text-[11px] text-tertiary font-medium gap-1 py-0.5">
+                                                                                    <span className="material-symbols-outlined text-[13px]">
+                                                                                        hourglass_top
                                                                                     </span>
-                                                                                    <span>Confirm Received</span>
-                                                                                </button>
-                                                                            </div>
-                                                                        )}
+                                                                                    <span>Waiting for {s.to} to confirm or add UPI</span>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
 
-                                                                        {/* Third Party Viewing */}
-                                                                        {isPending && !isDebtor && !isCreditor && (
-                                                                            <span className="text-[10px] text-on-surface-variant/80 italic">
-                                                                                Owed to {s.to}
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
+                                                                    {/* Third Party Viewing */}
+                                                                    {!isDebtor && !isCreditor && (
+                                                                        <div className="pt-1.5 border-t border-outline-variant/15 flex items-center justify-center text-[11px] text-on-surface-variant/80 italic">
+                                                                            <span>Settlement pending between {s.from} and {s.to}</span>
+                                                                        </div>
+                                                                    )}
+                                                                </>
                                                             )}
                                                         </div>
                                                     );

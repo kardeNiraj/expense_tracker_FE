@@ -28,7 +28,9 @@ export function useCategories(refresh = false) {
     return useQuery<string[]>({
         queryKey: queryKeys.categories(refresh),
         queryFn: () => apiFetch<string[]>(`/categories?refresh=${refresh}`),
-        staleTime: 1000 * 30, // 30 seconds cache
+        staleTime: 1000 * 60 * 30, // 30 minutes cache
+        gcTime: 1000 * 60 * 60 * 24 * 7,
+        networkMode: 'offlineFirst',
     });
 }
 
@@ -37,7 +39,9 @@ export function usePeople(refresh = false) {
     return useQuery<string[]>({
         queryKey: queryKeys.people(refresh),
         queryFn: () => apiFetch<string[]>(`/people?refresh=${refresh}`),
-        staleTime: 1000 * 30, // 30 seconds cache for instant sheet updates
+        staleTime: 1000 * 60 * 5, // 5 minutes cache
+        gcTime: 1000 * 60 * 60 * 24 * 7,
+        networkMode: 'offlineFirst',
     });
 }
 
@@ -46,7 +50,9 @@ export function usePeopleDetails(refresh = false) {
     return useQuery<PersonDetail[]>({
         queryKey: queryKeys.peopleDetails(),
         queryFn: () => apiFetch<PersonDetail[]>(`/people/details?refresh=${refresh}`),
-        staleTime: 1000 * 30, // 30 seconds cache
+        staleTime: 1000 * 60 * 5, // 5 minutes cache
+        gcTime: 1000 * 60 * 60 * 24 * 7,
+        networkMode: 'offlineFirst',
     });
 }
 
@@ -64,7 +70,9 @@ export function useSplits(params?: SplitsFilterParams) {
     return useQuery<Split[]>({
         queryKey: queryKeys.splits(params),
         queryFn: () => apiFetch<Split[]>(endpoint),
-        staleTime: 1000 * 30, // 30 seconds cache
+        staleTime: 1000 * 60 * 5, // 5 minutes cache
+        gcTime: 1000 * 60 * 60 * 24 * 7,
+        networkMode: 'offlineFirst',
     });
 }
 
@@ -74,7 +82,9 @@ export function useSplitDetails(splitId?: string) {
         queryKey: queryKeys.splitDetails(splitId || ''),
         queryFn: () => apiFetch<Split>(`/split/${splitId}`),
         enabled: Boolean(splitId),
-        staleTime: 1000 * 60 * 2, // 2 minutes
+        staleTime: 1000 * 60 * 10, // 10 minutes
+        gcTime: 1000 * 60 * 60 * 24 * 7,
+        networkMode: 'offlineFirst',
     });
 }
 
@@ -84,7 +94,9 @@ export function useSpendings(payee?: string) {
         queryKey: queryKeys.spendings(payee || ''),
         queryFn: () => apiFetch<SpendingsData>(`/spend/${encodeURIComponent(payee || '')}`),
         enabled: Boolean(payee),
-        staleTime: 1000 * 60, // 1 minute
+        staleTime: 1000 * 60 * 5, // 5 minutes
+        gcTime: 1000 * 60 * 60 * 24 * 7,
+        networkMode: 'offlineFirst',
     });
 }
 
@@ -93,7 +105,9 @@ export function useTripMeta() {
     return useQuery<TripMetaItem[]>({
         queryKey: queryKeys.meta(),
         queryFn: () => apiFetch<TripMetaItem[]>('/meta'),
-        staleTime: 1000 * 60 * 15, // 15 minutes
+        staleTime: 1000 * 60 * 30, // 30 minutes
+        gcTime: 1000 * 60 * 60 * 24 * 7,
+        networkMode: 'offlineFirst',
     });
 }
 
@@ -112,7 +126,9 @@ export function useTripInfo(refresh = false) {
     return useQuery<TripInfo>({
         queryKey: queryKeys.tripInfo(refresh),
         queryFn: () => apiFetch<TripInfo>(`/trip-info${refresh ? '?refresh=true' : ''}`),
-        staleTime: 1000 * 30, // 30 seconds
-        refetchOnWindowFocus: true, // Refresh when switching back to tab
+        staleTime: 1000 * 60 * 15, // 15 minutes
+        gcTime: 1000 * 60 * 60 * 24 * 7,
+        networkMode: 'offlineFirst',
+        refetchOnWindowFocus: false,
     });
 }

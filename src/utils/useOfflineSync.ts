@@ -2,9 +2,15 @@ import { useState, useEffect, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
     getOfflineQueue,
+    getGroupedOfflineQueue,
     subscribeToOfflineQueue,
     processOfflineQueue,
+    retryGroupNow as retryGroupAction,
+    discardGroup as discardGroupAction,
+    clearOfflineQueue,
     type SyncResult,
+    type QueuedItem,
+    type QueuedGroup,
 } from './offlineQueue';
 import { useExpense } from '../context';
 import { triggerHaptic } from './haptics';
@@ -16,10 +22,12 @@ export function useOfflineSync() {
     const [isOnline, setIsOnline] = useState<boolean>(() =>
         typeof navigator !== 'undefined' ? navigator.onLine : true
     );
-    const [pendingCount, setPendingCount] = useState<number>(() =>
-        getOfflineQueue().length
-    );
+    const [queue, setQueue] = useState<QueuedItem[]>(() => getOfflineQueue());
+    const [groups, setGroups] = useState<QueuedGroup[]>(() => getGroupedOfflineQueue());
     const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+    const pendingCount = queue.length;
+    const hasBackoff = groups.some((g) => g.isInBackoff);
 
     // Sync queue to backend
     const syncNow = useCallback(async (): Promise<SyncResult | null> => {
@@ -48,14 +56,50 @@ export function useOfflineSync() {
             return null;
         } finally {
             setIsSyncing(false);
-            setPendingCount(getOfflineQueue().length);
+            const freshQueue = getOfflineQueue();
+            setQueue(freshQueue);
+            setGroups(getGroupedOfflineQueue());
         }
     }, [isSyncing, queryClient, showToast]);
 
+    const retryGroup = useCallback(
+        async (groupId: string): Promise<SyncResult | null> => {
+            if (isSyncing || typeof navigator === 'undefined' || !navigator.onLine) {
+                return null;
+            }
+            setIsSyncing(true);
+            triggerHaptic('medium');
+            try {
+                const result = await retryGroupAction(groupId, queryClient);
+                return result;
+            } finally {
+                setIsSyncing(false);
+                setQueue(getOfflineQueue());
+                setGroups(getGroupedOfflineQueue());
+            }
+        },
+        [isSyncing, queryClient]
+    );
+
+    const discardGroup = useCallback((groupId: string) => {
+        triggerHaptic('warning');
+        discardGroupAction(groupId);
+        setQueue(getOfflineQueue());
+        setGroups(getGroupedOfflineQueue());
+    }, []);
+
+    const clearQueue = useCallback(() => {
+        triggerHaptic('warning');
+        clearOfflineQueue();
+        setQueue([]);
+        setGroups([]);
+    }, []);
+
     // Listen to queue changes and online/offline status
     useEffect(() => {
-        const unsubscribe = subscribeToOfflineQueue((queue) => {
-            setPendingCount(queue.length);
+        const unsubscribe = subscribeToOfflineQueue((updatedQueue) => {
+            setQueue(updatedQueue);
+            setGroups(getGroupedOfflineQueue());
         });
 
         const handleOnline = () => {
@@ -84,6 +128,15 @@ export function useOfflineSync() {
         window.addEventListener('offline', handleOffline);
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
+        // Periodic tick every 1 second when items are in backoff to refresh countdowns
+        const backoffInterval = setInterval(() => {
+            const currentQueue = getOfflineQueue();
+            const now = Date.now();
+            if (currentQueue.some((it) => it.nextRetryAt && it.nextRetryAt > now)) {
+                setGroups(getGroupedOfflineQueue(now));
+            }
+        }, 1000);
+
         // Initial check on mount if items are waiting and online
         let mountTimer: ReturnType<typeof setTimeout> | undefined;
         if (typeof navigator !== 'undefined' && navigator.onLine && getOfflineQueue().length > 0) {
@@ -94,6 +147,7 @@ export function useOfflineSync() {
 
         return () => {
             if (mountTimer) clearTimeout(mountTimer);
+            clearInterval(backoffInterval);
             unsubscribe();
             window.removeEventListener('online', handleOnline);
             window.removeEventListener('offline', handleOffline);
@@ -104,8 +158,14 @@ export function useOfflineSync() {
     return {
         isOnline,
         pendingCount,
+        queue,
+        groups,
+        hasBackoff,
         isSyncing,
         syncNow,
+        retryGroup,
+        discardGroup,
+        clearQueue,
     };
 }
 

@@ -13,20 +13,28 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
     });
 
-    // 2. Active Person (defaults to claimedPerson if set, else saved or ENV default)
+    // 2. Switcher Unlocked (Admin Mode) - Persisted in sessionStorage across renders and reloads
+    const [isSwitcherUnlocked, setIsSwitcherUnlockedState] = useState<boolean>(() => {
+        try {
+            return sessionStorage.getItem('admin_switcher_unlocked') === 'true';
+        } catch {
+            return false;
+        }
+    });
+
+    // 3. Active Person (prioritizes saved active_person, then claimedPerson, then ENV default)
     const [activePerson, setActivePersonState] = useState<string>(() => {
         try {
-            const claimed = localStorage.getItem('claimed_person');
-            if (claimed) return claimed;
             const saved = localStorage.getItem('active_person') || localStorage.getItem('manali_active_person');
             if (saved) return saved;
+            const claimed = localStorage.getItem('claimed_person');
+            if (claimed) return claimed;
         } catch {
             // fallback
         }
         return ENV.DEFAULT_ACTIVE_PERSON;
     });
 
-    const [isSwitcherUnlocked, setIsSwitcherUnlocked] = useState(false);
     const [activeTab, setActiveTab] = useState<AppTab>('dashboard');
     const [toast, setToast] = useState<{ message: string; icon?: string; visible: boolean }>({
         message: '',
@@ -38,7 +46,6 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const claimProfile = useCallback((name: string) => {
         setClaimedPersonState(name);
         setActivePersonState(name);
-        setIsSwitcherUnlocked(false);
         try {
             localStorage.setItem('claimed_person', name);
             localStorage.setItem('active_person', name);
@@ -49,7 +56,12 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     const unlockProfileSwitch = useCallback((passcode: string): boolean => {
         if (passcode.trim() === ENV.ADMIN_PASSCODE) {
-            setIsSwitcherUnlocked(true);
+            setIsSwitcherUnlockedState(true);
+            try {
+                sessionStorage.setItem('admin_switcher_unlocked', 'true');
+            } catch {
+                // ignore
+            }
             return true;
         }
         return false;
@@ -58,7 +70,6 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const unclaimDevice = useCallback((passcode: string): boolean => {
         if (passcode.trim() === ENV.ADMIN_PASSCODE) {
             setClaimedPersonState(null);
-            setIsSwitcherUnlocked(false);
             try {
                 localStorage.removeItem('claimed_person');
             } catch {
@@ -70,7 +81,12 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }, []);
 
     const lockSwitcher = useCallback(() => {
-        setIsSwitcherUnlocked(false);
+        setIsSwitcherUnlockedState(false);
+        try {
+            sessionStorage.removeItem('admin_switcher_unlocked');
+        } catch {
+            // ignore
+        }
     }, []);
 
     const setActivePerson = useCallback((name: string) => {
