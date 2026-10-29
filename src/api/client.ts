@@ -43,8 +43,9 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
     } catch (err: unknown) {
         clearTimeout(timeoutId);
 
-        // If HTTPS fails due to local dev server running plain HTTP, switch to HTTP fallback
-        if (activeBaseUrl.startsWith('https://') && (err instanceof TypeError || String(err).includes('fetch'))) {
+        // Only fallback to HTTP for local dev environments (localhost / 127.0.0.1)
+        const isLocalDev = activeBaseUrl.includes('localhost') || activeBaseUrl.includes('127.0.0.1');
+        if (isLocalDev && activeBaseUrl.startsWith('https://') && (err instanceof TypeError || String(err).includes('fetch'))) {
             const fallbackBaseUrl = activeBaseUrl.replace(/^https:/, 'http:');
             const fallbackUrl = `${fallbackBaseUrl}${cleanEndpoint}`;
 
@@ -61,7 +62,7 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
                 );
             }
 
-            // Persist the HTTP fallback for subsequent requests
+            // Persist the HTTP fallback only for localhost dev servers
             activeBaseUrl = fallbackBaseUrl;
 
             const json: ApiResponse<T> | T = await fallbackResponse.json();

@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useExpense } from '../../context';
-import { usePeople, useTripInfo } from '../../api';
+import { usePeople, usePeopleDetails, useTripInfo } from '../../api';
 import { Avatar } from '../../components/Avatar';
 import { ENV } from '../../config';
 
 export const ClaimIdentityScreen: React.FC = () => {
     const { claimProfile, unlockProfileSwitch, showToast } = useExpense();
     const { data: people = [], isLoading, isError, refetch } = usePeople();
+    usePeopleDetails();
     const { data: tripInfo } = useTripInfo();
 
     const [selectedPerson, setSelectedPerson] = useState<string | null>(null);
@@ -288,12 +289,11 @@ export const ClaimIdentityScreen: React.FC = () => {
                                     setPasscodeInput(e.target.value);
                                     setPasscodeError(false);
                                 }}
-                                placeholder="Enter passcode (default: 1234)"
-                                className={`w-full h-11 px-3.5 rounded-xl bg-surface-container-low text-sm font-mono text-on-surface border focus:outline-none transition-colors ${
-                                    passcodeError
+                                placeholder="Enter passcode"
+                                className={`w-full h-11 px-3.5 rounded-xl bg-surface-container-low text-sm font-mono text-on-surface border focus:outline-none transition-colors ${passcodeError
                                         ? 'border-error focus:border-error'
                                         : 'border-outline-variant/30 focus:border-primary'
-                                }`}
+                                    }`}
                                 autoFocus
                                 required
                             />

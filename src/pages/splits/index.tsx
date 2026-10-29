@@ -6,6 +6,7 @@ import {
     useSettleParticipantMutation,
     useAddContributionMutation,
     useDeleteSplitMutation,
+    usePeopleDetails,
 } from '../../api';
 import {
     Avatar,
@@ -33,6 +34,7 @@ export function SplitsPage() {
 
     const { data: splits = [], isLoading } = useSplits({ status: statusFilter });
     const { data: tripInfo } = useTripInfo();
+    const { data: peopleDetails = [] } = usePeopleDetails();
     const settleMutation = useSettleParticipantMutation();
     const contributeMutation = useAddContributionMutation();
     const deleteMutation = useDeleteSplitMutation();
@@ -152,7 +154,9 @@ export function SplitsPage() {
         allPendingSettlements.forEach((s) => {
             const key = `${s.from}->${s.to}`;
             if (!pairwiseNet[key]) {
-                pairwiseNet[key] = { from: s.from, to: s.to, amount: 0, toUpiId: s.toUpiId };
+                const personDetail = peopleDetails.find((p) => p.name.toLowerCase() === s.to.toLowerCase());
+                const resolvedToUpiId = s.toUpiId || personDetail?.upiId || null;
+                pairwiseNet[key] = { from: s.from, to: s.to, amount: 0, toUpiId: resolvedToUpiId };
             }
             pairwiseNet[key].amount += s.amount;
         });
@@ -638,9 +642,9 @@ export function SplitsPage() {
                                                             </div>
 
                                                             {/* Row 2: UPI details (if available) */}
-                                                            {s.toUpiId && (
+                                                            {(s.toUpiId || peopleDetails.find((p) => p.name.toLowerCase() === s.to.toLowerCase())?.upiId) && (
                                                                 <div className="text-[11px] text-on-surface-variant font-mono">
-                                                                    UPI: {s.toUpiId}
+                                                                    UPI: {s.toUpiId || peopleDetails.find((p) => p.name.toLowerCase() === s.to.toLowerCase())?.upiId}
                                                                 </div>
                                                             )}
 
@@ -684,40 +688,43 @@ export function SplitsPage() {
                                                                     )}
 
                                                                     {/* Debtor: Pay via UPI or Waiting */}
-                                                                    {isDebtor && (
-                                                                        <div className="pt-2 border-t border-outline-variant/15 flex items-center gap-2">
-                                                                            {s.upiIntent || s.toUpiId ? (
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() =>
-                                                                                        setPaymentSettlement({
-                                                                                            to: s.to,
-                                                                                            from: s.from,
-                                                                                            amount: s.amount,
-                                                                                            toUpiId: s.toUpiId,
-                                                                                            upiIntent: s.upiIntent,
-                                                                                            appLinks: s.appLinks,
-                                                                                            description: split.description,
-                                                                                            splitId: split.splitId,
-                                                                                        })
-                                                                                    }
-                                                                                    className="w-full h-8.5 px-3 rounded-xl bg-primary text-on-primary text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs hover:bg-primary/90 transition-all cursor-pointer active:scale-[0.99]"
-                                                                                >
-                                                                                    <span className="material-symbols-outlined text-[16px]">
-                                                                                        bolt
-                                                                                    </span>
-                                                                                    <span>Pay ₹{s.amount.toLocaleString('en-IN')} via UPI</span>
-                                                                                </button>
-                                                                            ) : (
-                                                                                <div className="w-full flex items-center justify-center text-[11px] text-tertiary font-medium gap-1 py-0.5">
-                                                                                    <span className="material-symbols-outlined text-[13px]">
-                                                                                        hourglass_top
-                                                                                    </span>
-                                                                                    <span>Waiting for {s.to} to confirm or add UPI</span>
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    )}
+                                                                    {isDebtor && (() => {
+                                                                        const resolvedUpiId = s.toUpiId || peopleDetails.find((p) => p.name.toLowerCase() === s.to.toLowerCase())?.upiId;
+                                                                        return (
+                                                                            <div className="pt-2 border-t border-outline-variant/15 flex items-center gap-2">
+                                                                                {s.upiIntent || resolvedUpiId ? (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() =>
+                                                                                            setPaymentSettlement({
+                                                                                                to: s.to,
+                                                                                                from: s.from,
+                                                                                                amount: s.amount,
+                                                                                                toUpiId: resolvedUpiId,
+                                                                                                upiIntent: s.upiIntent,
+                                                                                                appLinks: s.appLinks,
+                                                                                                description: split.description,
+                                                                                                splitId: split.splitId,
+                                                                                            })
+                                                                                        }
+                                                                                        className="w-full h-8.5 px-3 rounded-xl bg-primary text-on-primary text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs hover:bg-primary/90 transition-all cursor-pointer active:scale-[0.99]"
+                                                                                    >
+                                                                                        <span className="material-symbols-outlined text-[16px]">
+                                                                                            bolt
+                                                                                        </span>
+                                                                                        <span>Pay ₹{s.amount.toLocaleString('en-IN')} via UPI</span>
+                                                                                    </button>
+                                                                                ) : (
+                                                                                    <div className="w-full flex items-center justify-center text-[11px] text-tertiary font-medium gap-1 py-0.5">
+                                                                                        <span className="material-symbols-outlined text-[13px]">
+                                                                                            hourglass_top
+                                                                                        </span>
+                                                                                        <span>Waiting for {s.to} to confirm or add UPI</span>
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        );
+                                                                    })()}
 
                                                                     {/* Third Party Viewing */}
                                                                     {!isDebtor && !isCreditor && (

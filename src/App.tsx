@@ -1,7 +1,8 @@
+import { useState, useEffect } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { ExpenseProvider, useExpense } from './context';
 import { MobileGate, Header, BottomNav, Toast, InstallPrompt, PullToRefresh, PwaUpdatePrompt } from './components';
-import { apiFetch } from './api';
+import { apiFetch, queryKeys } from './api';
 import { Dashboard, SplitsPage, AddPage, PeoplePage, ClaimIdentityScreen } from './pages';
 import { ENV } from './config';
 import { setupQueryCachePersistence } from './utils/idbQueryCache';
@@ -20,9 +21,6 @@ const queryClient = new QueryClient({
         },
     },
 });
-
-// Setup native IndexedDB query cache persistence
-setupQueryCachePersistence(queryClient);
 
 function MainApp() {
     const { activeTab, isDeviceClaimed, isSwitcherUnlocked, showToast } = useExpense();
@@ -90,6 +88,49 @@ function MainApp() {
 }
 
 export function App() {
+    const [isCacheReady, setIsCacheReady] = useState(false);
+
+    useEffect(() => {
+        let mounted = true;
+        setupQueryCachePersistence(queryClient)
+            .finally(() => {
+                if (mounted) {
+                    setIsCacheReady(true);
+                    // Proactively prefetch people details & member list on startup
+                    // so UPI IDs and QR collection are ready offline even before visiting People tab
+                    if (typeof navigator !== 'undefined' && navigator.onLine) {
+                        queryClient.prefetchQuery({
+                            queryKey: queryKeys.peopleDetails(),
+                            queryFn: () => apiFetch('/people/details?refresh=false'),
+                        });
+                        queryClient.prefetchQuery({
+                            queryKey: queryKeys.people(false),
+                            queryFn: () => apiFetch('/people?refresh=false'),
+                        });
+                    }
+                }
+            });
+
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
+    if (!isCacheReady) {
+        return (
+            <div className="min-h-screen w-full bg-surface text-primary flex items-center justify-center font-sans">
+                <div className="flex flex-col items-center gap-3 animate-pulse">
+                    <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-xs">
+                        <span className="material-symbols-outlined text-[28px]">landscape</span>
+                    </div>
+                    <span className="text-xs font-semibold tracking-wider uppercase font-mono text-on-surface-variant">
+                        SplitNest
+                    </span>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <QueryClientProvider client={queryClient}>
             <ExpenseProvider>

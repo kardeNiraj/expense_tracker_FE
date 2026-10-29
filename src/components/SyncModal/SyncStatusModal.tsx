@@ -96,7 +96,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
 
         if (group.status === 'BACKOFF') {
             return (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30">
                     <span className="material-symbols-outlined text-[13px] animate-pulse">timer</span>
                     <span>Retrying in {group.backoffSecondsRemaining}s</span>
                 </span>
@@ -113,7 +113,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
         }
 
         return (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-surface-container-high text-on-surface-variant border border-outline-variant/30">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/25">
                 <span className="material-symbols-outlined text-[13px]">schedule</span>
                 <span>Queued</span>
             </span>
@@ -171,15 +171,15 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
                 {/* Network / Sync Banner */}
                 <div className="px-4 pt-3 pb-2 shrink-0">
                     {!isOnline ? (
-                        <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-2.5">
-                            <span className="material-symbols-outlined text-[20px] text-amber-600 dark:text-amber-400 shrink-0 mt-0.5">
+                        <div className="p-3 rounded-xl bg-tertiary/10 border border-tertiary/25 flex items-start gap-2.5">
+                            <span className="material-symbols-outlined text-[20px] text-tertiary shrink-0 mt-0.5">
                                 cloud_off
                             </span>
                             <div className="text-xs">
-                                <span className="font-bold text-amber-700 dark:text-amber-300">
+                                <span className="font-bold text-tertiary">
                                     You are currently offline
                                 </span>
-                                <p className="text-amber-800/80 dark:text-amber-200/80 mt-0.5 leading-relaxed text-[11px]">
+                                <p className="text-on-surface-variant mt-0.5 leading-relaxed text-[11px]">
                                     Transactions are stored safely in local IndexedDB. They will automatically sync to Google Sheets as soon as internet connection is restored.
                                 </p>
                             </div>
@@ -339,11 +339,11 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
                                                     {item.status === 'SYNCING' ? (
                                                         <span className="text-primary font-bold">Syncing</span>
                                                     ) : item.retryCount > 0 ? (
-                                                        <span className="text-amber-600 dark:text-amber-400">
+                                                        <span className="text-indigo-700 dark:text-indigo-300 font-semibold">
                                                             Retried {item.retryCount}x
                                                         </span>
                                                     ) : (
-                                                        <span className="text-on-surface-variant">Pending</span>
+                                                        <span className="text-sky-700 dark:text-sky-300 font-medium">Queued</span>
                                                     )}
                                                 </div>
                                             </div>

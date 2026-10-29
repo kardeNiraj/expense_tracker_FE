@@ -150,7 +150,7 @@ export function useAddSplitMutation() {
 
             if (typeof navigator !== 'undefined' && !navigator.onLine) {
                 enqueueOfflineMutation('ADD_SPLIT', payload);
-                return createOptimisticSplit(payload);
+                return { ...createOptimisticSplit(payload), offline: true };
             }
 
             try {
@@ -161,7 +161,7 @@ export function useAddSplitMutation() {
             } catch (err: unknown) {
                 if (isOfflineOrNetworkError(err)) {
                     enqueueOfflineMutation('ADD_SPLIT', payload);
-                    return createOptimisticSplit(payload);
+                    return { ...createOptimisticSplit(payload), offline: true };
                 }
                 throw err;
             }
@@ -210,10 +210,12 @@ export function useAddSplitMutation() {
 
             return { optimisticSplit };
         },
-        onSuccess: (_data, variables) => {
-            queryClient.invalidateQueries({ queryKey: ['splits'] });
-            queryClient.invalidateQueries({ queryKey: queryKeys.spendings(variables.paidBy) });
-            queryClient.invalidateQueries({ queryKey: ['spendings'] });
+        onSuccess: (data, variables) => {
+            if (!(data as { offline?: boolean })?.offline) {
+                queryClient.invalidateQueries({ queryKey: ['splits'] });
+                queryClient.invalidateQueries({ queryKey: queryKeys.spendings(variables.paidBy) });
+                queryClient.invalidateQueries({ queryKey: ['spendings'] });
+            }
         },
     });
 }
@@ -229,7 +231,7 @@ export function useAddContributionMutation() {
 
             if (typeof navigator !== 'undefined' && !navigator.onLine) {
                 enqueueOfflineMutation('ADD_CONTRIBUTION', payload);
-                return { splitId } as Split;
+                return { splitId, offline: true } as Split & { offline?: boolean };
             }
 
             try {
@@ -240,15 +242,17 @@ export function useAddContributionMutation() {
             } catch (err: unknown) {
                 if (isOfflineOrNetworkError(err)) {
                     enqueueOfflineMutation('ADD_CONTRIBUTION', payload);
-                    return { splitId } as Split;
+                    return { splitId, offline: true } as Split & { offline?: boolean };
                 }
                 throw err;
             }
         },
-        onSuccess: (_data, variables) => {
-            queryClient.invalidateQueries({ queryKey: queryKeys.splitDetails(variables.splitId) });
-            queryClient.invalidateQueries({ queryKey: ['splits'] });
-            queryClient.invalidateQueries({ queryKey: ['spendings'] });
+        onSuccess: (data, variables) => {
+            if (!(data as { offline?: boolean })?.offline) {
+                queryClient.invalidateQueries({ queryKey: queryKeys.splitDetails(variables.splitId) });
+                queryClient.invalidateQueries({ queryKey: ['splits'] });
+                queryClient.invalidateQueries({ queryKey: ['spendings'] });
+            }
         },
     });
 }
@@ -262,7 +266,7 @@ export function useSettleParticipantMutation() {
         mutationFn: async (payload: SettleParticipantPayload) => {
             if (typeof navigator !== 'undefined' && !navigator.onLine) {
                 enqueueOfflineMutation('SETTLE_PARTICIPANT', payload);
-                return { splitId: payload.splitId } as Split;
+                return { splitId: payload.splitId, offline: true } as Split & { offline?: boolean };
             }
 
             try {
@@ -278,7 +282,7 @@ export function useSettleParticipantMutation() {
             } catch (err: unknown) {
                 if (isOfflineOrNetworkError(err)) {
                     enqueueOfflineMutation('SETTLE_PARTICIPANT', payload);
-                    return { splitId: payload.splitId } as Split;
+                    return { splitId: payload.splitId, offline: true } as Split & { offline?: boolean };
                 }
                 throw err;
             }
@@ -312,8 +316,8 @@ export function useSettleParticipantMutation() {
                 });
             });
         },
-        onSuccess: (_data, variables) => {
-            if (typeof navigator !== 'undefined' && navigator.onLine) {
+        onSuccess: (data, variables) => {
+            if (typeof navigator !== 'undefined' && navigator.onLine && !(data as { offline?: boolean })?.offline) {
                 queryClient.invalidateQueries({ queryKey: queryKeys.splitDetails(variables.splitId) });
                 queryClient.invalidateQueries({ queryKey: ['splits'] });
                 queryClient.invalidateQueries({ queryKey: ['spendings'] });

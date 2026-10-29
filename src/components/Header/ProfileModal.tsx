@@ -103,8 +103,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                                 {isSwitcherUnlocked
                                     ? 'admin_panel_settings'
                                     : isDeviceClaimed
-                                    ? 'verified_user'
-                                    : 'switch_account'}
+                                        ? 'verified_user'
+                                        : 'switch_account'}
                             </span>
                         </div>
                         <div className="min-w-0">
@@ -112,15 +112,15 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                                 {isSwitcherUnlocked
                                     ? 'Admin Profile Switcher'
                                     : isDeviceClaimed
-                                    ? 'Member Profile'
-                                    : 'Claim This Device'}
+                                        ? 'Member Profile'
+                                        : 'Claim This Device'}
                             </h3>
                             <p className="text-xs text-on-surface-variant truncate">
                                 {isSwitcherUnlocked
                                     ? `Admin Active • Current: ${activePerson}`
                                     : isDeviceClaimed
-                                    ? `Bound to ${claimedPerson}`
-                                    : 'Select your name to bind this device'}
+                                        ? `Bound to ${claimedPerson}`
+                                        : 'Select your name to bind this device'}
                             </p>
                         </div>
                     </div>
@@ -172,12 +172,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                                         setPasscodeInput(e.target.value);
                                         setUnlockError(false);
                                     }}
-                                    placeholder="Enter admin passcode (default: 1234)"
-                                    className={`w-full h-11 px-3.5 rounded-xl bg-surface-container-lowest text-sm font-mono text-on-surface border focus:outline-hidden ${
-                                        unlockError
+                                    placeholder="Enter admin passcode"
+                                    className={`w-full h-11 px-3.5 rounded-xl bg-surface-container-lowest text-sm font-mono text-on-surface border focus:outline-hidden ${unlockError
                                             ? 'border-error focus:border-error'
                                             : 'border-outline-variant focus:border-primary'
-                                    }`}
+                                        }`}
                                     required
                                 />
                                 {unlockError && (
@@ -266,11 +265,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                                     return (
                                         <div
                                             key={person}
-                                            className={`p-2.5 rounded-2xl border transition-all flex items-center justify-between gap-2.5 ${
-                                                isCurrent
+                                            className={`p-2.5 rounded-2xl border transition-all flex items-center justify-between gap-2.5 ${isCurrent
                                                     ? 'bg-primary/5 border-primary/40 shadow-xs'
                                                     : 'bg-surface-container-low/70 border-outline-variant/20 hover:border-outline-variant/50 hover:bg-surface-container-low'
-                                            }`}
+                                                }`}
                                         >
                                             <button
                                                 type="button"
@@ -310,8 +308,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                                                         {!isDeviceClaimed && !isSwitcherUnlocked
                                                             ? 'Tap to claim device'
                                                             : isCurrent
-                                                            ? 'Currently viewing this profile'
-                                                            : 'Tap to view as ' + person}
+                                                                ? 'Currently viewing this profile'
+                                                                : 'Tap to view as ' + person}
                                                     </span>
                                                 </div>
                                             </button>

@@ -424,9 +424,11 @@ async function processSingleGroup(
             const isNotFound = errMsg.includes('not found') || errMsg.includes('404');
             const retryCount = (currentItem.retryCount || 0) + 1;
 
-            // Permanent missing ID after 3 retries: drop it so it does not block the user forever
-            if (isNotFound && retryCount >= 3) {
-                console.warn(`[OfflineQueue] Dropping obsolete item ${currentItem.id} (${currentItem.type}): ${String(err)}`);
+            // ONLY drop dependent operations (settle / contribution) if the target split was genuinely not found
+            // NEVER drop creation operations (ADD_SPLIT, ADD_EXPENSE) which must be preserved!
+            const isCreation = currentItem.type === 'ADD_SPLIT' || currentItem.type === 'ADD_EXPENSE';
+            if (!isCreation && isNotFound && retryCount >= 5) {
+                console.warn(`[OfflineQueue] Dropping obsolete dependent item ${currentItem.id} (${currentItem.type}): ${String(err)}`);
                 dequeueOfflineMutation(currentItem.id);
                 break;
             }

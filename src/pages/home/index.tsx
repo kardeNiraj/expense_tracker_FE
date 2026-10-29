@@ -1,6 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useExpense } from '../../context';
-import { useSpendings, useSplits, useSettleParticipantMutation, useTripInfo } from '../../api';
+import {
+    useSpendings,
+    useSplits,
+    useSettleParticipantMutation,
+    useTripInfo,
+    usePeople,
+    usePeopleDetails,
+} from '../../api';
 import { Avatar, PaymentModal, type PaymentSettlementData, CollectQrModal, type CollectQrModalData } from '../../components';
 import { triggerHaptic } from '../../utils/haptics';
 import { parseCustomDate, formatPurchaseTime, getCategoryMeta } from '../../utils/formatters';
@@ -10,6 +17,22 @@ export function Dashboard() {
     const { data: spendings, isLoading: isSpendingsLoading } = useSpendings(activePerson);
     const { data: allSplits = [], isLoading: isSplitsLoading } = useSplits();
     const { data: tripInfo } = useTripInfo();
+    const { data: people = [], refetch: refetchPeople } = usePeople();
+    const { data: peopleDetails = [], refetch: refetchPeopleDetails } = usePeopleDetails();
+
+    // Proactively fetch people and UPI details if not present on initial dashboard mount
+    // Ensures UPI IDs and QR codes are ready offline even if user never visits the People tab
+    useEffect(() => {
+        if (typeof navigator !== 'undefined' && navigator.onLine) {
+            if (people.length === 0) {
+                refetchPeople().catch(() => {});
+            }
+            if (peopleDetails.length === 0) {
+                refetchPeopleDetails().catch(() => {});
+            }
+        }
+    }, [people.length, peopleDetails.length, refetchPeople, refetchPeopleDetails]);
+
     const settleMutation = useSettleParticipantMutation();
     const [paymentSettlement, setPaymentSettlement] = useState<PaymentSettlementData | null>(null);
     const [collectSettlement, setCollectSettlement] = useState<CollectQrModalData | null>(null);
@@ -17,7 +40,7 @@ export function Dashboard() {
     const [expandedOwed, setExpandedOwed] = useState<Record<string, boolean>>({});
     const [expandedOwedToMe, setExpandedOwedToMe] = useState<Record<string, boolean>>({});
 
-    const activeSplits = allSplits.filter((s) => s.status === 'ACTIVE');
+    const activeSplits = allSplits.filter((s) => (s.status || 'ACTIVE').toUpperCase() === 'ACTIVE');
 
     // Date checker for today
     const isTodayDate = (dateStr?: string) => {
@@ -36,16 +59,44 @@ export function Dashboard() {
         (exp) => !exp.description?.toLowerCase().includes('(split:')
     );
 
-    // 2. Split expenses where activePerson participated
+    // Sum of any auto-recorded split rows inside spendings to prevent double-counting
+    const recordedSplitsInSheet = (spendings?.recentExpenses || []).filter((exp) =>
+        exp.description?.toLowerCase().includes('(split:')
+    );
+    const recordedSplitsSum = recordedSplitsInSheet.reduce((sum, e) => sum + (e.amount || 0), 0);
+    const recordedSplitsTodaySum = recordedSplitsInSheet
+        .filter((e) => isTodayDate(e.timestamp))
+        .reduce((sum, e) => sum + (e.amount || 0), 0);
+
+    // 2. Split expenses where activePerson participated or paid upfront
     const userSplitItems = allSplits
         .filter((split) =>
             split.participants?.some(
                 (p) => p.toLowerCase() === activePerson.toLowerCase()
-            )
+            ) ||
+            split.paidBy?.toLowerCase() === activePerson.toLowerCase()
         )
         .map((split) => {
+            const isParticipant = split.participants?.some(
+                (p) => p.toLowerCase() === activePerson.toLowerCase()
+            );
             const count = split.participants?.length || 1;
-            const myShare = Math.round((split.totalAmount / count) * 100) / 100;
+            // Check if there is an explicit settlement for activePerson (e.g. custom shares or pairwise dues)
+            const mySettlement = split.settlements?.find(
+                (s) => s.from.toLowerCase() === activePerson.toLowerCase()
+            );
+            let myShare = 0;
+            if (mySettlement) {
+                myShare = mySettlement.amount;
+            } else if (isParticipant) {
+                if (split.paidBy?.toLowerCase() === activePerson.toLowerCase() && split.settlements?.length > 0) {
+                    const othersOwe = split.settlements.reduce((sum, s) => sum + s.amount, 0);
+                    myShare = Math.max(0, Math.round((split.totalAmount - othersOwe) * 100) / 100);
+                } else {
+                    myShare = Math.round((split.totalAmount / count) * 100) / 100;
+                }
+            }
+
             return {
                 id: split.splitId,
                 timestamp: split.timestamp,
@@ -59,20 +110,34 @@ export function Dashboard() {
         });
 
     // 3. User's Personal Spend Totals
-    const directTotal = personalDirectExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
-    const splitsTotal = userSplitItems.reduce((sum, s) => sum + s.myShare, 0);
-    const userTotalSpend = directTotal + splitsTotal;
+    // Deduct any auto-recorded split rows from spendings.total to isolate pure personal direct expenses
+    const directTotal = typeof spendings?.directTotal === 'number'
+        ? spendings.directTotal
+        : typeof spendings?.total === 'number'
+        ? Math.max(0, Math.round((spendings.total - recordedSplitsSum) * 100) / 100)
+        : personalDirectExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
 
-    const directToday = personalDirectExpenses
-        .filter((e) => isTodayDate(e.timestamp))
-        .reduce((sum, e) => sum + (e.amount || 0), 0);
+    const splitsTotal = userSplitItems.reduce((sum, s) => sum + s.myShare, 0);
+    const userTotalSpend = Math.round((directTotal + splitsTotal) * 100) / 100;
+
+    const directToday = typeof spendings?.directToday === 'number'
+        ? spendings.directToday
+        : typeof spendings?.today === 'number'
+        ? Math.max(0, Math.round((spendings.today - recordedSplitsTodaySum) * 100) / 100)
+        : personalDirectExpenses
+            .filter((e) => isTodayDate(e.timestamp))
+            .reduce((sum, e) => sum + (e.amount || 0), 0);
+
     const splitsToday = userSplitItems
         .filter((s) => s.isToday)
         .reduce((sum, s) => sum + s.myShare, 0);
-    const userTodaySpend = directToday + splitsToday;
+    const userTodaySpend = Math.round((directToday + splitsToday) * 100) / 100;
 
     const userMonthSpend = userTotalSpend;
-    const totalUserExpensesCount = personalDirectExpenses.length + userSplitItems.length;
+    const totalDirectCount = typeof spendings?.directExpensesCount === 'number'
+        ? spendings.directExpensesCount
+        : personalDirectExpenses.length;
+    const totalUserExpensesCount = totalDirectCount + userSplitItems.length;
 
     // Upfront bill coverage (if user covered bills upfront for the group)
     const upfrontPaidByActiveUser = allSplits
@@ -131,12 +196,17 @@ export function Dashboard() {
         split.settlements?.forEach((s) => {
             if (s.status === 'PENDING') {
                 if (s.from.toLowerCase() === activePerson.toLowerCase()) {
+                    const personDetail = peopleDetails.find(
+                        (p) => p.name.toLowerCase() === s.to.toLowerCase()
+                    );
+                    const resolvedToUpiId = s.toUpiId || personDetail?.upiId || null;
+
                     myOwedSettlements.push({
                         splitId: split.splitId,
                         description: split.description,
                         to: s.to,
                         amount: s.amount,
-                        toUpiId: s.toUpiId,
+                        toUpiId: resolvedToUpiId,
                         upiIntent: s.upiIntent,
                         appLinks: s.appLinks,
                     });

@@ -112,7 +112,7 @@ export const Header: React.FC = () => {
                                         : isSyncing
                                         ? 'bg-primary-fixed/40 border-primary/40 text-primary animate-pulse'
                                         : hasBackoff
-                                        ? 'bg-amber-500/20 border-amber-500/40 text-amber-700 dark:text-amber-300'
+                                        ? 'bg-indigo-500/15 border-indigo-500/35 text-indigo-700 dark:text-indigo-300'
                                         : 'bg-primary-fixed/40 border-primary/40 text-primary'
                                 }`}
                                 title="Tap to view sync status & per-split queue"

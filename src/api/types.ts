@@ -72,6 +72,11 @@ export interface SpendingsData {
     today: number;
     currentMonth: number;
     total: number;
+    directToday?: number;
+    directCurrentMonth?: number;
+    directTotal?: number;
+    splitRecordedTotal?: number;
+    directExpensesCount?: number;
     todayExpensesCount: number;
     totalExpensesCount: number;
     recentExpenses: ExpenseRecord[];
