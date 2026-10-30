@@ -332,8 +332,8 @@ export function useUpdateUpiMutation() {
 
     return useMutation({
         networkMode: 'always',
-        mutationFn: async ({ name, upiId }: UpdateUpiPayload) => {
-            const payload = { name, upiId };
+        mutationFn: async ({ name, upiId, requestedBy }: UpdateUpiPayload) => {
+            const payload = { name, upiId, requestedBy };
             if (typeof navigator !== 'undefined' && !navigator.onLine) {
                 enqueueOfflineMutation('UPDATE_UPI', payload);
                 return { message: 'UPI saved offline', status: 'offline' };

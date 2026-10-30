@@ -132,6 +132,7 @@ export interface SettleParticipantPayload {
 export interface UpdateUpiPayload {
     name: string;
     upiId: string;
+    requestedBy?: string;
 }
 
 export interface UpdateSplitPayload {

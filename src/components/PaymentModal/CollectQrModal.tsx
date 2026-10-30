@@ -31,7 +31,7 @@ const CollectQrContent: React.FC<CollectQrContentProps> = ({
     data,
     onConfirmedSettled,
 }) => {
-    const { activePerson, showToast } = useExpense();
+    const { activePerson, claimedPerson, showToast } = useExpense();
     const { data: peopleDetails = [] } = usePeopleDetails();
     const updateUpiMutation = useUpdateUpiMutation();
     const settleMutation = useSettleParticipantMutation();
@@ -60,6 +60,7 @@ const CollectQrContent: React.FC<CollectQrContentProps> = ({
             await updateUpiMutation.mutateAsync({
                 name: activePerson,
                 upiId: trimmed,
+                requestedBy: claimedPerson || activePerson,
             });
             triggerHaptic('success');
             showToast('UPI ID saved successfully!', 'check_circle');

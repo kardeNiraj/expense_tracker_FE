@@ -5,7 +5,7 @@ import { Avatar } from '../../components';
 import type { PersonDetail } from '../../api/types';
 
 export function PeoplePage() {
-    const { activePerson, showToast } = useExpense();
+    const { activePerson, claimedPerson, isSwitcherUnlocked, showToast } = useExpense();
     const { data: peopleDetails = [], isLoading, refetch } = usePeopleDetails();
     const { refetch: refetchPeople } = usePeople(true);
     const updateUpiMutation = useUpdateUpiMutation();
@@ -26,6 +26,7 @@ export function PeoplePage() {
             await updateUpiMutation.mutateAsync({
                 name: editingPerson.name,
                 upiId: upiInput.trim(),
+                requestedBy: isSwitcherUnlocked ? editingPerson.name : (claimedPerson || activePerson),
             });
             showToast(`Updated UPI ID for ${editingPerson.name}!`);
             setEditingPerson(null);
@@ -74,6 +75,10 @@ export function PeoplePage() {
                 <div className="space-y-3">
                     {peopleDetails.map((person) => {
                         const isCurrent = person.name === activePerson;
+                        const isOwner = claimedPerson
+                            ? person.name.toLowerCase() === claimedPerson.toLowerCase()
+                            : person.name.toLowerCase() === activePerson.toLowerCase();
+                        const canEdit = isSwitcherUnlocked || isOwner;
 
                         return (
                             <div
@@ -121,19 +126,33 @@ export function PeoplePage() {
                                     </div>
 
                                     <div className="flex items-center gap-2 shrink-0">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setEditingPerson(person);
-                                                setUpiInput(person.upiId || '');
-                                            }}
-                                            className="h-8 px-2.5 rounded-lg bg-surface-container text-primary hover:bg-primary hover:text-on-primary text-xs font-semibold transition-colors cursor-pointer border border-outline-variant/20 flex items-center gap-1 shadow-2xs"
-                                        >
-                                            <span className="material-symbols-outlined text-[15px]">
-                                                {person.upiId ? 'edit' : 'add'}
-                                            </span>
-                                            <span>{person.upiId ? 'Edit UPI' : 'Add UPI'}</span>
-                                        </button>
+                                        {canEdit ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setEditingPerson(person);
+                                                    setUpiInput(person.upiId || '');
+                                                }}
+                                                className="h-8 px-2.5 rounded-lg bg-surface-container text-primary hover:bg-primary hover:text-on-primary text-xs font-semibold transition-colors cursor-pointer border border-outline-variant/20 flex items-center gap-1 shadow-2xs"
+                                            >
+                                                <span className="material-symbols-outlined text-[15px]">
+                                                    {person.upiId ? 'edit' : 'add'}
+                                                </span>
+                                                <span>{person.upiId ? 'Edit UPI' : 'Add UPI'}</span>
+                                            </button>
+                                        ) : person.upiId ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => handleCopy(person.upiId!)}
+                                                className="h-8 px-2.5 rounded-lg bg-surface-container text-on-surface-variant hover:text-primary hover:bg-surface-container-high text-xs font-medium transition-colors cursor-pointer border border-outline-variant/20 flex items-center gap-1 shadow-2xs"
+                                                title="Copy UPI"
+                                            >
+                                                <span className="material-symbols-outlined text-[15px]">
+                                                    content_copy
+                                                </span>
+                                                <span>Copy</span>
+                                            </button>
+                                        ) : null}
                                     </div>
                                 </div>
                             </div>
