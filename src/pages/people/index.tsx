@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useExpense } from '../../context';
 import { usePeopleDetails, useUpdateUpiMutation, usePeople } from '../../api';
 import { Avatar } from '../../components';
+import { triggerHaptic } from '../../utils/haptics';
 import type { PersonDetail } from '../../api/types';
 
 export function PeoplePage() {
@@ -15,6 +16,7 @@ export function PeoplePage() {
 
     const handleCopy = (text: string) => {
         navigator.clipboard.writeText(text);
+        triggerHaptic('success');
         showToast(`Copied UPI ID: ${text}`, 'content_copy');
     };
 
@@ -80,14 +82,34 @@ export function PeoplePage() {
                             : person.name.toLowerCase() === activePerson.toLowerCase();
                         const canEdit = isSwitcherUnlocked || isOwner;
 
+                        const handleCardClick = () => {
+                            if (person.upiId) {
+                                handleCopy(person.upiId);
+                            }
+                        };
+
                         return (
                             <div
                                 key={person.name}
+                                onClick={handleCardClick}
+                                role={person.upiId ? 'button' : undefined}
+                                tabIndex={person.upiId ? 0 : undefined}
+                                onKeyDown={(e) => {
+                                    if ((e.key === 'Enter' || e.key === ' ') && person.upiId) {
+                                        e.preventDefault();
+                                        handleCopy(person.upiId);
+                                    }
+                                }}
                                 className={`bg-surface-container-lowest p-4 rounded-2xl shadow-xs border transition-all ${
+                                    person.upiId
+                                        ? 'cursor-pointer hover:border-outline-variant/60 active:scale-[0.99]'
+                                        : ''
+                                } ${
                                     isCurrent
                                         ? 'border-primary/40 ring-1 ring-primary/20'
                                         : 'border-outline-variant/30'
                                 }`}
+                                title={person.upiId ? 'Tap to copy UPI ID' : undefined}
                             >
                                 <div className="flex items-center justify-between gap-3">
                                     <div className="flex items-center gap-3 min-w-0">
@@ -104,19 +126,9 @@ export function PeoplePage() {
                                                 )}
                                             </div>
                                             {person.upiId ? (
-                                                <div className="flex items-center gap-1 text-xs text-on-surface-variant font-mono mt-0.5">
-                                                    <span className="truncate">{person.upiId}</span>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleCopy(person.upiId!)}
-                                                        className="text-primary hover:text-primary-container cursor-pointer ml-0.5"
-                                                        title="Copy UPI"
-                                                    >
-                                                        <span className="material-symbols-outlined text-[14px]">
-                                                            content_copy
-                                                        </span>
-                                                    </button>
-                                                </div>
+                                                <p className="text-xs text-on-surface-variant font-mono mt-0.5 truncate select-all">
+                                                    {person.upiId}
+                                                </p>
                                             ) : (
                                                 <span className="text-xs text-tertiary font-medium block mt-0.5">
                                                     No UPI ID linked
@@ -125,11 +137,12 @@ export function PeoplePage() {
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center gap-2 shrink-0">
-                                        {canEdit ? (
+                                    {canEdit && (
+                                        <div className="flex items-center gap-1.5 shrink-0">
                                             <button
                                                 type="button"
-                                                onClick={() => {
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
                                                     setEditingPerson(person);
                                                     setUpiInput(person.upiId || '');
                                                 }}
@@ -138,22 +151,10 @@ export function PeoplePage() {
                                                 <span className="material-symbols-outlined text-[15px]">
                                                     {person.upiId ? 'edit' : 'add'}
                                                 </span>
-                                                <span>{person.upiId ? 'Edit UPI' : 'Add UPI'}</span>
+                                                <span>{person.upiId ? 'Edit' : 'Add UPI'}</span>
                                             </button>
-                                        ) : person.upiId ? (
-                                            <button
-                                                type="button"
-                                                onClick={() => handleCopy(person.upiId!)}
-                                                className="h-8 px-2.5 rounded-lg bg-surface-container text-on-surface-variant hover:text-primary hover:bg-surface-container-high text-xs font-medium transition-colors cursor-pointer border border-outline-variant/20 flex items-center gap-1 shadow-2xs"
-                                                title="Copy UPI"
-                                            >
-                                                <span className="material-symbols-outlined text-[15px]">
-                                                    content_copy
-                                                </span>
-                                                <span>Copy</span>
-                                            </button>
-                                        ) : null}
-                                    </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         );

@@ -18,6 +18,7 @@ import {
 } from '../../components';
 import type { Split } from '../../api/types';
 import { triggerHaptic } from '../../utils/haptics';
+import { getCategoryMeta } from '../../utils/formatters';
 
 export function SplitsPage() {
     const { activePerson, showToast } = useExpense();
@@ -180,17 +181,6 @@ export function SplitsPage() {
         triggerHaptic('light');
         navigator.clipboard.writeText(text);
         showToast(message, 'content_copy');
-    };
-
-    const getCategoryIcon = (category: string) => {
-        const c = (category || '').toLowerCase();
-        if (c.includes('food') || c.includes('dine') || c.includes('snack') || c.includes('cafe') || c.includes('lunch') || c.includes('dinner')) return 'restaurant';
-        if (c.includes('water') || c.includes('drink') || c.includes('beverage') || c.includes('bar')) return 'water_drop';
-        if (c.includes('travel') || c.includes('cab') || c.includes('taxi') || c.includes('transport') || c.includes('fuel') || c.includes('toll')) return 'directions_car';
-        if (c.includes('stay') || c.includes('hotel') || c.includes('cottage') || c.includes('room') || c.includes('resort')) return 'hotel';
-        if (c.includes('activity') || c.includes('sport') || c.includes('ski') || c.includes('trek') || c.includes('adventure')) return 'snowboarding';
-        if (c.includes('shopping') || c.includes('market') || c.includes('mall') || c.includes('groceries')) return 'shopping_bag';
-        return 'receipt_long';
     };
 
     const formatDisplayDate = (dateStr?: string) => {
@@ -394,6 +384,7 @@ export function SplitsPage() {
                         const isOwner =
                             split.createdBy?.toLowerCase() === activePerson.toLowerCase() ||
                             split.paidBy?.toLowerCase() === activePerson.toLowerCase();
+                        const catMeta = getCategoryMeta(split.category);
 
                         return (
                             <div
@@ -421,9 +412,9 @@ export function SplitsPage() {
                                     {/* Top Row: Category + Status (Left) & Total Amount + Chevron (Right) */}
                                     <div className="flex items-center justify-between gap-2">
                                         <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-                                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-surface-container text-primary">
+                                            <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${catMeta.bgClass} ${catMeta.textClass}`}>
                                                 <span className="material-symbols-outlined text-[13px]">
-                                                    {getCategoryIcon(split.category)}
+                                                    {catMeta.icon}
                                                 </span>
                                                 <span className="truncate max-w-[120px]">{split.category}</span>
                                             </span>
