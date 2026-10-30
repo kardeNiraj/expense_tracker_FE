@@ -68,13 +68,14 @@ export function Dashboard() {
         .filter((e) => isTodayDate(e.timestamp))
         .reduce((sum, e) => sum + (e.amount || 0), 0);
 
-    // 2. Split expenses where activePerson participated or paid upfront
+    // 2. Split expenses where activePerson participated or paid upfront (excluding deleted splits)
     const userSplitItems = allSplits
         .filter((split) =>
-            split.participants?.some(
+            split.status?.toUpperCase() !== 'DELETED' &&
+            (split.participants?.some(
                 (p) => p.toLowerCase() === activePerson.toLowerCase()
             ) ||
-            split.paidBy?.toLowerCase() === activePerson.toLowerCase()
+            split.paidBy?.toLowerCase() === activePerson.toLowerCase())
         )
         .map((split) => {
             const isParticipant = split.participants?.some(
@@ -139,9 +140,9 @@ export function Dashboard() {
         : personalDirectExpenses.length;
     const totalUserExpensesCount = totalDirectCount + userSplitItems.length;
 
-    // Upfront bill coverage (if user covered bills upfront for the group)
+    // Upfront bill coverage (if user covered bills upfront for the group, excluding deleted splits)
     const upfrontPaidByActiveUser = allSplits
-        .filter((s) => s.paidBy?.toLowerCase() === activePerson.toLowerCase())
+        .filter((s) => s.status?.toUpperCase() !== 'DELETED' && s.paidBy?.toLowerCase() === activePerson.toLowerCase())
         .reduce((sum, s) => sum + s.totalAmount, 0);
 
     // Combined activity items for activePerson
