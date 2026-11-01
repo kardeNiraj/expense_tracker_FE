@@ -13,3 +13,4 @@ export { default as QRCode, type QRCodeProps } from './QRCode/QRCode.tsx';
 export { default as PullToRefresh, type PullToRefreshProps } from './PullToRefresh/PullToRefresh.tsx';
 export { default as PwaUpdatePrompt } from './PwaReload/PwaUpdatePrompt.tsx';
 export { SyncStatusModal, type SyncStatusModalProps } from './SyncModal/SyncStatusModal.tsx';
+export { SpendHistoryModal } from './SpendHistory/SpendHistoryModal.tsx';

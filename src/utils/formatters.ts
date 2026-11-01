@@ -139,6 +139,19 @@ export function formatPurchaseTime(dateStr?: string): PurchaseTimeInfo {
 }
 
 /**
+ * Formats a date string into "Month YYYY", e.g. "October 2026", "November 2026".
+ */
+export function formatMonthYear(dateStr?: string): string {
+    if (!dateStr) return 'Other';
+    const d = parseCustomDate(dateStr);
+    if (!d) return 'Other';
+    return d.toLocaleDateString('en-US', {
+        month: 'long',
+        year: 'numeric',
+    });
+}
+
+/**
  * Returns matching Material Symbol icon and tinted styling for categories.
  */
 export function getCategoryMeta(category?: string): CategoryMeta {

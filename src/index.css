@@ -5,57 +5,89 @@
     --font-headline: 'Space Grotesk', -apple-system, sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
 
-    /* Stitch & DESIGN.md Semantic Colors */
-    --color-primary: #006948;
-    --color-primary-container: #00855d;
-    --color-primary-fixed: #85f8c4;
-    --color-primary-fixed-dim: #68dba9;
+    /* Core Brand Colors (DESIGN.md Section 2.1 & 8) */
+    --color-primary: #065f46;
+    --color-primary-dark: #004532;
+    --color-primary-light: #8bd6b7;
+    --color-primary-container: #065f46;
+    --color-primary-fixed: #a6f2d1;
+    --color-primary-fixed-dim: #8bd6b6;
     --color-on-primary: #ffffff;
-    --color-on-primary-container: #f5fff7;
-    --color-on-primary-fixed: #002114;
-    --color-on-primary-fixed-variant: #005137;
-    --color-inverse-primary: #68dba9;
+    --color-on-primary-container: #8bd6b7;
+    --color-on-primary-fixed: #002116;
+    --color-on-primary-fixed-variant: #00513b;
+    --color-inverse-primary: #8bd6b6;
 
-    --color-secondary: #006a61;
-    --color-secondary-container: #86f2e4;
-    --color-secondary-fixed: #89f5e7;
-    --color-secondary-fixed-dim: #6bd8cb;
+    --color-secondary: #0f766e;
+    --color-secondary-dark: #006a63;
+    --color-secondary-light: #99efe5;
+    --color-secondary-container: #99efe5;
+    --color-secondary-fixed: #9cf2e8;
+    --color-secondary-fixed-dim: #80d5cb;
     --color-on-secondary: #ffffff;
-    --color-on-secondary-container: #006f66;
+    --color-on-secondary-container: #006f67;
     --color-on-secondary-fixed: #00201d;
-    --color-on-secondary-fixed-variant: #005049;
+    --color-on-secondary-fixed-variant: #00504a;
 
-    --color-tertiary: #9b3e3b;
-    --color-tertiary-container: #ba5551;
-    --color-tertiary-fixed: #ffdad7;
-    --color-tertiary-fixed-dim: #ffb3ae;
+    --color-tertiary: #d97706;
+    --color-tertiary-dark: #5e3000;
+    --color-tertiary-container: #804300;
+    --color-tertiary-fixed: #ffdcc3;
+    --color-tertiary-fixed-dim: #ffb77d;
     --color-on-tertiary: #ffffff;
-    --color-on-tertiary-container: #fffbff;
-    --color-on-tertiary-fixed: #410004;
-    --color-on-tertiary-fixed-variant: #7f2928;
+    --color-on-tertiary-container: #ffb87e;
+    --color-on-tertiary-fixed: #2f1500;
+    --color-on-tertiary-fixed-variant: #6e3900;
 
-    --color-error: #ba1a1a;
+    --color-negative: #be123c;
+    --color-dark-slate: #1e293b;
+
+    --color-error: #be123c;
     --color-error-container: #ffdad6;
     --color-on-error: #ffffff;
     --color-on-error-container: #93000a;
 
-    --color-surface: #f8f9ff;
-    --color-surface-bright: #f8f9ff;
-    --color-surface-dim: #cbdbf5;
-    --color-surface-variant: #d3e4fe;
-    --color-surface-container-lowest: #ffffff;
-    --color-surface-container-low: #eff4ff;
-    --color-surface-container: #e5eeff;
-    --color-surface-container-high: #dce9ff;
-    --color-surface-container-highest: #d3e4fe;
-    --color-surface-tint: #006c4a;
+    /* Custom Brand Tokens */
+    --color-brand-emerald-deep: #065f46;
+    --color-brand-slate-teal: #0f766e;
+    --color-brand-warm-amber: #d97706;
+    --color-brand-crimson-rose: #be123c;
+    --color-brand-dark-slate: #1e293b;
 
-    --color-on-surface: #0b1c30;
-    --color-on-surface-variant: #3d4a42;
-    --color-inverse-surface: #213145;
-    --color-inverse-on-surface: #eaf1ff;
-    --color-outline: #6d7a72;
-    --color-outline-variant: #bccac0;
+    /* Surface & Neutral Scale (DESIGN.md Section 2.2) */
+    --color-surface-canvas: #f8fafc;
+    --color-surface-card: #ffffff;
+    --color-surface-card-subtle: #f1f5f9;
+    --color-border-subtle: #e2e8f0;
+    --color-border-strong: #cbd5e1;
+
+    --color-surface: #f8fafc;
+    --color-surface-bright: #f9f9ff;
+    --color-surface-dim: #cfdaf2;
+    --color-surface-variant: #d8e3fb;
+    --color-surface-container-lowest: #ffffff;
+    --color-surface-container-low: #f0f3ff;
+    --color-surface-container: #e7eeff;
+    --color-surface-container-high: #dee8ff;
+    --color-surface-container-highest: #d8e3fb;
+    --color-surface-tint: #1b6b51;
+
+    --color-on-surface: #111c2d;
+    --color-on-surface-variant: #3f4944;
+    --color-inverse-surface: #263143;
+    --color-inverse-on-surface: #ecf1ff;
+    --color-outline: #6f7973;
+    --color-outline-variant: #bec9c2;
+
+    /* Status Indicator Palette (DESIGN.md Section 2.3 & 8) */
+    --color-status-pending-bg: #fef3c7;
+    --color-status-pending-text: #92400e;
+    --color-status-awaiting-bg: #e0f2fe;
+    --color-status-awaiting-text: #0369a1;
+    --color-status-partial-bg: #f3e8ff;
+    --color-status-partial-text: #6b21a8;
+    --color-status-settled-bg: #dcfce7;
+    --color-status-settled-text: #15803d;
 
     /* Scaled shade tokens for compatibility */
     --color-primary-50: oklch(97.9% 0.018 166.113);
@@ -63,36 +95,36 @@
     --color-primary-200: oklch(90.5% 0.082 164.15);
     --color-primary-300: oklch(84.5% 0.126 164.978);
     --color-primary-400: oklch(76.5% 0.156 163.223);
-    --color-primary-500: oklch(69.6% 0.149 162.48);
-    --color-primary-600: oklch(59.6% 0.127 163.225);
-    --color-primary-700: oklch(50.8% 0.104 165.612);
-    --color-primary-800: oklch(43.2% 0.083 166.913);
-    --color-primary-900: oklch(37.8% 0.068 168.94);
-    --color-primary-950: oklch(26.2% 0.045 172.552);
+    --color-primary-500: #065f46;
+    --color-primary-600: #044e39;
+    --color-primary-700: #033d2c;
+    --color-primary-800: #022c20;
+    --color-primary-900: #002116;
+    --color-primary-950: #00150e;
 
     --color-secondary-50: oklch(98.4% 0.012 180.72);
     --color-secondary-100: oklch(95.3% 0.045 180.801);
     --color-secondary-200: oklch(91% 0.084 180.426);
     --color-secondary-300: oklch(85.5% 0.121 181.071);
     --color-secondary-400: oklch(77.7% 0.134 181.912);
-    --color-secondary-500: oklch(70.4% 0.123 182.503);
-    --color-secondary-600: oklch(60% 0.104 184.704);
-    --color-secondary-700: oklch(51.1% 0.084 186.391);
-    --color-secondary-800: oklch(43.7% 0.069 188.216);
-    --color-secondary-900: oklch(38.6% 0.055 188.416);
-    --color-secondary-950: oklch(27.7% 0.04 192.524);
+    --color-secondary-500: #0f766e;
+    --color-secondary-600: #0d655e;
+    --color-secondary-700: #0a544e;
+    --color-secondary-800: #08433e;
+    --color-secondary-900: #00201d;
+    --color-secondary-950: #001513;
 
     --color-tertiary-50: oklch(97.1% 0.009 19.606);
     --color-tertiary-100: oklch(91.7% 0.022 19.943);
     --color-tertiary-200: oklch(84.7% 0.044 20.56);
     --color-tertiary-300: oklch(75.1% 0.08 21.797);
     --color-tertiary-400: oklch(62.8% 0.134 24.442);
-    --color-tertiary-500: oklch(57.3% 0.167 27.557);
-    --color-tertiary-600: oklch(52.6% 0.172 29.551);
-    --color-tertiary-700: oklch(46.7% 0.15 29.744);
-    --color-tertiary-800: oklch(41.9% 0.124 29.125);
-    --color-tertiary-900: oklch(38.3% 0.099 27.949);
-    --color-tertiary-950: oklch(25.8% 0.065 28.268);
+    --color-tertiary-500: #d97706;
+    --color-tertiary-600: #b45309;
+    --color-tertiary-700: #92400e;
+    --color-tertiary-800: #78350f;
+    --color-tertiary-900: #451a03;
+    --color-tertiary-950: #2f1500;
 
     --color-neutral-50: oklch(98.4% 0.003 247.858);
     --color-neutral-100: oklch(96.8% 0.006 247.896);
@@ -107,14 +139,63 @@
     --color-neutral-950: oklch(12.9% 0.037 264.695);
 }
 
+:root {
+    /* Fonts (DESIGN.md Section 8) */
+    --font-headline: 'Space Grotesk', -apple-system, sans-serif;
+    --font-body: 'Hanken Grotesk', -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+
+    /* Brand Colors */
+    --color-primary: #065f46;
+    --color-primary-dark: #004532;
+    --color-primary-light: #8bd6b7;
+    --color-secondary: #0f766e;
+    --color-secondary-dark: #006a63;
+    --color-secondary-light: #99efe5;
+    --color-tertiary: #d97706;
+    --color-negative: #be123c;
+    --color-dark-slate: #1e293b;
+
+    /* Surfaces */
+    --surface-canvas: #f8fafc;
+    --surface-card: #ffffff;
+    --surface-card-subtle: #f1f5f9;
+    --border-subtle: #e2e8f0;
+    --border-strong: #cbd5e1;
+
+    /* Status Colors */
+    --status-pending-bg: #fef3c7;
+    --status-pending-text: #92400e;
+    --status-awaiting-bg: #e0f2fe;
+    --status-awaiting-text: #0369a1;
+    --status-partial-bg: #f3e8ff;
+    --status-partial-text: #6b21a8;
+    --status-settled-bg: #dcfce7;
+    --status-settled-text: #15803d;
+
+    /* Radii */
+    --radius-sm: 0.25rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 1rem;
+    --radius-xl: 1.5rem;
+    --radius-full: 9999px;
+
+    /* Spacing */
+    --space-xs: 0.25rem;
+    --space-sm: 0.5rem;
+    --space-md: 1rem;
+    --space-lg: 1.5rem;
+    --space-xl: 2rem;
+}
+
 @layer base {
     html, body {
         width: 100%;
         margin: 0;
         padding: 0;
-        background-color: #f8f9ff;
+        background-color: #f8fafc;
         font-family: 'Hanken Grotesk', -apple-system, sans-serif;
-        color: #0b1c30;
+        color: #111c2d;
         -webkit-tap-highlight-color: transparent;
         touch-action: manipulation;
         overscroll-behavior-y: contain;
@@ -138,6 +219,50 @@
             font-size: 16px !important;
         }
     }
+}
+
+/* Typographic utility classes from DESIGN.md Section 3 */
+.display-currency {
+    font-family: 'Space Grotesk', -apple-system, sans-serif;
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 44px;
+}
+
+.display-currency-mobile {
+    font-family: 'Space Grotesk', -apple-system, sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 36px;
+}
+
+.headline-lg {
+    font-family: 'Space Grotesk', -apple-system, sans-serif;
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 32px;
+}
+
+.headline-md {
+    font-family: 'Space Grotesk', -apple-system, sans-serif;
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 28px;
+}
+
+.label-currency {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 20px;
+}
+
+.label-pill {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 14px;
+    letter-spacing: 0.05em;
 }
 
 .material-symbols-outlined {

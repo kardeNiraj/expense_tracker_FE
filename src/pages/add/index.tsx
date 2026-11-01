@@ -318,7 +318,7 @@ export function AddPage() {
             {mode === 'split' && (
                 <form onSubmit={handleGroupSplitSubmit} className="space-y-4">
                     {/* Amount Input with Quick-Add Chips */}
-                    <div className="bg-surface-container-lowest rounded-2xl p-4 shadow-xs border border-outline-variant/30 flex flex-col items-center justify-center text-center space-y-3">
+                    <div className="bg-surface-container-lowest rounded-2xl p-4 shadow-xs border border-outline-variant/30 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all flex flex-col items-center justify-center text-center space-y-3">
                         <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider font-mono">
                             Total Bill Amount
                         </span>
@@ -441,11 +441,11 @@ export function AddPage() {
 
                     {/* Participants & Split Distribution Mode */}
                     <div className="bg-surface-container-lowest rounded-2xl p-4 shadow-xs border border-outline-variant/30 space-y-3">
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-on-surface uppercase tracking-wider font-mono">
+                        <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-bold text-on-surface uppercase tracking-wider font-mono truncate min-w-0">
                                 Split Between ({activeParticipants.length} people)
                             </span>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5 shrink-0">
                                 <button
                                     type="button"
                                     onClick={async () => {
@@ -458,8 +458,9 @@ export function AddPage() {
                                         }
                                     }}
                                     disabled={isPeopleFetching}
-                                    className="p-1 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors cursor-pointer flex items-center gap-1 text-[11px] font-semibold"
+                                    className="h-7 w-7 sm:w-auto sm:px-2 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors cursor-pointer flex items-center justify-center sm:justify-start gap-1 text-[11px] font-semibold border border-outline-variant/20 shadow-2xs whitespace-nowrap shrink-0"
                                     title="Reload members from Google Sheet"
+                                    aria-label="Reload members"
                                 >
                                     <span
                                         className={`material-symbols-outlined text-[15px] ${
@@ -468,15 +469,20 @@ export function AddPage() {
                                     >
                                         sync
                                     </span>
-                                    <span>Reload</span>
+                                    <span className="hidden sm:inline">Reload</span>
                                 </button>
                                 {splitDistributionMode === 'EQUAL' && (
                                     <button
                                         type="button"
                                         onClick={selectAllParticipants}
-                                        className="text-xs font-semibold text-primary hover:underline cursor-pointer"
+                                        className="h-7 px-2.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-primary hover:text-primary-container text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer whitespace-nowrap shrink-0 border border-outline-variant/20 shadow-2xs active:scale-95"
+                                        title="Select all members"
+                                        aria-label="Select all members"
                                     >
-                                        Select All
+                                        <span className="material-symbols-outlined text-[15px]">
+                                            select_all
+                                        </span>
+                                        <span>Select All</span>
                                     </button>
                                 )}
                             </div>
@@ -681,7 +687,7 @@ export function AddPage() {
             {mode === 'expense' && (
                 <form onSubmit={handleQuickExpenseSubmit} className="space-y-4">
                     {/* Amount Input with Quick-Add Chips */}
-                    <div className="bg-surface-container-lowest rounded-2xl p-4 shadow-xs border border-outline-variant/30 flex flex-col items-center justify-center text-center space-y-3">
+                    <div className="bg-surface-container-lowest rounded-2xl p-4 shadow-xs border border-outline-variant/30 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all flex flex-col items-center justify-center text-center space-y-3">
                         <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider font-mono">
                             Expense Amount
                         </span>

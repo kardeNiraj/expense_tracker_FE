@@ -19,6 +19,7 @@ interface ProfileModalProps {
     lockSwitcher: () => void;
     showToast: (message: string, icon?: string) => void;
     onOpenSyncStatus?: () => void;
+    onOpenSpendHistory?: () => void;
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({
@@ -36,6 +37,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     lockSwitcher,
     showToast,
     onOpenSyncStatus,
+    onOpenSpendHistory,
 }) => {
     const [passcodeInput, setPasscodeInput] = useState('');
     const [unlockError, setUnlockError] = useState(false);
@@ -83,7 +85,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+            className="fixed inset-0 z-60 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
             onClick={handleClose}
         >
             <div
@@ -338,7 +340,36 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 </div>
 
                 {/* Footer Bar: Sync Status, PWA Reload & Close */}
-                <div className="p-3 border-t border-outline-variant/20 bg-surface-container-lowest shrink-0 space-y-2">
+                <div className="p-3 pb-safe border-t border-outline-variant/20 bg-surface-container-lowest shrink-0 space-y-2">
+                    {onOpenSpendHistory && (
+                        <div className="flex items-center justify-between text-xs px-0.5 pb-1 border-b border-outline-variant/15">
+                            <div className="flex items-center gap-1.5 text-on-surface-variant min-w-0">
+                                <span className="material-symbols-outlined text-primary text-[17px] shrink-0">
+                                    calendar_month
+                                </span>
+                                <div className="min-w-0">
+                                    <span className="font-bold text-on-surface block text-[11px] leading-tight">
+                                        Month-wise Spend History
+                                    </span>
+                                    <span className="text-[10px] text-on-surface-variant block truncate">
+                                        All transactions segregated by month
+                                    </span>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    handleClose();
+                                    onOpenSpendHistory();
+                                }}
+                                className="h-8 px-2.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors active:scale-95"
+                            >
+                                <span>Spends</span>
+                                <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+                            </button>
+                        </div>
+                    )}
+
                     {onOpenSyncStatus && (
                         <div className="flex items-center justify-between text-xs px-0.5 pb-1 border-b border-outline-variant/15">
                             <div className="flex items-center gap-1.5 text-on-surface-variant min-w-0">

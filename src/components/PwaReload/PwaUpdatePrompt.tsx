@@ -42,7 +42,7 @@ export const PwaUpdatePrompt: React.FC = () => {
     };
 
     return (
-        <div className="fixed top-3 inset-x-0 z-60 flex justify-center px-4 animate-in slide-in-from-top duration-300 pointer-events-auto">
+        <div className="fixed top-3 inset-x-0 z-70 flex justify-center px-4 animate-in slide-in-from-top duration-300 pointer-events-auto">
             <div className="bg-primary text-on-primary px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-primary-container max-w-sm w-full justify-between">
                 <div className="flex items-center gap-2.5 min-w-0">
                     <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0">

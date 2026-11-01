@@ -21,7 +21,7 @@ export const BottomNav: React.FC = () => {
     return (
         <nav
             aria-label="Bottom Navigation"
-            className="fixed bottom-0 inset-x-0 z-50 pb-safe bg-surface-container-lowest/95 backdrop-blur-xl border-t border-outline-variant/30 shadow-[0_-2px_12px_rgba(0,0,0,0.05)]"
+            className="fixed bottom-0 inset-x-0 z-40 pb-safe bg-surface-container-lowest/95 backdrop-blur-xl border-t border-outline-variant/30 shadow-[0_-2px_12px_rgba(0,0,0,0.05)]"
         >
             <div className="max-w-md mx-auto h-16 px-4 flex items-center justify-around">
                 {tabs.map((tab) => {

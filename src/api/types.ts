@@ -65,6 +65,16 @@ export interface ExpenseRecord {
     amount: number;
     description: string;
     sheet?: string;
+    isSplitRow?: boolean;
+}
+
+export interface MonthSpendStats {
+    month: string;
+    total: number;
+    directTotal: number;
+    splitRecordedTotal: number;
+    expensesCount: number;
+    expenses: ExpenseRecord[];
 }
 
 export interface SpendingsData {
@@ -80,6 +90,8 @@ export interface SpendingsData {
     todayExpensesCount: number;
     totalExpensesCount: number;
     recentExpenses: ExpenseRecord[];
+    allExpenses?: ExpenseRecord[];
+    monthlyStats?: MonthSpendStats[];
 }
 
 export interface TripMetaItem {

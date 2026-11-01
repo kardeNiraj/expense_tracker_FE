@@ -170,7 +170,7 @@ const EditSplitContent: React.FC<EditSplitContentProps> = ({ split, onClose }) =
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+            className="fixed inset-0 z-60 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
             onClick={onClose}
         >
             <div
@@ -222,7 +222,7 @@ const EditSplitContent: React.FC<EditSplitContentProps> = ({ split, onClose }) =
                     )}
 
                     {/* Amount Input */}
-                    <div className="bg-surface-container-low rounded-2xl p-4 border border-outline-variant/30 space-y-2">
+                    <div className="bg-surface-container-low rounded-2xl p-4 border border-outline-variant/30 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all space-y-2">
                         <div className="flex items-center justify-between">
                             <label className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider font-mono">
                                 Total Bill Amount (₹)
@@ -457,7 +457,7 @@ const EditSplitContent: React.FC<EditSplitContentProps> = ({ split, onClose }) =
                                         Amount (₹)
                                     </label>
                                     <div className="flex items-center gap-1.5">
-                                        <div className="flex-1 flex items-center h-9 px-3 rounded-lg bg-surface-container-low border border-outline-variant/30 focus-within:border-primary">
+                                        <div className="flex-1 flex items-center h-9 px-3 rounded-lg bg-surface-container-low border border-outline-variant/30 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
                                             <span className="text-xs font-bold text-primary font-mono mr-1">₹</span>
                                             <input
                                                 type="text"
@@ -525,7 +525,7 @@ const EditSplitContent: React.FC<EditSplitContentProps> = ({ split, onClose }) =
                 </form>
 
                 {/* Footer Buttons */}
-                <div className="p-4 border-t border-outline-variant/20 bg-surface-container-lowest shrink-0 flex items-center gap-2">
+                <div className="p-4 pb-safe border-t border-outline-variant/20 bg-surface-container-lowest shrink-0 flex items-center gap-2">
                     <button
                         type="button"
                         onClick={onClose}

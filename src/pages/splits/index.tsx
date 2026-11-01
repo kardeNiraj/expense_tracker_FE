@@ -236,13 +236,13 @@ export function SplitsPage() {
             if (pendingReceivable > 0) {
                 return {
                     text: `You get ₹${pendingReceivable.toLocaleString('en-IN')}`,
-                    badgeClass: 'bg-primary-fixed text-on-primary-fixed border border-primary/20',
+                    badgeClass: 'bg-status-settled-bg text-status-settled-text border border-status-settled-text/20 font-mono text-[11px] font-semibold',
                     icon: 'call_received',
                 };
             } else if (split.settlements && split.settlements.length > 0) {
                 return {
                     text: 'All dues received ✓',
-                    badgeClass: 'bg-surface-container text-primary font-semibold',
+                    badgeClass: 'bg-status-settled-bg text-status-settled-text font-mono text-[11px] font-semibold',
                     icon: 'task_alt',
                 };
             }
@@ -262,13 +262,13 @@ export function SplitsPage() {
                 return {
                     text: `You owe ₹${mySettlement.amount.toLocaleString('en-IN')}`,
                     subtext: `to ${mySettlement.to}`,
-                    badgeClass: 'bg-tertiary-fixed text-on-tertiary-fixed font-bold border border-tertiary/20',
+                    badgeClass: 'bg-status-pending-bg text-status-pending-text font-mono text-[11px] font-bold border border-status-pending-text/20',
                     icon: 'priority_high',
                 };
             } else {
                 return {
                     text: 'You settled ✓',
-                    badgeClass: 'bg-surface-container text-on-surface-variant font-medium',
+                    badgeClass: 'bg-status-settled-bg text-status-settled-text font-mono text-[11px] font-semibold',
                     icon: 'check_circle',
                 };
             }
@@ -419,21 +419,26 @@ export function SplitsPage() {
                                                 <span className="truncate max-w-[120px]">{split.category}</span>
                                             </span>
 
-                                            {/* Overall Split Status Badge */}
+                                            {/* Overall Split Status Badge (DESIGN.md Section 2.3 & 3) */}
                                             {split.status === 'SETTLED' ? (
-                                                <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant uppercase tracking-wider">
-                                                    <span className="material-symbols-outlined text-[12px]">done_all</span>
+                                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold font-mono tracking-wide px-2.5 py-0.5 rounded-full bg-status-settled-bg text-status-settled-text uppercase">
+                                                    <span className="material-symbols-outlined text-[13px]">done_all</span>
                                                     <span>Settled</span>
                                                 </span>
                                             ) : pendingSettlements === 0 ? (
-                                                <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed uppercase tracking-wider">
-                                                    <span className="material-symbols-outlined text-[12px]">check</span>
+                                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold font-mono tracking-wide px-2.5 py-0.5 rounded-full bg-status-settled-bg text-status-settled-text uppercase">
+                                                    <span className="material-symbols-outlined text-[13px]">check</span>
                                                     <span>All Paid</span>
                                                 </span>
-                                            ) : (
-                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed-variant uppercase tracking-wider">
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse" />
+                                            ) : pendingSettlements < totalSettlements ? (
+                                                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold font-mono tracking-wide px-2.5 py-0.5 rounded-full bg-status-partial-bg text-status-partial-text uppercase">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-[#9333ea] animate-pulse" />
                                                     <span>{pendingSettlements} of {totalSettlements} due</span>
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold font-mono tracking-wide px-2.5 py-0.5 rounded-full bg-status-pending-bg text-status-pending-text uppercase">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-[#d97706]" />
+                                                    <span>{pendingSettlements} due</span>
                                                 </span>
                                             )}
                                         </div>
@@ -619,9 +624,9 @@ export function SplitsPage() {
                                                                         {s.from} owes {s.to}
                                                                     </span>
                                                                     <span
-                                                                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${isPending
-                                                                                ? 'bg-tertiary-container text-on-tertiary-container'
-                                                                                : 'bg-primary-fixed text-on-primary-fixed'
+                                                                        className={`text-[11px] font-semibold font-mono tracking-wide px-2.5 py-0.5 rounded-full shrink-0 ${isPending
+                                                                                ? 'bg-status-pending-bg text-status-pending-text'
+                                                                                : 'bg-status-settled-bg text-status-settled-text'
                                                                             }`}
                                                                     >
                                                                         {s.status}
@@ -830,7 +835,7 @@ export function SplitsPage() {
 
             {/* Add Contribution Modal */}
             {selectedSplitForContribution && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+                <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
                     <div className="bg-surface-container-lowest rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-outline-variant/30 space-y-4">
                         <div className="flex items-center justify-between pb-2 border-b border-outline-variant/20">
                             <div>
@@ -873,18 +878,23 @@ export function SplitsPage() {
 
                             <div>
                                 <label htmlFor="contribute-amount-input" className="text-xs font-semibold text-on-surface-variant block mb-1">
-                                    Amount (₹)
+                                    Amount
                                 </label>
-                                <input
-                                    id="contribute-amount-input"
-                                    type="number"
-                                    min="1"
-                                    value={contributionAmount}
-                                    onChange={(e) => setContributionAmount(e.target.value)}
-                                    placeholder="Enter amount"
-                                    className="w-full h-10 px-3 rounded-xl bg-surface-container-low text-sm font-mono font-bold text-on-surface border border-outline-variant/30 focus:outline-none"
-                                    required
-                                />
+                                <div className="flex items-center rounded-xl bg-surface-container-low border border-outline-variant/30 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 px-3 transition-all">
+                                    <span className="text-base font-bold text-primary font-mono mr-1.5 select-none">
+                                        ₹
+                                    </span>
+                                    <input
+                                        id="contribute-amount-input"
+                                        type="number"
+                                        min="1"
+                                        value={contributionAmount}
+                                        onChange={(e) => setContributionAmount(e.target.value)}
+                                        placeholder="0"
+                                        className="w-full h-10 bg-transparent text-sm font-mono font-bold text-on-surface focus:outline-none"
+                                        required
+                                    />
+                                </div>
                             </div>
 
                             <div className="flex items-center gap-2 pt-2">
@@ -931,11 +941,11 @@ export function SplitsPage() {
             {/* Delete Confirmation Modal (Step 5) */}
             {splitToDelete && (
                 <div
-                    className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+                    className="fixed inset-0 z-60 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
                     onClick={() => setSplitToDelete(null)}
                 >
                     <div
-                        className="w-full max-w-sm bg-surface-container-lowest rounded-t-3xl sm:rounded-2xl border border-outline-variant/30 p-5 shadow-2xl space-y-4 animate-in slide-in-from-bottom duration-200"
+                        className="w-full max-w-sm bg-surface-container-lowest rounded-t-3xl sm:rounded-2xl border border-outline-variant/30 p-5 pb-safe shadow-2xl space-y-4 animate-in slide-in-from-bottom duration-200"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex items-center gap-3 text-error">

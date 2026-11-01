@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useExpense } from '../../context';
 import { usePeopleDetails, useUpdateUpiMutation, usePeople } from '../../api';
-import { Avatar } from '../../components';
+import { Avatar, SpendHistoryModal } from '../../components';
 import { triggerHaptic } from '../../utils/haptics';
 import type { PersonDetail } from '../../api/types';
 
@@ -13,6 +13,7 @@ export function PeoplePage() {
 
     const [editingPerson, setEditingPerson] = useState<PersonDetail | null>(null);
     const [upiInput, setUpiInput] = useState('');
+    const [selectedPersonForSpend, setSelectedPersonForSpend] = useState<string | null>(null);
 
     const handleCopy = (text: string) => {
         navigator.clipboard.writeText(text);
@@ -143,6 +144,22 @@ export function PeoplePage() {
                                                 type="button"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
+                                                    triggerHaptic('light');
+                                                    setSelectedPersonForSpend(person.name);
+                                                }}
+                                                className="h-8 px-2.5 rounded-lg bg-surface-container text-on-surface hover:text-primary text-xs font-semibold transition-colors cursor-pointer border border-outline-variant/20 flex items-center gap-1 shadow-2xs"
+                                                title="View your month-wise spend history"
+                                            >
+                                                <span className="material-symbols-outlined text-[15px] text-primary">
+                                                    calendar_month
+                                                </span>
+                                                <span>My Spends</span>
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
                                                     setEditingPerson(person);
                                                     setUpiInput(person.upiId || '');
                                                 }}
@@ -164,7 +181,7 @@ export function PeoplePage() {
 
             {/* Edit / Add UPI Modal */}
             {editingPerson && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+                <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
                     <div className="bg-surface-container-lowest rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-outline-variant/30 space-y-4">
                         <div className="flex items-center justify-between pb-2 border-b border-outline-variant/20">
                             <div>
@@ -225,6 +242,13 @@ export function PeoplePage() {
                     </div>
                 </div>
             )}
+            {/* Dedicated Month-wise Spend History Breakdown Modal */}
+            <SpendHistoryModal
+                isOpen={!!selectedPersonForSpend}
+                onClose={() => setSelectedPersonForSpend(null)}
+                initialPerson={selectedPersonForSpend || activePerson}
+                claimedPerson={claimedPerson}
+            />
         </div>
     );
 }

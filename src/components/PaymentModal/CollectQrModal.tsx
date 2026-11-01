@@ -143,7 +143,7 @@ const CollectQrContent: React.FC<CollectQrContentProps> = ({
 
     return (
         <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200"
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-60 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200"
             onClick={onClose}
         >
             <div
@@ -309,7 +309,7 @@ const CollectQrContent: React.FC<CollectQrContentProps> = ({
                 </div>
 
                 {/* Footer Action: Settle Confirmation */}
-                <div className="p-4 border-t border-outline-variant/20 bg-surface-container-lowest">
+                <div className="p-4 pb-safe border-t border-outline-variant/20 bg-surface-container-lowest">
                     <button
                         type="button"
                         disabled={isSettling}

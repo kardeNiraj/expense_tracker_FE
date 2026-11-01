@@ -190,7 +190,7 @@ export const ClaimIdentityScreen: React.FC = () => {
 
             {/* Confirmation Modal when tapping a member */}
             {selectedPerson && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
+                <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
                     <div
                         className="fixed inset-0"
                         onClick={() => setSelectedPerson(null)}
@@ -242,7 +242,7 @@ export const ClaimIdentityScreen: React.FC = () => {
 
             {/* Admin Passcode Modal */}
             {showAdminModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
+                <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
                     <div
                         className="fixed inset-0"
                         onClick={() => setShowAdminModal(false)}

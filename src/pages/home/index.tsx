@@ -8,17 +8,18 @@ import {
     usePeople,
     usePeopleDetails,
 } from '../../api';
-import { Avatar, PaymentModal, type PaymentSettlementData, CollectQrModal, type CollectQrModalData } from '../../components';
+import { Avatar, PaymentModal, type PaymentSettlementData, CollectQrModal, type CollectQrModalData, SpendHistoryModal } from '../../components';
 import { triggerHaptic } from '../../utils/haptics';
 import { parseCustomDate, formatPurchaseTime, getCategoryMeta } from '../../utils/formatters';
 
 export function Dashboard() {
-    const { activePerson, setActiveTab, showToast } = useExpense();
+    const { activePerson, claimedPerson, setActiveTab, showToast } = useExpense();
     const { data: spendings, isLoading: isSpendingsLoading } = useSpendings(activePerson);
     const { data: allSplits = [], isLoading: isSplitsLoading } = useSplits();
     const { data: tripInfo } = useTripInfo();
     const { data: people = [], refetch: refetchPeople } = usePeople();
     const { data: peopleDetails = [], refetch: refetchPeopleDetails } = usePeopleDetails();
+    const [showSpendHistory, setShowSpendHistory] = useState(false);
 
     // Proactively fetch people and UPI details if not present on initial dashboard mount
     // Ensures UPI IDs and QR codes are ready offline even if user never visits the People tab
@@ -55,12 +56,13 @@ export function Dashboard() {
     };
 
     // 1. Direct personal expenses logged by activePerson (excluding auto-recorded split rows)
-    const personalDirectExpenses = (spendings?.recentExpenses || []).filter(
+    const directExpenseList = spendings?.allExpenses || spendings?.recentExpenses || [];
+    const personalDirectExpenses = directExpenseList.filter(
         (exp) => !exp.description?.toLowerCase().includes('(split:')
     );
 
     // Sum of any auto-recorded split rows inside spendings to prevent double-counting
-    const recordedSplitsInSheet = (spendings?.recentExpenses || []).filter((exp) =>
+    const recordedSplitsInSheet = directExpenseList.filter((exp) =>
         exp.description?.toLowerCase().includes('(split:')
     );
     const recordedSplitsSum = recordedSplitsInSheet.reduce((sum, e) => sum + (e.amount || 0), 0);
@@ -146,7 +148,7 @@ export function Dashboard() {
         .reduce((sum, s) => sum + s.totalAmount, 0);
 
     // Combined activity items for activePerson
-    const combinedRecentItems = [
+    const allPersonalItems = [
         ...personalDirectExpenses.map((e, idx) => ({
             id: `direct-${idx}`,
             description: e.description,
@@ -174,6 +176,9 @@ export function Dashboard() {
         const timeB = parseCustomDate(b.timestamp)?.getTime() || 0;
         return timeB - timeA;
     });
+
+    // Recent 10 items for the home overview dashboard
+    const combinedRecentItems = allPersonalItems.slice(0, 10);
 
     // Calculate personal settlements from active splits
     const myOwedSettlements: {
@@ -473,13 +478,23 @@ export function Dashboard() {
             <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-3">
                     {/* Total Spend by Active Person */}
-                    <div className="bg-surface-container-lowest p-4 rounded-2xl shadow-xs border border-outline-variant/30 flex flex-col justify-between relative overflow-hidden">
-                        <div className="absolute -right-4 -bottom-4 w-16 h-16 rounded-full bg-primary-fixed/20 pointer-events-none" />
+                    <div
+                        onClick={() => {
+                            triggerHaptic('light');
+                            setShowSpendHistory(true);
+                        }}
+                        className="bg-surface-container-lowest p-4 rounded-2xl shadow-xs border border-outline-variant/30 hover:border-primary/40 flex flex-col justify-between relative overflow-hidden cursor-pointer active:scale-[0.98] transition-all group"
+                        title="Tap to view month-wise spend breakdown"
+                        role="button"
+                        tabIndex={0}
+                    >
+                        <div className="absolute -right-4 -bottom-4 w-16 h-16 rounded-full bg-primary-fixed/20 pointer-events-none group-hover:scale-110 transition-transform" />
                         <div className="flex items-center justify-between mb-2">
-                            <span className="text-[11px] font-bold text-outline tracking-wider font-mono">
-                                YOUR SPEND
+                            <span className="text-[11px] font-bold text-outline tracking-wider font-mono flex items-center gap-1">
+                                <span>YOUR SPEND</span>
+                                <span className="material-symbols-outlined text-[12px] text-primary opacity-0 group-hover:opacity-100 transition-opacity">arrow_forward</span>
                             </span>
-                            <div className="w-6 h-6 rounded-full bg-primary-fixed flex items-center justify-center text-primary">
+                            <div className="w-6 h-6 rounded-full bg-primary-fixed flex items-center justify-center text-primary shadow-2xs">
                                 <span className="material-symbols-outlined text-[16px]">
                                     wallet
                                 </span>
@@ -887,13 +902,31 @@ export function Dashboard() {
 
             {/* Recent Expenses List for Active Person */}
             <div className="space-y-3">
-                <div className="flex items-center justify-between px-1">
-                    <h2 className="text-base font-bold text-on-surface font-headline">
-                        Recent Spendings by {activePerson}
-                    </h2>
-                    <span className="text-xs text-on-surface-variant font-mono">
-                        {combinedRecentItems.length} {combinedRecentItems.length === 1 ? 'item' : 'items'}
-                    </span>
+                <div className="flex items-center justify-between gap-2 px-1">
+                    <div className="min-w-0 flex-1">
+                        <h2 className="text-base font-bold text-on-surface font-headline truncate">
+                            Recent Spendings
+                        </h2>
+                        <span className="text-[11px] text-on-surface-variant font-mono block truncate">
+                            {combinedRecentItems.length} of {allPersonalItems.length}{' '}
+                            {allPersonalItems.length === 1 ? 'item' : 'items'} • {activePerson}
+                        </span>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => {
+                            triggerHaptic('light');
+                            setShowSpendHistory(true);
+                        }}
+                        className="shrink-0 whitespace-nowrap text-xs font-semibold text-primary hover:text-primary-container active:opacity-70 transition-opacity flex items-center gap-0.5 cursor-pointer py-1 pl-2 -mr-1"
+                        title="View all transactions month-wise"
+                    >
+                        <span>View all</span>
+                        <span className="material-symbols-outlined text-[15px] translate-y-[0.5px]">
+                            chevron_right
+                        </span>
+                    </button>
                 </div>
 
                 {isDataLoading ? (
@@ -998,6 +1031,21 @@ export function Dashboard() {
                                 </div>
                             );
                         })}
+
+                        {allPersonalItems.length > 10 && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    triggerHaptic('light');
+                                    setShowSpendHistory(true);
+                                }}
+                                className="w-full py-2.5 px-4 rounded-xl bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-outline-variant/30 active:scale-[0.99] shadow-2xs"
+                            >
+                                <span className="material-symbols-outlined text-[17px]">calendar_month</span>
+                                <span>View all {allPersonalItems.length} transactions across months</span>
+                                <span className="material-symbols-outlined text-[15px]">arrow_forward</span>
+                            </button>
+                        )}
                     </div>
                 )}
             </div>
@@ -1013,6 +1061,14 @@ export function Dashboard() {
                 isOpen={!!collectSettlement}
                 onClose={() => setCollectSettlement(null)}
                 data={collectSettlement}
+            />
+
+            {/* Dedicated Month-wise Spend History Breakdown Modal */}
+            <SpendHistoryModal
+                isOpen={showSpendHistory}
+                onClose={() => setShowSpendHistory(false)}
+                initialPerson={activePerson}
+                claimedPerson={claimedPerson}
             />
         </div>
     );

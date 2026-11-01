@@ -6,6 +6,7 @@ import { ENV } from '../../config';
 import { ProfileModal } from './ProfileModal';
 import { JoinTripModal } from './JoinTripModal';
 import { SyncStatusModal } from '../SyncModal/SyncStatusModal';
+import { SpendHistoryModal } from '../SpendHistory/SpendHistoryModal';
 import { useOfflineSync } from '../../utils/useOfflineSync';
 import { triggerHaptic } from '../../utils/haptics';
 
@@ -30,6 +31,7 @@ export const Header: React.FC = () => {
     const [showSwitcher, setShowSwitcher] = useState(false);
     const [showJoinModal, setShowJoinModal] = useState(false);
     const [showSyncModal, setShowSyncModal] = useState(false);
+    const [showSpendHistory, setShowSpendHistory] = useState(false);
 
     const isHealthy = health?.status === 'healthy';
     const tripTitle = tripInfo?.title || ENV.DEFAULT_TRIP_TITLE;
@@ -38,7 +40,7 @@ export const Header: React.FC = () => {
 
     return (
         <>
-            <header className="fixed top-0 inset-x-0 z-50 pt-safe bg-surface/90 backdrop-blur-xl border-b border-outline-variant/20 shadow-[0_1px_8px_rgba(0,0,0,0.03)]">
+            <header className="fixed top-0 inset-x-0 z-40 pt-safe bg-surface/90 backdrop-blur-xl border-b border-outline-variant/20 shadow-[0_1px_8px_rgba(0,0,0,0.03)]">
                 <div className="max-w-md mx-auto h-16 px-4 flex items-center justify-between gap-2">
                     {/* Brand / Trip Icon - Tap to open Join Trip QR Modal */}
                     <div className="flex items-center gap-2 min-w-0">
@@ -203,6 +205,7 @@ export const Header: React.FC = () => {
                 lockSwitcher={lockSwitcher}
                 showToast={showToast}
                 onOpenSyncStatus={() => setShowSyncModal(true)}
+                onOpenSpendHistory={() => setShowSpendHistory(true)}
             />
 
             {/* Join Trip / Invite Members QR Modal */}
@@ -218,6 +221,14 @@ export const Header: React.FC = () => {
             <SyncStatusModal
                 isOpen={showSyncModal}
                 onClose={() => setShowSyncModal(false)}
+            />
+
+            {/* Dedicated Month-wise Spend History Breakdown Modal */}
+            <SpendHistoryModal
+                isOpen={showSpendHistory}
+                onClose={() => setShowSpendHistory(false)}
+                initialPerson={activePerson}
+                claimedPerson={claimedPerson}
             />
         </>
     );

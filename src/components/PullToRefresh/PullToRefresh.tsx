@@ -112,7 +112,7 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
         <div ref={containerRef} className="relative w-full min-h-full">
             {/* Pull Indicator Pill */}
             <div
-                className="fixed top-18 inset-x-0 flex justify-center z-40 pointer-events-none transition-all duration-200"
+                className="fixed top-18 inset-x-0 flex justify-center z-30 pointer-events-none transition-all duration-200"
                 style={{
                     transform: `translateY(${pullY > 0 || isRefreshing ? Math.min(pullY, 48) : -60}px)`,
                     opacity: pullY > 8 || isRefreshing ? 1 : 0,

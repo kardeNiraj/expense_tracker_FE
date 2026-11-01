@@ -140,7 +140,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
 
     return (
         <div
-            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in"
+            className="fixed inset-0 z-60 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in"
             onClick={onClose}
         >
             <div
@@ -437,7 +437,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
                 </div>
 
                 {/* Modal Footer */}
-                <div className="p-4 border-t border-outline-variant/20 bg-surface flex flex-col gap-2 shrink-0">
+                <div className="p-4 pb-safe border-t border-outline-variant/20 bg-surface flex flex-col gap-2 shrink-0">
                     <div className="flex items-center gap-2">
                         {pendingCount > 0 && !clearQueueConfirm && (
                             <button
