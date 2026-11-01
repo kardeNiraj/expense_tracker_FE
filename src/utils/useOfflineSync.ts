@@ -7,6 +7,7 @@ import {
     processOfflineQueue,
     retryGroupNow as retryGroupAction,
     discardGroup as discardGroupAction,
+    discardQueuedMutation as discardMutationAction,
     clearOfflineQueue,
     type SyncResult,
     type QueuedItem,
@@ -81,19 +82,44 @@ export function useOfflineSync() {
         [isSyncing, queryClient]
     );
 
-    const discardGroup = useCallback((groupId: string) => {
-        triggerHaptic('warning');
-        discardGroupAction(groupId);
-        setQueue(getOfflineQueue());
-        setGroups(getGroupedOfflineQueue());
-    }, []);
+    const discardGroup = useCallback(
+        (groupId: string) => {
+            triggerHaptic('warning');
+            discardGroupAction(groupId, queryClient);
+            setQueue(getOfflineQueue());
+            setGroups(getGroupedOfflineQueue());
+            if (typeof navigator !== 'undefined' && navigator.onLine) {
+                queryClient.invalidateQueries();
+            }
+            showToast('Discarded operation and removed from view', 'delete');
+        },
+        [queryClient, showToast]
+    );
+
+    const discardItem = useCallback(
+        (itemId: string) => {
+            triggerHaptic('warning');
+            discardMutationAction(itemId, queryClient);
+            setQueue(getOfflineQueue());
+            setGroups(getGroupedOfflineQueue());
+            if (typeof navigator !== 'undefined' && navigator.onLine) {
+                queryClient.invalidateQueries();
+            }
+            showToast('Operation cancelled and removed from view', 'delete');
+        },
+        [queryClient, showToast]
+    );
 
     const clearQueue = useCallback(() => {
         triggerHaptic('warning');
-        clearOfflineQueue();
+        clearOfflineQueue(queryClient);
         setQueue([]);
         setGroups([]);
-    }, []);
+        if (typeof navigator !== 'undefined' && navigator.onLine) {
+            queryClient.invalidateQueries();
+        }
+        showToast('All pending operations cleared', 'delete');
+    }, [queryClient, showToast]);
 
     // Listen to queue changes and online/offline status
     useEffect(() => {
@@ -127,6 +153,13 @@ export function useOfflineSync() {
         window.addEventListener('online', handleOnline);
         window.addEventListener('offline', handleOffline);
         document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        // Proactively process pending offline queue on app mount if device is online
+        if (typeof navigator !== 'undefined' && navigator.onLine && getOfflineQueue().length > 0) {
+            setTimeout(() => {
+                syncNow();
+            }, 800);
+        }
 
         // Periodic tick every 1 second when items are in backoff to refresh countdowns
         const backoffInterval = setInterval(() => {
@@ -165,6 +198,7 @@ export function useOfflineSync() {
         syncNow,
         retryGroup,
         discardGroup,
+        discardItem,
         clearQueue,
     };
 }

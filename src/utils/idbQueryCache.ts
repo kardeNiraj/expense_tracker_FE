@@ -1,6 +1,14 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { getOfflineQueue } from './offlineQueue';
-import type { AddSplitPayload, AddExpensePayload, Split, SpendingsData } from '../api/types';
+import type {
+    AddSplitPayload,
+    AddExpensePayload,
+    SettleParticipantPayload,
+    AddContributionPayload,
+    UpdateSplitPayload,
+    Split,
+    SpendingsData,
+} from '../api/types';
 
 const DB_NAME = 'splitnest_offline_db';
 const DB_VERSION = 1;
@@ -183,6 +191,75 @@ export function rehydratePendingOfflineData(queryClient: QueryClient): void {
                     });
                 }
             }
+        }
+
+        // 3. Rehydrate UPDATE_SPLIT items
+        const pendingUpdateItems = queue.filter((it) => it.type === 'UPDATE_SPLIT');
+        for (const it of pendingUpdateItems) {
+            const p = it.payload as UpdateSplitPayload;
+            queryClient.setQueriesData<Split[]>({ queryKey: ['splits'] }, (old = []) => {
+                return old.map((s) => {
+                    if (s.splitId !== p.splitId) return s;
+                    return {
+                        ...s,
+                        description: p.description ?? s.description,
+                        category: p.category ?? s.category,
+                        totalAmount: p.amount ?? s.totalAmount,
+                        participants: p.participants ?? s.participants,
+                    };
+                });
+            });
+        }
+
+        // 4. Rehydrate ADD_CONTRIBUTION items
+        const pendingContribItems = queue.filter((it) => it.type === 'ADD_CONTRIBUTION');
+        for (const it of pendingContribItems) {
+            const p = it.payload as AddContributionPayload;
+            queryClient.setQueriesData<Split[]>({ queryKey: ['splits'] }, (old = []) => {
+                return old.map((s) => {
+                    if (s.splitId !== p.splitId) return s;
+                    const alreadyExists = (s.contributions || []).some(
+                        (c) => c.person === p.person && c.amount === p.amount
+                    );
+                    if (alreadyExists) return s;
+                    return {
+                        ...s,
+                        contributions: [...(s.contributions || []), { person: p.person, amount: p.amount }],
+                    };
+                });
+            });
+        }
+
+        // 5. Rehydrate SETTLE_PARTICIPANT items
+        const pendingSettleItems = queue.filter((it) => it.type === 'SETTLE_PARTICIPANT');
+        for (const it of pendingSettleItems) {
+            const p = it.payload as SettleParticipantPayload;
+            queryClient.setQueriesData<Split[]>({ queryKey: ['splits'] }, (old = []) => {
+                return old.map((s) => {
+                    if (s.splitId !== p.splitId) return s;
+                    const settlements = s.settlements.map((settle) => {
+                        const match =
+                            settle.from.trim().toLowerCase() === p.from.trim().toLowerCase() &&
+                            (!p.to || settle.to.trim().toLowerCase() === p.to.trim().toLowerCase());
+                        return match ? { ...settle, status: 'SETTLED' as const } : settle;
+                    });
+                    const allSettled = settlements.every((st) => st.status === 'SETTLED');
+                    return {
+                        ...s,
+                        settlements,
+                        status: allSettled ? ('SETTLED' as const) : s.status,
+                    };
+                });
+            });
+        }
+
+        // 6. Rehydrate DELETE_SPLIT items (filter out deleted splits)
+        const pendingDeleteItems = queue.filter((it) => it.type === 'DELETE_SPLIT');
+        for (const it of pendingDeleteItems) {
+            const p = it.payload as { splitId: string };
+            queryClient.setQueriesData<Split[]>({ queryKey: ['splits'] }, (old = []) => {
+                return old.filter((s) => s.splitId !== p.splitId);
+            });
         }
     } catch (err) {
         console.warn('[IndexedDB] Error rehydrating pending offline data:', err);

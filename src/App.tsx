@@ -6,6 +6,7 @@ import { apiFetch, queryKeys } from './api';
 import { Dashboard, SplitsPage, AddPage, PeoplePage, ClaimIdentityScreen } from './pages';
 import { ENV } from './config';
 import { setupQueryCachePersistence } from './utils/idbQueryCache';
+import { processOfflineQueue } from './utils/offlineQueue';
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -39,6 +40,8 @@ function MainApp() {
                 apiFetch('/trip-info?refresh=true'),
                 apiFetch('/people/details?refresh=true'),
             ]);
+            // Also flush any pending queued operations in the background
+            processOfflineQueue(queryClient).catch(() => {});
             await queryClient.invalidateQueries();
             await queryClient.refetchQueries({ type: 'active' });
             showToast('Refreshed latest data from Sheet!', 'sync');

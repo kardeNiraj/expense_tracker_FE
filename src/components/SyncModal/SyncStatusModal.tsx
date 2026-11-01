@@ -7,6 +7,7 @@ import type {
     AddContributionPayload,
     SettleParticipantPayload,
     UpdateUpiPayload,
+    UpdateSplitPayload,
 } from '../../api/types';
 import type { QueuedItem, QueuedGroup } from '../../utils/offlineQueue';
 
@@ -25,6 +26,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
         syncNow,
         retryGroup,
         discardGroup,
+        discardItem,
         clearQueue,
     } = useOfflineSync();
 
@@ -73,6 +75,22 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
                     title: `Update UPI: ${p.name}`,
                     subtitle: `UPI ID: ${p.upiId}`,
                     icon: 'account_balance_wallet',
+                };
+            }
+            case 'DELETE_SPLIT': {
+                const p = item.payload as { splitId: string };
+                return {
+                    title: `Delete Split: ${p.splitId}`,
+                    subtitle: 'Removal of split transaction',
+                    icon: 'delete',
+                };
+            }
+            case 'UPDATE_SPLIT': {
+                const p = item.payload as UpdateSplitPayload;
+                return {
+                    title: `Update Split: ${p.description || p.splitId}`,
+                    subtitle: `Amount: ₹${p.amount || 0} • ${p.category || 'Split'}`,
+                    icon: 'edit',
                 };
             }
             default:
@@ -335,15 +353,31 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
                                                     </div>
                                                 </div>
 
-                                                <div className="shrink-0 text-[10px] font-mono">
-                                                    {item.status === 'SYNCING' ? (
-                                                        <span className="text-primary font-bold">Syncing</span>
-                                                    ) : item.retryCount > 0 ? (
-                                                        <span className="text-indigo-700 dark:text-indigo-300 font-semibold">
-                                                            Retried {item.retryCount}x
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-sky-700 dark:text-sky-300 font-medium">Queued</span>
+                                                <div className="shrink-0 flex items-center gap-1.5">
+                                                    <div className="text-[10px] font-mono">
+                                                        {item.status === 'SYNCING' ? (
+                                                            <span className="text-primary font-bold">Syncing</span>
+                                                        ) : item.retryCount > 0 ? (
+                                                            <span className="text-indigo-700 dark:text-indigo-300 font-semibold">
+                                                                Retried {item.retryCount}x
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-sky-700 dark:text-sky-300 font-medium">Queued</span>
+                                                        )}
+                                                    </div>
+                                                    {item.status !== 'SYNCING' && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                discardItem(item.id);
+                                                            }}
+                                                            className="w-5 h-5 rounded-md flex items-center justify-center text-on-surface-variant/60 hover:text-error hover:bg-error/10 transition-colors cursor-pointer"
+                                                            title="Cancel operation and remove from view"
+                                                            aria-label="Cancel operation"
+                                                        >
+                                                            <span className="material-symbols-outlined text-[13px]">close</span>
+                                                        </button>
                                                     )}
                                                 </div>
                                             </div>

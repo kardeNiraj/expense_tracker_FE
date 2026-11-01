@@ -1,9 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiFetch } from './client';
 import { queryKeys } from './queries';
 import {
     enqueueOfflineMutation,
-    isOfflineOrNetworkError,
+    processOfflineQueue,
 } from '../utils/offlineQueue';
 import type {
     AddExpensePayload,
@@ -68,30 +67,24 @@ function createOptimisticSplit(payload: AddSplitPayload): Split {
     };
 }
 
-// 1. ADD EXPENSE MUTATION WITH OPTIMISTIC UI & OFFLINE QUEUE
+// 1. ADD EXPENSE MUTATION WITH WRITE-AHEAD QUEUE & OPTIMISTIC UI
 export function useAddExpenseMutation() {
     const queryClient = useQueryClient();
 
     return useMutation({
         networkMode: 'always',
         mutationFn: async (payload: AddExpensePayload) => {
-            if (typeof navigator !== 'undefined' && !navigator.onLine) {
-                enqueueOfflineMutation('ADD_EXPENSE', payload);
-                return { message: 'Saved offline', status: 'offline', offline: true };
-            }
+            // Write-Ahead Queue: Always serialize to local queue first
+            enqueueOfflineMutation('ADD_EXPENSE', payload);
 
-            try {
-                return await apiFetch<{ message?: string; status?: string }>('/add-expense', {
-                    method: 'POST',
-                    body: JSON.stringify(payload),
+            // Trigger background processing with auto-retry
+            setTimeout(() => {
+                processOfflineQueue(queryClient).catch((err) => {
+                    console.warn('[Queue] Background sync error for ADD_EXPENSE:', err);
                 });
-            } catch (err: unknown) {
-                if (isOfflineOrNetworkError(err)) {
-                    enqueueOfflineMutation('ADD_EXPENSE', payload);
-                    return { message: 'Saved offline', status: 'offline', offline: true };
-                }
-                throw err;
-            }
+            }, 50);
+
+            return { message: 'Saved and queued for sync', status: 'queued', offline: true };
         },
         onMutate: async (newExpense) => {
             await queryClient.cancelQueries({ queryKey: ['spendings'] });
@@ -121,23 +114,14 @@ export function useAddExpenseMutation() {
 
             return { prevSpendings, spendingsKey };
         },
-        onError: (_err, _vars, context) => {
-            if (context?.prevSpendings && context?.spendingsKey) {
-                queryClient.setQueryData(context.spendingsKey, context.prevSpendings);
-            }
-        },
-        onSuccess: (data, variables) => {
-            // Only invalidate if synced online; keep optimistic cache if offline
-            if (!(data as { offline?: boolean })?.offline) {
-                queryClient.invalidateQueries({ queryKey: queryKeys.spendings(variables.payee) });
-                queryClient.invalidateQueries({ queryKey: ['spendings'] });
-                queryClient.invalidateQueries({ queryKey: ['splits'] });
-            }
+        onSuccess: () => {
+            // Optimistic state is safely rendered and stored in IndexedDB.
+            // Canonical data is updated when processOfflineQueue succeeds in background.
         },
     });
 }
 
-// 2. ADD SPLIT MUTATION WITH OPTIMISTIC UI & OFFLINE QUEUE
+// 2. ADD SPLIT MUTATION WITH WRITE-AHEAD QUEUE & OPTIMISTIC UI
 export function useAddSplitMutation() {
     const queryClient = useQueryClient();
 
@@ -148,23 +132,17 @@ export function useAddSplitMutation() {
                 payload.splitId = `split_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
             }
 
-            if (typeof navigator !== 'undefined' && !navigator.onLine) {
-                enqueueOfflineMutation('ADD_SPLIT', payload);
-                return { ...createOptimisticSplit(payload), offline: true };
-            }
+            // Write-Ahead Queue: Always serialize to local queue first
+            enqueueOfflineMutation('ADD_SPLIT', payload);
 
-            try {
-                return await apiFetch<Split>('/split', {
-                    method: 'POST',
-                    body: JSON.stringify(payload),
+            // Trigger background processing with auto-retry
+            setTimeout(() => {
+                processOfflineQueue(queryClient).catch((err) => {
+                    console.warn('[Queue] Background sync error for ADD_SPLIT:', err);
                 });
-            } catch (err: unknown) {
-                if (isOfflineOrNetworkError(err)) {
-                    enqueueOfflineMutation('ADD_SPLIT', payload);
-                    return { ...createOptimisticSplit(payload), offline: true };
-                }
-                throw err;
-            }
+            }, 50);
+
+            return { ...createOptimisticSplit(payload), offline: true };
         },
         onMutate: async (newSplitPayload) => {
             if (!newSplitPayload.splitId) {
@@ -210,17 +188,14 @@ export function useAddSplitMutation() {
 
             return { optimisticSplit };
         },
-        onSuccess: (data, variables) => {
-            if (!(data as { offline?: boolean })?.offline) {
-                queryClient.invalidateQueries({ queryKey: ['splits'] });
-                queryClient.invalidateQueries({ queryKey: queryKeys.spendings(variables.paidBy) });
-                queryClient.invalidateQueries({ queryKey: ['spendings'] });
-            }
+        onSuccess: () => {
+            // Optimistic state is safely rendered and stored in IndexedDB.
+            // Canonical data is updated when processOfflineQueue succeeds in background.
         },
     });
 }
 
-// 3. ADD CONTRIBUTION MUTATION
+// 3. ADD CONTRIBUTION MUTATION WITH WRITE-AHEAD QUEUE
 export function useAddContributionMutation() {
     const queryClient = useQueryClient();
 
@@ -228,64 +203,54 @@ export function useAddContributionMutation() {
         networkMode: 'always',
         mutationFn: async ({ splitId, person, amount }: AddContributionPayload) => {
             const payload: AddContributionPayload = { splitId, person, amount };
+            enqueueOfflineMutation('ADD_CONTRIBUTION', payload);
 
-            if (typeof navigator !== 'undefined' && !navigator.onLine) {
-                enqueueOfflineMutation('ADD_CONTRIBUTION', payload);
-                return { splitId, offline: true } as Split & { offline?: boolean };
-            }
-
-            try {
-                return await apiFetch<Split>(`/split/${splitId}/contributions`, {
-                    method: 'POST',
-                    body: JSON.stringify({ person, amount }),
+            setTimeout(() => {
+                processOfflineQueue(queryClient).catch((err) => {
+                    console.warn('[Queue] Background sync error for ADD_CONTRIBUTION:', err);
                 });
-            } catch (err: unknown) {
-                if (isOfflineOrNetworkError(err)) {
-                    enqueueOfflineMutation('ADD_CONTRIBUTION', payload);
-                    return { splitId, offline: true } as Split & { offline?: boolean };
-                }
-                throw err;
-            }
+            }, 50);
+
+            return { splitId, offline: true } as Split & { offline?: boolean };
         },
-        onSuccess: (data, variables) => {
-            if (!(data as { offline?: boolean })?.offline) {
-                queryClient.invalidateQueries({ queryKey: queryKeys.splitDetails(variables.splitId) });
-                queryClient.invalidateQueries({ queryKey: ['splits'] });
-                queryClient.invalidateQueries({ queryKey: ['spendings'] });
-            }
+        onMutate: async (newContribution) => {
+            await queryClient.cancelQueries({ queryKey: ['splits'] });
+            queryClient.setQueriesData<Split[]>({ queryKey: ['splits'] }, (old) => {
+                if (!old) return old;
+                return old.map((s) => {
+                    if (s.splitId !== newContribution.splitId) return s;
+                    return {
+                        ...s,
+                        contributions: [
+                            ...(s.contributions || []),
+                            { person: newContribution.person, amount: newContribution.amount },
+                        ],
+                    };
+                });
+            });
+        },
+        onSuccess: () => {
+            // Handled when processOfflineQueue invalidates queries
         },
     });
 }
 
-// 4. SETTLE PARTICIPANT MUTATION WITH OPTIMISTIC UI
+// 4. SETTLE PARTICIPANT MUTATION WITH WRITE-AHEAD QUEUE
 export function useSettleParticipantMutation() {
     const queryClient = useQueryClient();
 
     return useMutation({
         networkMode: 'always',
         mutationFn: async (payload: SettleParticipantPayload) => {
-            if (typeof navigator !== 'undefined' && !navigator.onLine) {
-                enqueueOfflineMutation('SETTLE_PARTICIPANT', payload);
-                return { splitId: payload.splitId, offline: true } as Split & { offline?: boolean };
-            }
+            enqueueOfflineMutation('SETTLE_PARTICIPANT', payload);
 
-            try {
-                return await apiFetch<Split>(`/split/${payload.splitId}/settle`, {
-                    method: 'PATCH',
-                    body: JSON.stringify({
-                        from: payload.from,
-                        to: payload.to,
-                        settled: payload.settled !== false,
-                        confirmedBy: payload.confirmedBy,
-                    }),
+            setTimeout(() => {
+                processOfflineQueue(queryClient).catch((err) => {
+                    console.warn('[Queue] Background sync error for SETTLE_PARTICIPANT:', err);
                 });
-            } catch (err: unknown) {
-                if (isOfflineOrNetworkError(err)) {
-                    enqueueOfflineMutation('SETTLE_PARTICIPANT', payload);
-                    return { splitId: payload.splitId, offline: true } as Split & { offline?: boolean };
-                }
-                throw err;
-            }
+            }, 50);
+
+            return { splitId: payload.splitId, offline: true } as Split & { offline?: boolean };
         },
         onMutate: async (variables) => {
             await queryClient.cancelQueries({ queryKey: ['splits'] });
@@ -316,64 +281,91 @@ export function useSettleParticipantMutation() {
                 });
             });
         },
-        onSuccess: (data, variables) => {
-            if (typeof navigator !== 'undefined' && navigator.onLine && !(data as { offline?: boolean })?.offline) {
-                queryClient.invalidateQueries({ queryKey: queryKeys.splitDetails(variables.splitId) });
-                queryClient.invalidateQueries({ queryKey: ['splits'] });
-                queryClient.invalidateQueries({ queryKey: ['spendings'] });
-            }
+        onSuccess: () => {
+            // Handled when processOfflineQueue invalidates queries
         },
     });
 }
 
-// 5. UPDATE UPI MUTATION
+// 5. UPDATE UPI MUTATION WITH WRITE-AHEAD QUEUE
+let lastPreviousUpiId: string | undefined;
+
 export function useUpdateUpiMutation() {
     const queryClient = useQueryClient();
 
     return useMutation({
         networkMode: 'always',
         mutationFn: async ({ name, upiId, requestedBy }: UpdateUpiPayload) => {
-            const payload = { name, upiId, requestedBy };
-            if (typeof navigator !== 'undefined' && !navigator.onLine) {
-                enqueueOfflineMutation('UPDATE_UPI', payload);
-                return { message: 'UPI saved offline', status: 'offline' };
-            }
+            const payload = { name, upiId, requestedBy, previousUpiId: lastPreviousUpiId };
+            enqueueOfflineMutation('UPDATE_UPI', payload);
 
-            try {
-                return await apiFetch<{ message?: string; status?: string }>('/people/upi', {
-                    method: 'POST',
-                    body: JSON.stringify(payload),
+            setTimeout(() => {
+                processOfflineQueue(queryClient).catch((err) => {
+                    console.warn('[Queue] Background sync error for UPDATE_UPI:', err);
                 });
-            } catch (err: unknown) {
-                if (isOfflineOrNetworkError(err)) {
-                    enqueueOfflineMutation('UPDATE_UPI', payload);
-                    return { message: 'UPI saved offline', status: 'offline' };
+            }, 50);
+
+            return { message: 'UPI saved locally and queued for sync', status: 'queued', offline: true };
+        },
+        onMutate: async ({ name, upiId }) => {
+            await queryClient.cancelQueries({ queryKey: queryKeys.peopleDetails() });
+
+            const people = queryClient.getQueryData<{ name: string; upiId?: string }[]>(queryKeys.peopleDetails());
+            const prevPerson = people?.find((p) => p.name.trim().toLowerCase() === name.trim().toLowerCase());
+            lastPreviousUpiId = prevPerson?.upiId;
+
+            queryClient.setQueriesData<{ name: string; upiId?: string }[]>(
+                { queryKey: queryKeys.peopleDetails() },
+                (old) => {
+                    if (!old) return old;
+                    return old.map((p) => {
+                        if (p.name.trim().toLowerCase() === name.trim().toLowerCase()) {
+                            return { ...p, upiId };
+                        }
+                        return p;
+                    });
                 }
-                throw err;
-            }
+            );
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: queryKeys.peopleDetails() });
+            // Handled when processOfflineQueue invalidates queries
         },
     });
 }
 
-// 6. DELETE SPLIT MUTATION WITH OPTIMISTIC REMOVAL
+// 6. DELETE SPLIT MUTATION WITH WRITE-AHEAD QUEUE
+let lastDeletedSplit: Split | undefined;
+
 export function useDeleteSplitMutation() {
     const queryClient = useQueryClient();
 
     return useMutation({
         networkMode: 'always',
         mutationFn: async ({ splitId, requestedBy }: { splitId: string; requestedBy?: string }) => {
-            return await apiFetch<{ success: boolean; message: string }>(
-                `/split/${splitId}?requestedBy=${encodeURIComponent(requestedBy || '')}`,
-                {
-                    method: 'DELETE',
-                }
-            );
+            const payload = { splitId, requestedBy, previousSplit: lastDeletedSplit };
+            enqueueOfflineMutation('DELETE_SPLIT', payload);
+
+            setTimeout(() => {
+                processOfflineQueue(queryClient).catch((err) => {
+                    console.warn('[Queue] Background sync error for DELETE_SPLIT:', err);
+                });
+            }, 50);
+
+            return { success: true, message: `Split ${splitId} deleted locally`, offline: true };
         },
         onMutate: async ({ splitId }) => {
             await queryClient.cancelQueries({ queryKey: ['splits'] });
+
+            const splitsQueries = queryClient.getQueriesData<Split[]>({ queryKey: ['splits'] });
+            let previousSplit: Split | undefined;
+            for (const [, splits] of splitsQueries) {
+                const found = splits?.find((s) => s.splitId === splitId);
+                if (found) {
+                    previousSplit = found;
+                    break;
+                }
+            }
+            lastDeletedSplit = previousSplit;
 
             // Optimistically filter out deleted split from cache
             queryClient.setQueriesData<Split[]>({ queryKey: ['splits'] }, (old) => {
@@ -382,26 +374,43 @@ export function useDeleteSplitMutation() {
             });
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['splits'] });
-            queryClient.invalidateQueries({ queryKey: ['spendings'] });
+            // Handled when processOfflineQueue invalidates queries
         },
     });
 }
 
-// 7. UPDATE SPLIT MUTATION WITH OPTIMISTIC CACHE UPDATE
+// 7. UPDATE SPLIT MUTATION WITH WRITE-AHEAD QUEUE
+let lastUpdatedSplit: Split | undefined;
+
 export function useUpdateSplitMutation() {
     const queryClient = useQueryClient();
 
     return useMutation({
         networkMode: 'always',
         mutationFn: async (payload: UpdateSplitPayload) => {
-            return await apiFetch<{ success: boolean; data: Split }>(`/split/${payload.splitId}`, {
-                method: 'PUT',
-                body: JSON.stringify(payload),
-            });
+            enqueueOfflineMutation('UPDATE_SPLIT', { ...payload, previousSplit: lastUpdatedSplit });
+
+            setTimeout(() => {
+                processOfflineQueue(queryClient).catch((err) => {
+                    console.warn('[Queue] Background sync error for UPDATE_SPLIT:', err);
+                });
+            }, 50);
+
+            return { success: true, data: payload as unknown as Split, offline: true };
         },
         onMutate: async (payload) => {
             await queryClient.cancelQueries({ queryKey: ['splits'] });
+
+            const splitsQueries = queryClient.getQueriesData<Split[]>({ queryKey: ['splits'] });
+            let previousSplit: Split | undefined;
+            for (const [, splits] of splitsQueries) {
+                const found = splits?.find((s) => s.splitId === payload.splitId);
+                if (found) {
+                    previousSplit = found;
+                    break;
+                }
+            }
+            lastUpdatedSplit = previousSplit;
 
             // Optimistically update split in cache
             queryClient.setQueriesData<Split[]>({ queryKey: ['splits'] }, (old) => {
@@ -418,10 +427,8 @@ export function useUpdateSplitMutation() {
                 });
             });
         },
-        onSuccess: (_data, variables) => {
-            queryClient.invalidateQueries({ queryKey: queryKeys.splitDetails(variables.splitId) });
-            queryClient.invalidateQueries({ queryKey: ['splits'] });
-            queryClient.invalidateQueries({ queryKey: ['spendings'] });
+        onSuccess: () => {
+            // Handled when processOfflineQueue invalidates queries
         },
     });
 }

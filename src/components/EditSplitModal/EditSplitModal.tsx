@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { Split } from '../../api/types';
-import { useCategories, usePeople, useUpdateSplitMutation } from '../../api';
+import { useCategories, usePeople, useUpdateSplitMutation, useAddContributionMutation, useSplits } from '../../api';
 import { useExpense } from '../../context';
 import { triggerHaptic } from '../../utils/haptics';
 import { DEFAULT_CATEGORIES } from '../../config';
@@ -23,7 +23,11 @@ const EditSplitContent: React.FC<EditSplitContentProps> = ({ split, onClose }) =
     const { data: rawCategories = [] } = useCategories();
     const categories = rawCategories.length > 0 ? rawCategories : DEFAULT_CATEGORIES;
     const { data: people = [] } = usePeople();
+    const { data: splits = [] } = useSplits();
+    const liveSplit = splits.find((s) => s.splitId === split.splitId) || split;
+
     const updateMutation = useUpdateSplitMutation();
+    const contributeMutation = useAddContributionMutation();
 
     const [amount, setAmount] = useState(String(split.totalAmount));
     const [description, setDescription] = useState(split.description);
@@ -31,8 +35,68 @@ const EditSplitContent: React.FC<EditSplitContentProps> = ({ split, onClose }) =
     const [participants, setParticipants] = useState<string[]>(split.participants || []);
     const [isSaving, setIsSaving] = useState(false);
 
+    // Contribution form state
+    const [isAddingContrib, setIsAddingContrib] = useState(false);
+    const [contribPerson, setContribPerson] = useState<string>(() => {
+        const nonPayer = (split.participants || []).find((p) => p.toLowerCase() !== split.paidBy.toLowerCase());
+        return nonPayer || split.participants?.[0] || '';
+    });
+    const [contribAmount, setContribAmount] = useState('');
+    const [isSavingContrib, setIsSavingContrib] = useState(false);
+
+    const currentContributions = liveSplit.contributions || [];
+    const totalContributed = currentContributions.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+
     const settledCount = (split.settlements || []).filter((s) => s.status === 'SETTLED').length;
     const hasSettled = settledCount > 0;
+
+    const effectiveContribPerson = participants.includes(contribPerson)
+        ? contribPerson
+        : (participants[0] || '');
+
+    const handleAddContribution = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        const amtNum = parseFloat(contribAmount);
+        if (!amtNum || amtNum <= 0) {
+            triggerHaptic('warning');
+            showToast('Please enter a valid contribution amount', 'warning');
+            return;
+        }
+
+        if (!effectiveContribPerson) {
+            triggerHaptic('warning');
+            showToast('Please select a contributing person', 'warning');
+            return;
+        }
+
+        const totalBill = parseFloat(amount) || split.totalAmount;
+        if (totalContributed + amtNum > totalBill) {
+            triggerHaptic('warning');
+            showToast(
+                `Total contributions (₹${totalContributed + amtNum}) cannot exceed total bill amount (₹${totalBill})`,
+                'warning'
+            );
+            return;
+        }
+
+        setIsSavingContrib(true);
+        try {
+            await contributeMutation.mutateAsync({
+                splitId: split.splitId,
+                person: effectiveContribPerson,
+                amount: amtNum,
+            });
+            triggerHaptic('success');
+            showToast(`Added contribution of ₹${amtNum} by ${effectiveContribPerson}!`, 'payments');
+            setContribAmount('');
+            setIsAddingContrib(false);
+        } catch (err: unknown) {
+            triggerHaptic('warning');
+            showToast(`Failed to add contribution: ${String(err)}`, 'error');
+        } finally {
+            setIsSavingContrib(false);
+        }
+    };
 
     const toggleParticipant = (person: string) => {
         if (hasSettled) return;
@@ -294,6 +358,170 @@ const EditSplitContent: React.FC<EditSplitContentProps> = ({ split, onClose }) =
                             })}
                         </div>
                     </div>
+
+                    {/* Upfront Contributions Section */}
+                    <div className="bg-surface-container-low rounded-2xl p-4 border border-outline-variant/30 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <span className="material-symbols-outlined text-[18px] text-primary">payments</span>
+                                <span className="text-xs font-bold text-on-surface">Upfront Contributions</span>
+                                {currentContributions.length > 0 && (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-primary/10 text-primary border border-primary/20">
+                                        ₹{totalContributed.toLocaleString('en-IN')}
+                                    </span>
+                                )}
+                            </div>
+                            {!isAddingContrib && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        triggerHaptic('light');
+                                        setIsAddingContrib(true);
+                                    }}
+                                    className="text-xs font-semibold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                                >
+                                    <span className="material-symbols-outlined text-[15px]">add</span>
+                                    <span>Add Contribution</span>
+                                </button>
+                            )}
+                        </div>
+
+                        {/* List of existing contributions */}
+                        {currentContributions.length > 0 ? (
+                            <div className="space-y-1.5">
+                                {currentContributions.map((c, idx) => (
+                                    <div
+                                        key={`${c.person}-${c.amount}-${idx}`}
+                                        className="flex items-center justify-between p-2.5 rounded-xl bg-surface-container/60 border border-outline-variant/15 text-xs"
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-6 h-6 rounded-full bg-primary/10 text-primary font-bold text-[10px] flex items-center justify-center">
+                                                {c.person.charAt(0).toUpperCase()}
+                                            </div>
+                                            <span className="font-semibold text-on-surface">{c.person}</span>
+                                            <span className="text-[10px] text-on-surface-variant">(Paid upfront)</span>
+                                        </div>
+                                        <span className="font-mono font-bold text-primary">
+                                            ₹{Number(c.amount).toLocaleString('en-IN')}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            !isAddingContrib && (
+                                <p className="text-[11px] text-on-surface-variant">
+                                    No upfront contributions recorded for this split yet.
+                                </p>
+                            )
+                        )}
+
+                        {/* Inline Add Contribution Form */}
+                        {isAddingContrib && (
+                            <div className="p-3 rounded-xl bg-surface-container border border-primary/25 space-y-3 animate-in fade-in duration-150">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[11px] font-bold text-primary uppercase tracking-wider font-mono">
+                                        New Contribution
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            triggerHaptic('light');
+                                            setIsAddingContrib(false);
+                                            setContribAmount('');
+                                        }}
+                                        className="w-6 h-6 rounded-full flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high cursor-pointer"
+                                    >
+                                        <span className="material-symbols-outlined text-[16px]">close</span>
+                                    </button>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[11px] font-semibold text-on-surface-variant block">
+                                        Contributing Person
+                                    </label>
+                                    <select
+                                        value={effectiveContribPerson}
+                                        onChange={(e) => setContribPerson(e.target.value)}
+                                        className="w-full h-9 px-3 rounded-lg bg-surface-container-low text-xs font-semibold text-on-surface border border-outline-variant/30 focus:outline-hidden"
+                                    >
+                                        {participants.map((p) => (
+                                            <option key={p} value={p}>
+                                                {p} {p.toLowerCase() === split.paidBy.toLowerCase() ? '(Primary Payer)' : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[11px] font-semibold text-on-surface-variant block">
+                                        Amount (₹)
+                                    </label>
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="flex-1 flex items-center h-9 px-3 rounded-lg bg-surface-container-low border border-outline-variant/30 focus-within:border-primary">
+                                            <span className="text-xs font-bold text-primary font-mono mr-1">₹</span>
+                                            <input
+                                                type="text"
+                                                inputMode="decimal"
+                                                value={contribAmount}
+                                                onChange={(e) => {
+                                                    const cleaned = e.target.value.replace(/[^0-9.]/g, '');
+                                                    const parts = cleaned.split('.');
+                                                    if (parts.length > 2) return;
+                                                    if (parts[1] && parts[1].length > 2) return;
+                                                    setContribAmount(cleaned);
+                                                }}
+                                                placeholder="0"
+                                                className="w-full bg-transparent text-xs font-mono font-bold text-on-surface focus:outline-hidden"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Quick Increment buttons */}
+                                    <div className="flex items-center gap-1 pt-1 flex-wrap">
+                                        {[50, 100, 200, 500].map((inc) => (
+                                            <button
+                                                key={inc}
+                                                type="button"
+                                                onClick={() => {
+                                                    triggerHaptic('light');
+                                                    const curr = parseFloat(contribAmount) || 0;
+                                                    setContribAmount(String(curr + inc));
+                                                }}
+                                                className="px-2 py-0.5 rounded-md bg-surface-container-low hover:bg-surface-container-high text-on-surface font-mono text-[10px] font-semibold border border-outline-variant/20 cursor-pointer"
+                                            >
+                                                +₹{inc}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 pt-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            triggerHaptic('light');
+                                            setIsAddingContrib(false);
+                                            setContribAmount('');
+                                        }}
+                                        className="flex-1 h-8 rounded-lg bg-surface-container-low text-on-surface-variant text-xs font-semibold hover:bg-surface-container-high cursor-pointer"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={isSavingContrib || !contribAmount}
+                                        onClick={handleAddContribution}
+                                        className="flex-1 h-8 rounded-lg bg-primary text-on-primary text-xs font-bold shadow-xs hover:bg-primary/90 flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                                    >
+                                        <span className="material-symbols-outlined text-[14px]">
+                                            {isSavingContrib ? 'hourglass_top' : 'check'}
+                                        </span>
+                                        <span>{isSavingContrib ? 'Adding...' : 'Add Contribution'}</span>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </form>
 
                 {/* Footer Buttons */}
@@ -327,7 +555,7 @@ export const EditSplitModal: React.FC<EditSplitModalProps> = ({ isOpen, onClose,
 
     return (
         <EditSplitContent
-            key={`${split.splitId}-${split.totalAmount}-${split.description}`}
+            key={split.splitId}
             split={split}
             onClose={onClose}
         />

@@ -1,11 +1,13 @@
 import { apiFetch } from '../api/client';
 import type { QueryClient } from '@tanstack/react-query';
+import { rollbackMutationInQueryCache } from './offlineRollback';
 import type {
     AddExpensePayload,
     AddSplitPayload,
     AddContributionPayload,
     SettleParticipantPayload,
     UpdateUpiPayload,
+    UpdateSplitPayload,
     Split,
 } from '../api/types';
 
@@ -16,7 +18,9 @@ export type QueuedMutationType =
     | 'ADD_SPLIT'
     | 'ADD_CONTRIBUTION'
     | 'SETTLE_PARTICIPANT'
-    | 'UPDATE_UPI';
+    | 'UPDATE_UPI'
+    | 'DELETE_SPLIT'
+    | 'UPDATE_SPLIT';
 
 export type QueuedItemStatus = 'PENDING' | 'SYNCING' | 'FAILED';
 
@@ -129,6 +133,10 @@ export function enqueueOfflineMutation<T>(
         splitId = (payload as SettleParticipantPayload)?.splitId;
     } else if (type === 'ADD_CONTRIBUTION') {
         splitId = (payload as AddContributionPayload)?.splitId;
+    } else if (type === 'DELETE_SPLIT') {
+        splitId = (payload as { splitId: string })?.splitId;
+    } else if (type === 'UPDATE_SPLIT') {
+        splitId = (payload as UpdateSplitPayload)?.splitId;
     }
 
     const item: QueuedItem<T> = {
@@ -155,20 +163,58 @@ export function dequeueOfflineMutation(id: string): void {
 }
 
 /**
- * Discards an entire split group or standalone transaction from the queue.
+ * Discards an entire split group or standalone transaction from the queue
+ * and rolls back its optimistic changes in the UI cache.
  */
-export function discardGroup(groupId: string): void {
-    const queue = getOfflineQueue().filter((item) => {
+export function discardGroup(groupId: string, queryClient?: QueryClient): void {
+    const queue = getOfflineQueue();
+    const itemsToDiscard: QueuedItem[] = [];
+    const remaining: QueuedItem[] = [];
+
+    for (const item of queue) {
         const itemGroupId = item.splitId || `item_${item.id}`;
-        return itemGroupId !== groupId;
-    });
-    saveOfflineQueue(queue);
+        if (itemGroupId === groupId) {
+            itemsToDiscard.push(item);
+        } else {
+            remaining.push(item);
+        }
+    }
+
+    if (queryClient) {
+        for (const item of itemsToDiscard) {
+            rollbackMutationInQueryCache(item, queryClient);
+        }
+    }
+
+    saveOfflineQueue(remaining);
 }
 
 /**
- * Clears the entire offline queue.
+ * Discards a single queued operation by ID and rolls back its optimistic UI changes.
  */
-export function clearOfflineQueue(): void {
+export function discardQueuedMutation(id: string, queryClient?: QueryClient): void {
+    const queue = getOfflineQueue();
+    const itemToDiscard = queue.find((it) => it.id === id);
+    if (!itemToDiscard) return;
+
+    if (queryClient) {
+        rollbackMutationInQueryCache(itemToDiscard, queryClient);
+    }
+
+    const remaining = queue.filter((it) => it.id !== id);
+    saveOfflineQueue(remaining);
+}
+
+/**
+ * Clears the entire offline queue and rolls back all optimistic changes in the UI cache.
+ */
+export function clearOfflineQueue(queryClient?: QueryClient): void {
+    const queue = getOfflineQueue();
+    if (queryClient) {
+        for (const item of queue) {
+            rollbackMutationInQueryCache(item, queryClient);
+        }
+    }
     saveOfflineQueue([]);
 }
 
@@ -218,6 +264,16 @@ export function getGroupedOfflineQueue(now: number = Date.now()): QueuedGroup[] 
                 title = `Update UPI (${p.name})`;
                 description = p.upiId;
                 type = 'UPI';
+            } else if (item.type === 'DELETE_SPLIT') {
+                const p = item.payload as { splitId: string };
+                title = `Delete Split`;
+                description = p.splitId;
+                type = 'SPLIT';
+            } else if (item.type === 'UPDATE_SPLIT') {
+                const p = item.payload as UpdateSplitPayload;
+                title = `Update: ${p.description || p.splitId}`;
+                amount = p.amount;
+                type = 'SPLIT';
             }
 
             group = {
@@ -279,6 +335,7 @@ export function subscribeToOfflineQueue(listener: QueueListener): () => void {
 }
 
 let isProcessing = false;
+let pendingTrigger = false;
 let autoRetryTimer: ReturnType<typeof setTimeout> | null = null;
 
 function planNextAutoRetry(queryClient?: QueryClient): void {
@@ -378,6 +435,26 @@ async function executeSingleMutation(item: QueuedItem): Promise<void> {
             });
             break;
         }
+
+        case 'DELETE_SPLIT': {
+            const { splitId, requestedBy } = item.payload as { splitId: string; requestedBy?: string };
+            await apiFetch<{ success: boolean; message: string }>(
+                `/split/${splitId}?requestedBy=${encodeURIComponent(requestedBy || '')}`,
+                {
+                    method: 'DELETE',
+                }
+            );
+            break;
+        }
+
+        case 'UPDATE_SPLIT': {
+            const payload = item.payload as UpdateSplitPayload;
+            await apiFetch<{ success: boolean; data: Split }>(`/split/${payload.splitId}`, {
+                method: 'PUT',
+                body: JSON.stringify(payload),
+            });
+            break;
+        }
     }
 }
 
@@ -388,7 +465,8 @@ async function executeSingleMutation(item: QueuedItem): Promise<void> {
  */
 async function processSingleGroup(
     groupItems: QueuedItem[],
-    onProgress?: (synced: number, total: number) => void
+    onProgress?: (synced: number, total: number) => void,
+    queryClient?: QueryClient
 ): Promise<{ processed: number; failed: number }> {
     let processed = 0;
     let failed = 0;
@@ -430,6 +508,9 @@ async function processSingleGroup(
             if (!isCreation && isNotFound && retryCount >= 5) {
                 console.warn(`[OfflineQueue] Dropping obsolete dependent item ${currentItem.id} (${currentItem.type}): ${String(err)}`);
                 dequeueOfflineMutation(currentItem.id);
+                if (queryClient) {
+                    rollbackMutationInQueryCache(currentItem, queryClient);
+                }
                 break;
             }
 
@@ -464,6 +545,7 @@ export async function processOfflineQueue(
     onProgress?: (synced: number, total: number) => void
 ): Promise<SyncResult> {
     if (isProcessing) {
+        pendingTrigger = true;
         return { processed: 0, failed: 0, remaining: getOfflineQueue().length };
     }
 
@@ -490,7 +572,7 @@ export async function processOfflineQueue(
         // Parallel processing across distinct split groups!
         const results = await Promise.allSettled(
             Array.from(groupsMap.values()).map((groupItems) =>
-                processSingleGroup(groupItems, onProgress)
+                processSingleGroup(groupItems, onProgress, queryClient)
             )
         );
 
@@ -505,7 +587,22 @@ export async function processOfflineQueue(
         if (totalProcessed > 0 && queryClient) {
             queryClient.invalidateQueries();
         }
-        planNextAutoRetry(queryClient);
+
+        const remainingQueue = getOfflineQueue();
+        const now = Date.now();
+        const hasUnblockedPending = remainingQueue.some(
+            (it) => (!it.nextRetryAt || it.nextRetryAt <= now) && it.status !== 'SYNCING'
+        );
+
+        if ((pendingTrigger || hasUnblockedPending) && typeof navigator !== 'undefined' && navigator.onLine) {
+            pendingTrigger = false;
+            setTimeout(() => {
+                processOfflineQueue(queryClient);
+            }, 50);
+        } else {
+            pendingTrigger = false;
+            planNextAutoRetry(queryClient);
+        }
     }
 
     return {

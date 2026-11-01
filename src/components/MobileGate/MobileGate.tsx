@@ -206,7 +206,7 @@ export const MobileGate: React.FC<MobileGateProps> = ({ children, breakpoint = E
 
             {/* Desktop Simulator View */}
             {previewInDesktop && (
-                <div className="hidden md:flex fixed inset-0 z-50 bg-neutral-900/90 py-6 px-4 flex-col items-center justify-center overflow-y-auto">
+                <div className="hidden md:flex fixed inset-0 z-50 bg-neutral-900/90 py-6 px-4 flex-col items-center justify-center">
                     <div className="w-full max-w-[420px] mb-2 flex items-center justify-between text-xs text-white/80 px-2">
                         <span className="flex items-center gap-1.5 font-medium">
                             <span className="w-2 h-2 rounded-full bg-primary-fixed animate-pulse" />
@@ -220,8 +220,13 @@ export const MobileGate: React.FC<MobileGateProps> = ({ children, breakpoint = E
                             Exit Preview
                         </button>
                     </div>
-                    <div className="w-full max-w-[420px] max-h-[90vh] bg-surface rounded-[36px] shadow-2xl border-4 border-neutral-700 overflow-y-auto relative flex flex-col no-scrollbar">
-                        {children}
+                    <div
+                        className="w-full max-w-[420px] h-[844px] max-h-[88vh] bg-surface rounded-[36px] shadow-2xl border-4 border-neutral-700 overflow-hidden relative flex flex-col no-scrollbar"
+                        style={{ transform: 'translateZ(0)' }}
+                    >
+                        <div className="flex-1 overflow-y-auto no-scrollbar relative w-full h-full">
+                            {children}
+                        </div>
                     </div>
                 </div>
             )}
