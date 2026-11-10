@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { ExpenseProvider, useExpense } from './context';
 import { MobileGate, Header, BottomNav, Toast, InstallPrompt, PullToRefresh, PwaUpdatePrompt } from './components';
@@ -7,6 +7,8 @@ import { Dashboard, SplitsPage, AddPage, PeoplePage, ClaimIdentityScreen } from 
 import { ENV } from './config';
 import { setupQueryCachePersistence } from './utils/idbQueryCache';
 import { processOfflineQueue } from './utils/offlineQueue';
+
+const AnalyticsPage = lazy(() => import('./pages/analytics/index.tsx'));
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -77,6 +79,22 @@ function MainApp() {
                     {activeTab === 'dashboard' && <Dashboard />}
                     {activeTab === 'splits' && <SplitsPage />}
                     {activeTab === 'add' && <AddPage />}
+                    {activeTab === 'analytics' && (
+                        <Suspense
+                            fallback={
+                                <div className="space-y-3 pt-2">
+                                    <div className="h-36 rounded-3xl bg-surface-card-subtle border border-border-subtle animate-pulse" />
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="h-24 rounded-2xl bg-surface-card-subtle border border-border-subtle animate-pulse" />
+                                        <div className="h-24 rounded-2xl bg-surface-card-subtle border border-border-subtle animate-pulse" />
+                                    </div>
+                                    <div className="h-56 rounded-2xl bg-surface-card-subtle border border-border-subtle animate-pulse" />
+                                </div>
+                            }
+                        >
+                            <AnalyticsPage />
+                        </Suspense>
+                    )}
                     {activeTab === 'people' && <PeoplePage />}
                 </main>
             </PullToRefresh>

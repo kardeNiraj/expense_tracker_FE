@@ -1,6 +1,20 @@
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { apiFetch } from './client';
-import type { PersonDetail, Split, SpendingsData, TripMetaItem, TripInfo } from './types';
+import type {
+    AnalyticsData,
+    AnalyticsRange,
+    PersonDetail,
+    Split,
+    SpendingsData,
+    TripMetaItem,
+    TripInfo,
+} from './types';
+
+export interface AnalyticsQueryParams {
+    person?: string;
+    month?: string;
+    range?: AnalyticsRange;
+}
 
 export interface SplitsFilterParams {
     payee?: string;
@@ -18,6 +32,7 @@ export const queryKeys = {
     splits: (filters?: SplitsFilterParams) => ['splits', filters || {}] as const,
     splitDetails: (splitId: string) => ['split', splitId] as const,
     spendings: (payee: string) => ['spendings', payee] as const,
+    analytics: (params?: AnalyticsQueryParams) => ['analytics', params || {}] as const,
     meta: () => ['meta'] as const,
     tripInfo: (refresh = false) => ['trip-info', { refresh }] as const,
     health: () => ['health'] as const,
@@ -130,5 +145,32 @@ export function useTripInfo(refresh = false) {
         gcTime: 1000 * 60 * 60 * 24 * 7,
         networkMode: 'offlineFirst',
         refetchOnWindowFocus: false,
+    });
+}
+
+// 10. Spend Analytics Query
+export function useAnalytics(params?: AnalyticsQueryParams & { enabled?: boolean }) {
+    const queryParams = new URLSearchParams();
+    if (params?.person) queryParams.set('person', params.person);
+    if (params?.month && params.month !== 'ALL') queryParams.set('month', params.month);
+    if (params?.range && params.range !== 'all') queryParams.set('range', params.range);
+
+    const queryString = queryParams.toString();
+    const endpoint = queryString ? `/analytics?${queryString}` : '/analytics';
+
+    const cleanKeyParams: AnalyticsQueryParams = {
+        person: params?.person || 'ALL',
+        month: params?.month || 'ALL',
+        range: params?.range || 'all',
+    };
+
+    return useQuery<AnalyticsData>({
+        queryKey: queryKeys.analytics(cleanKeyParams),
+        queryFn: () => apiFetch<AnalyticsData>(endpoint),
+        enabled: params?.enabled ?? true,
+        placeholderData: keepPreviousData,
+        staleTime: 1000 * 60 * 3, // 3 minutes cache
+        gcTime: 1000 * 60 * 60 * 24 * 7,
+        networkMode: 'offlineFirst',
     });
 }

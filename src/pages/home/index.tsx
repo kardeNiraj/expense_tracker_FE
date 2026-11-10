@@ -575,6 +575,33 @@ export function Dashboard() {
                 </button>
             </div>
 
+            {/* Quick Link to Dedicated /analytics Route */}
+            <button
+                type="button"
+                onClick={() => {
+                    triggerHaptic('light');
+                    setActiveTab('analytics');
+                }}
+                className="w-full px-3.5 py-2.5 rounded-2xl bg-surface-card border border-border-subtle hover:border-primary/40 shadow-[0_1px_3px_rgba(15,23,42,0.05)] flex items-center justify-between gap-2.5 active:scale-[0.99] transition-[border-color,transform] cursor-pointer group"
+            >
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-status-settled-bg text-primary flex items-center justify-center shrink-0">
+                        <span className="material-symbols-outlined text-[18px]">analytics</span>
+                    </div>
+                    <div className="text-left min-w-0">
+                        <span className="text-xs font-bold text-on-surface block truncate">
+                            See Where Your Money Goes
+                        </span>
+                        <span className="text-[11px] text-on-surface-variant block truncate">
+                            Category donut, daily burn &amp; monthly spend insights
+                        </span>
+                    </div>
+                </div>
+                <span className="material-symbols-outlined text-[18px] text-primary group-hover:translate-x-0.5 transition-transform shrink-0">
+                    arrow_forward
+                </span>
+            </button>
+
             {/* Pending Settlements for Active Person */}
             {(myOwedSettlements.length > 0 || owedToMeSettlements.length > 0) && (
                 <div className="space-y-2.5">

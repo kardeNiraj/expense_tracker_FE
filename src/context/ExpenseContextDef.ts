@@ -1,6 +1,6 @@
 import { createContext } from 'react';
 
-export type AppTab = 'dashboard' | 'splits' | 'add' | 'people';
+export type AppTab = 'dashboard' | 'splits' | 'add' | 'analytics' | 'people';
 
 export interface ExpenseContextType {
     activePerson: string;

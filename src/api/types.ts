@@ -158,3 +158,150 @@ export interface UpdateSplitPayload {
     requestedBy?: string;
 }
 
+// Analytics Response Types
+export type AnalyticsRange = 'all' | 'this_month' | 'last_month' | '30d' | '7d';
+
+export interface AnalyticsScope {
+    person: string;
+    isGroupView: boolean;
+    month: string;
+    range: string;
+    generatedAt: string;
+    availableMonths: string[];
+    availablePeople: string[];
+}
+
+export interface AnalyticsLargestExpense {
+    description: string;
+    category: string;
+    amount: number;
+    timestamp: string | null;
+    isSplit: boolean;
+    paidBy: string;
+}
+
+export interface AnalyticsSummary {
+    trueSpend: number;
+    outOfPocketPaid: number;
+    directSpend: number;
+    splitShareSpend: number;
+    directCount: number;
+    splitCount: number;
+    totalTransactions: number;
+    avgTransaction: number;
+    avgDailySpend: number;
+    activeDaysCount: number;
+    todaySpend: number;
+    currentMonthSpend: number;
+    previousMonthSpend: number;
+    monthOverMonthDeltaPct: number | null;
+    projectedMonthEndSpend: number;
+    largestExpense: AnalyticsLargestExpense | null;
+}
+
+export interface AnalyticsCounterparty {
+    person: string;
+    toReceive: number;
+    toPay: number;
+    netAmount: number;
+    pendingCount: number;
+}
+
+export interface AnalyticsSettlementsOverview {
+    toReceive: number;
+    toPay: number;
+    netBalance: number;
+    settledCount: number;
+    pendingCount: number;
+    settlementRatePct: number;
+    counterparties: AnalyticsCounterparty[];
+}
+
+export interface AnalyticsCategoryStat {
+    category: string;
+    amount: number;
+    directAmount: number;
+    splitAmount: number;
+    upfrontAmount: number;
+    percentage: number;
+    count: number;
+    avgAmount: number;
+}
+
+export interface AnalyticsDailyPoint {
+    date: string;
+    label: string;
+    amount: number;
+    directAmount: number;
+    splitAmount: number;
+    cumulativeAmount: number;
+    count: number;
+}
+
+export interface AnalyticsMonthlyPoint {
+    month: string;
+    total: number;
+    directAmount: number;
+    splitAmount: number;
+    upfrontPaid: number;
+    count: number;
+    topCategory: string | null;
+    categories: Record<string, number>;
+}
+
+export interface AnalyticsDayOfWeekPoint {
+    day: string;
+    dayIndex: number;
+    isWeekend: boolean;
+    amount: number;
+    count: number;
+    avgAmount: number;
+}
+
+export interface AnalyticsMemberStat {
+    person: string;
+    trueSpend: number;
+    outOfPocketPaid: number;
+    directSpend: number;
+    splitShareSpend: number;
+    netPendingBalance: number;
+    shareOfGroupPct: number;
+}
+
+export interface AnalyticsInsight {
+    id: string;
+    type: string;
+    tone: 'info' | 'positive' | 'warning';
+    title: string;
+    message: string;
+}
+
+export interface AnalyticsTransaction {
+    id: string;
+    description: string;
+    category: string;
+    amount: number;
+    upfrontAmount: number;
+    timestamp: string | null;
+    date: string | null;
+    month: string;
+    isSplit: boolean;
+    paidBy: string;
+    splitId: string | null;
+    totalBill: number;
+    participantsCount: number;
+}
+
+export interface AnalyticsData {
+    scope: AnalyticsScope;
+    summary: AnalyticsSummary;
+    settlementsOverview: AnalyticsSettlementsOverview;
+    byCategory: AnalyticsCategoryStat[];
+    dailyTrend: AnalyticsDailyPoint[];
+    monthlyTrend: AnalyticsMonthlyPoint[];
+    dayOfWeek: AnalyticsDayOfWeekPoint[];
+    memberBreakdown: AnalyticsMemberStat[];
+    insights: AnalyticsInsight[];
+    transactions: AnalyticsTransaction[];
+}
+

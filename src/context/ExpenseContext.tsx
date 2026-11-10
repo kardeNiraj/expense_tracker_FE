@@ -1,7 +1,24 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import type { AppTab } from './ExpenseContextDef';
 import { ExpenseContext } from './ExpenseContextDef';
 import { ENV } from '../config';
+
+const TAB_TO_PATH: Record<AppTab, string> = {
+    dashboard: '/',
+    splits: '/splits',
+    add: '/add',
+    analytics: '/analytics',
+    people: '/people',
+};
+
+function getTabFromPathname(pathname: string): AppTab {
+    const clean = pathname.replace(/\/+$/, '').toLowerCase() || '/';
+    if (clean === '/analytics') return 'analytics';
+    if (clean === '/splits') return 'splits';
+    if (clean === '/add') return 'add';
+    if (clean === '/people') return 'people';
+    return 'dashboard';
+}
 
 export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     // 1. Claimed Person (locks this device to a user)
@@ -35,7 +52,32 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return ENV.DEFAULT_ACTIVE_PERSON;
     });
 
-    const [activeTab, setActiveTab] = useState<AppTab>('dashboard');
+    const [activeTab, setActiveTabState] = useState<AppTab>(() => {
+        if (typeof window !== 'undefined') {
+            return getTabFromPathname(window.location.pathname);
+        }
+        return 'dashboard';
+    });
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const handlePopState = () => {
+            setActiveTabState(getTabFromPathname(window.location.pathname));
+        };
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, []);
+
+    const setActiveTab = useCallback((tab: AppTab) => {
+        setActiveTabState(tab);
+        if (typeof window !== 'undefined') {
+            const targetPath = TAB_TO_PATH[tab] || '/';
+            const currentPath = window.location.pathname.replace(/\/+$/, '') || '/';
+            if (currentPath !== targetPath) {
+                window.history.pushState({ tab }, '', targetPath);
+            }
+        }
+    }, []);
     const [toast, setToast] = useState<{ message: string; icon?: string; visible: boolean }>({
         message: '',
         visible: false,
@@ -133,6 +175,7 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
             isSwitcherUnlocked,
             lockSwitcher,
             activeTab,
+            setActiveTab,
             toast,
             showToast,
         ]
