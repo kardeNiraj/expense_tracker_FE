@@ -1,15 +1,30 @@
 import { createContext } from 'react';
+import type { DeviceStateResponse } from '../api/types';
 
-export type AppTab = 'dashboard' | 'splits' | 'add' | 'analytics' | 'people';
+export type AppTab = 'dashboard' | 'splits' | 'add' | 'analytics' | 'people' | 'admin';
+
+export interface ClaimActionResult {
+    ok: boolean;
+    code?: string;
+    message?: string;
+}
 
 export interface ExpenseContextType {
     activePerson: string;
     setActivePerson: (name: string) => void;
     claimedPerson: string | null;
     isDeviceClaimed: boolean;
-    claimProfile: (name: string) => void;
-    unlockProfileSwitch: (passcode: string) => boolean;
-    unclaimDevice: (passcode: string) => boolean;
+    currentDeviceId: string;
+    deviceState: DeviceStateResponse | null;
+    personLocks: Record<string, boolean>;
+    blockedPeopleForDevice: string[];
+    isDeviceBlocked: boolean;
+    accessRestrictionReason: string | null;
+    claimProfile: (name: string) => Promise<ClaimActionResult>;
+    requestClaimApproval: (name: string) => Promise<ClaimActionResult>;
+    unlockProfileSwitch: (passcode: string) => Promise<boolean>;
+    unclaimDevice: () => Promise<boolean>;
+    refreshDeviceStatus: () => Promise<void>;
     isSwitcherUnlocked: boolean;
     lockSwitcher: () => void;
     activeTab: AppTab;

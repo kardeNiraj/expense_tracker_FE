@@ -1,8 +1,10 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { apiFetch } from './client';
 import type {
+    AdminDashboardData,
     AnalyticsData,
     AnalyticsRange,
+    DeviceStateResponse,
     PersonDetail,
     Split,
     SpendingsData,
@@ -36,6 +38,8 @@ export const queryKeys = {
     meta: () => ['meta'] as const,
     tripInfo: (refresh = false) => ['trip-info', { refresh }] as const,
     health: () => ['health'] as const,
+    deviceMe: () => ['device', 'me'] as const,
+    adminAnalytics: (refresh = false) => ['admin', 'analytics', { refresh }] as const,
 };
 
 // 1. Categories Query
@@ -172,5 +176,33 @@ export function useAnalytics(params?: AnalyticsQueryParams & { enabled?: boolean
         staleTime: 1000 * 60 * 3, // 3 minutes cache
         gcTime: 1000 * 60 * 60 * 24 * 7,
         networkMode: 'offlineFirst',
+    });
+}
+
+// 11. Current Device State Query
+export function useDeviceMe(enabled = true) {
+    return useQuery<DeviceStateResponse>({
+        queryKey: queryKeys.deviceMe(),
+        queryFn: () => apiFetch<DeviceStateResponse>('/devices/me'),
+        enabled,
+        staleTime: 1000 * 30,
+        networkMode: 'online',
+        retry: 1,
+    });
+}
+
+// 12. Strict Admin Analytics & Device Control Query
+export function useAdminDashboard(enabled = true, refresh = false) {
+    return useQuery<AdminDashboardData>({
+        queryKey: queryKeys.adminAnalytics(refresh),
+        queryFn: () =>
+            apiFetch<AdminDashboardData>(
+                `/admin/analytics${refresh ? '?refresh=true' : ''}`
+            ),
+        enabled,
+        staleTime: 1000 * 15,
+        gcTime: 0,
+        networkMode: 'online',
+        retry: false,
     });
 }

@@ -21,6 +21,7 @@ export const Header: React.FC = () => {
         unclaimDevice,
         isSwitcherUnlocked,
         lockSwitcher,
+        setActiveTab,
         showToast,
     } = useExpense();
 
@@ -206,6 +207,7 @@ export const Header: React.FC = () => {
                 showToast={showToast}
                 onOpenSyncStatus={() => setShowSyncModal(true)}
                 onOpenSpendHistory={() => setShowSpendHistory(true)}
+                onOpenAdminConsole={() => setActiveTab('admin')}
             />
 
             {/* Join Trip / Invite Members QR Modal */}

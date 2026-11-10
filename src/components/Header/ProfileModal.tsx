@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Avatar } from '../Avatar';
-import { ENV } from '../../config';
 import { triggerHaptic } from '../../utils/haptics';
 import { reloadApp } from '../../utils/pwaReload';
+import type { ClaimActionResult } from '../../context/ExpenseContextDef';
 
 interface ProfileModalProps {
     isOpen: boolean;
@@ -12,14 +12,15 @@ interface ProfileModalProps {
     claimedPerson: string | null;
     isDeviceClaimed: boolean;
     isSwitcherUnlocked: boolean;
-    claimProfile: (name: string) => void;
+    claimProfile: (name: string) => Promise<ClaimActionResult>;
     setActivePerson: (name: string) => void;
-    unlockProfileSwitch: (passcode: string) => boolean;
-    unclaimDevice: (passcode: string) => boolean;
+    unlockProfileSwitch: (passcode: string) => Promise<boolean>;
+    unclaimDevice: () => Promise<boolean>;
     lockSwitcher: () => void;
     showToast: (message: string, icon?: string) => void;
     onOpenSyncStatus?: () => void;
     onOpenSpendHistory?: () => void;
+    onOpenAdminConsole?: () => void;
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({
@@ -38,35 +39,47 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     showToast,
     onOpenSyncStatus,
     onOpenSpendHistory,
+    onOpenAdminConsole,
 }) => {
     const [passcodeInput, setPasscodeInput] = useState('');
     const [unlockError, setUnlockError] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     if (!isOpen) return null;
 
-    const handleUnlock = (e: React.FormEvent) => {
+    const handleUnlock = async (e: React.FormEvent) => {
         e.preventDefault();
-        const success = unlockProfileSwitch(passcodeInput);
-        if (success) {
-            triggerHaptic('success');
-            setUnlockError(false);
-            setPasscodeInput('');
-            showToast('Admin Mode unlocked! You can switch viewers freely.', 'lock_open');
-        } else {
-            triggerHaptic('warning');
-            setUnlockError(true);
-            showToast('Incorrect admin passcode', 'error');
+        setIsSubmitting(true);
+        try {
+            const success = await unlockProfileSwitch(passcodeInput);
+            if (success) {
+                triggerHaptic('success');
+                setUnlockError(false);
+                setPasscodeInput('');
+                showToast('Admin Mode unlocked! You can switch viewers freely.', 'lock_open');
+            } else {
+                triggerHaptic('warning');
+                setUnlockError(true);
+                showToast('Incorrect admin passcode', 'error');
+            }
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
-    const handleReleaseDevice = () => {
-        const success = unclaimDevice(ENV.ADMIN_PASSCODE);
-        if (success) {
-            triggerHaptic('medium');
-            showToast('Device binding released', 'lock_reset');
-        } else {
-            triggerHaptic('warning');
-            showToast('Failed to release device', 'error');
+    const handleReleaseDevice = async () => {
+        setIsSubmitting(true);
+        try {
+            const success = await unclaimDevice();
+            if (success) {
+                triggerHaptic('medium');
+                showToast('Device binding released', 'lock_reset');
+            } else {
+                triggerHaptic('warning');
+                showToast('Failed to release device', 'error');
+            }
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -198,12 +211,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                                 </button>
                                 <button
                                     type="submit"
-                                    className="flex-1 h-11 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-colors cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                                    disabled={isSubmitting}
+                                    className="flex-1 h-11 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-colors cursor-pointer disabled:opacity-60 shadow-xs flex items-center justify-center gap-1.5"
                                 >
                                     <span className="material-symbols-outlined text-[16px]">
                                         lock_open
                                     </span>
-                                    <span>Unlock Switcher</span>
+                                    <span>{isSubmitting ? 'Verifying...' : 'Unlock Switcher'}</span>
                                 </button>
                             </div>
                         </form>
@@ -267,26 +281,31 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                                     return (
                                         <div
                                             key={person}
-                                            className={`p-2.5 rounded-2xl border transition-all flex items-center justify-between gap-2.5 ${isCurrent
+                                            className={`p-2.5 rounded-2xl border transition-colors flex items-center justify-between gap-2.5 ${isCurrent
                                                     ? 'bg-primary/5 border-primary/40 shadow-xs'
                                                     : 'bg-surface-container-low/70 border-outline-variant/20 hover:border-outline-variant/50 hover:bg-surface-container-low'
                                                 }`}
                                         >
                                             <button
                                                 type="button"
-                                                onClick={() => {
+                                                disabled={isSubmitting}
+                                                onClick={async () => {
                                                     triggerHaptic('light');
                                                     if (!isDeviceClaimed && !isSwitcherUnlocked) {
-                                                        claimProfile(person);
-                                                        showToast(`Device claimed as ${person}!`, 'verified_user');
-                                                        handleClose();
+                                                        const res = await claimProfile(person);
+                                                        if (res.ok) {
+                                                            showToast(`Device claimed as ${person}!`, 'verified_user');
+                                                            handleClose();
+                                                        } else {
+                                                            showToast(res.message || 'Claim restricted', 'error');
+                                                        }
                                                     } else {
                                                         setActivePerson(person);
                                                         showToast(`Switched active view to ${person}`);
                                                         handleClose();
                                                     }
                                                 }}
-                                                className="flex items-center gap-3 min-w-0 flex-1 text-left cursor-pointer"
+                                                className="flex items-center gap-3 min-w-0 flex-1 text-left cursor-pointer disabled:opacity-60"
                                             >
                                                 <Avatar name={person} size="md" />
                                                 <div className="min-w-0">
@@ -320,12 +339,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                                             {isSwitcherUnlocked && !isOwner && (
                                                 <button
                                                     type="button"
-                                                    onClick={() => {
+                                                    disabled={isSubmitting}
+                                                    onClick={async () => {
                                                         triggerHaptic('success');
-                                                        claimProfile(person);
-                                                        showToast(`Device rebound to ${person}!`, 'verified_user');
+                                                        const res = await claimProfile(person);
+                                                        if (res.ok) {
+                                                            showToast(`Device rebound to ${person}!`, 'verified_user');
+                                                        } else {
+                                                            showToast(res.message || 'Could not rebind', 'error');
+                                                        }
                                                     }}
-                                                    className="px-2 py-1 rounded-lg text-[10px] font-semibold text-primary hover:bg-primary/10 border border-primary/20 shrink-0 cursor-pointer"
+                                                    className="px-2 py-1 rounded-lg text-[10px] font-semibold text-primary hover:bg-primary/10 border border-primary/20 shrink-0 cursor-pointer disabled:opacity-60"
                                                     title={`Set ${person} as the permanent device owner`}
                                                 >
                                                     Set Owner
@@ -339,8 +363,37 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                     )}
                 </div>
 
-                {/* Footer Bar: Sync Status, PWA Reload & Close */}
+                {/* Footer Bar: Admin Console (Admin only), Sync Status, PWA Reload & Close */}
                 <div className="p-3 pb-safe border-t border-outline-variant/20 bg-surface-container-lowest shrink-0 space-y-2">
+                    {isSwitcherUnlocked && onOpenAdminConsole && (
+                        <div className="flex items-center justify-between text-xs px-0.5 pb-1.5 border-b border-outline-variant/15">
+                            <div className="flex items-center gap-1.5 text-on-surface-variant min-w-0">
+                                <span className="material-symbols-outlined text-primary text-[17px] shrink-0">
+                                    shield_person
+                                </span>
+                                <div className="min-w-0">
+                                    <span className="font-bold text-on-surface block text-[11px] leading-tight">
+                                        Admin Console &amp; Device Control
+                                    </span>
+                                    <span className="text-[10px] text-on-surface-variant block truncate">
+                                        Audit claimed devices, block IDs &amp; lock claims
+                                    </span>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    handleClose();
+                                    onOpenAdminConsole();
+                                }}
+                                className="h-8 px-2.5 rounded-xl bg-primary text-on-primary text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors hover:bg-primary-dark"
+                            >
+                                <span>Open</span>
+                                <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+                            </button>
+                        </div>
+                    )}
+
                     {onOpenSpendHistory && (
                         <div className="flex items-center justify-between text-xs px-0.5 pb-1 border-b border-outline-variant/15">
                             <div className="flex items-center gap-1.5 text-on-surface-variant min-w-0">

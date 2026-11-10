@@ -1,145 +1,53 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import type { AppTab } from './ExpenseContextDef';
 import { ExpenseContext } from './ExpenseContextDef';
 import { ENV } from '../config';
-
-const TAB_TO_PATH: Record<AppTab, string> = {
-    dashboard: '/',
-    splits: '/splits',
-    add: '/add',
-    analytics: '/analytics',
-    people: '/people',
-};
-
-function getTabFromPathname(pathname: string): AppTab {
-    const clean = pathname.replace(/\/+$/, '').toLowerCase() || '/';
-    if (clean === '/analytics') return 'analytics';
-    if (clean === '/splits') return 'splits';
-    if (clean === '/add') return 'add';
-    if (clean === '/people') return 'people';
-    return 'dashboard';
-}
+import { loginAdminApi } from '../api/deviceApi';
+import {
+    clearActiveAdminToken,
+    getActiveAdminToken,
+    setActiveAdminToken,
+} from '../utils/deviceIdentity';
+import {
+    clearPersistedClaim,
+    getTabFromPathname,
+    persistActivePerson,
+    persistClaimedPerson,
+    pushTabPath,
+    readInitialActivePerson,
+    readInitialClaimedPerson,
+} from './expenseStorage';
+import { useDeviceSync } from './useDeviceSync';
 
 export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    // 1. Claimed Person (locks this device to a user)
-    const [claimedPerson, setClaimedPersonState] = useState<string | null>(() => {
-        try {
-            return localStorage.getItem('claimed_person');
-        } catch {
-            return null;
-        }
-    });
-
-    // 2. Switcher Unlocked (Admin Mode) - Persisted in sessionStorage across renders and reloads
-    const [isSwitcherUnlocked, setIsSwitcherUnlockedState] = useState<boolean>(() => {
-        try {
-            return sessionStorage.getItem('admin_switcher_unlocked') === 'true';
-        } catch {
-            return false;
-        }
-    });
-
-    // 3. Active Person (prioritizes saved active_person, then claimedPerson, then ENV default)
-    const [activePerson, setActivePersonState] = useState<string>(() => {
-        try {
-            const saved = localStorage.getItem('active_person') || localStorage.getItem('manali_active_person');
-            if (saved) return saved;
-            const claimed = localStorage.getItem('claimed_person');
-            if (claimed) return claimed;
-        } catch {
-            // fallback
-        }
-        return ENV.DEFAULT_ACTIVE_PERSON;
-    });
-
-    const [activeTab, setActiveTabState] = useState<AppTab>(() => {
-        if (typeof window !== 'undefined') {
-            return getTabFromPathname(window.location.pathname);
-        }
-        return 'dashboard';
-    });
-
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-        const handlePopState = () => {
-            setActiveTabState(getTabFromPathname(window.location.pathname));
-        };
-        window.addEventListener('popstate', handlePopState);
-        return () => window.removeEventListener('popstate', handlePopState);
-    }, []);
-
-    const setActiveTab = useCallback((tab: AppTab) => {
-        setActiveTabState(tab);
-        if (typeof window !== 'undefined') {
-            const targetPath = TAB_TO_PATH[tab] || '/';
-            const currentPath = window.location.pathname.replace(/\/+$/, '') || '/';
-            if (currentPath !== targetPath) {
-                window.history.pushState({ tab }, '', targetPath);
-            }
-        }
-    }, []);
+    const [claimedPerson, setClaimedPersonState] = useState<string | null>(readInitialClaimedPerson);
+    const [isSwitcherUnlocked, setIsSwitcherUnlockedState] = useState<boolean>(() =>
+        Boolean(getActiveAdminToken())
+    );
+    const [activePerson, setActivePersonState] = useState<string>(readInitialActivePerson);
+    const [activeTab, setActiveTabState] = useState<AppTab>(() =>
+        typeof window !== 'undefined' ? getTabFromPathname(window.location.pathname) : 'dashboard'
+    );
     const [toast, setToast] = useState<{ message: string; icon?: string; visible: boolean }>({
         message: '',
         visible: false,
     });
 
-    const isDeviceClaimed = Boolean(claimedPerson);
+    const claimedPersonRef = useRef<string | null>(claimedPerson);
+    const activePersonRef = useRef<string>(activePerson);
+    const activeTabRef = useRef<AppTab>(activeTab);
 
-    const claimProfile = useCallback((name: string) => {
-        setClaimedPersonState(name);
-        setActivePersonState(name);
-        try {
-            localStorage.setItem('claimed_person', name);
-            localStorage.setItem('active_person', name);
-        } catch {
-            // ignore
-        }
-    }, []);
+    useEffect(() => {
+        claimedPersonRef.current = claimedPerson;
+    }, [claimedPerson]);
 
-    const unlockProfileSwitch = useCallback((passcode: string): boolean => {
-        if (passcode.trim() === ENV.ADMIN_PASSCODE) {
-            setIsSwitcherUnlockedState(true);
-            try {
-                sessionStorage.setItem('admin_switcher_unlocked', 'true');
-            } catch {
-                // ignore
-            }
-            return true;
-        }
-        return false;
-    }, []);
+    useEffect(() => {
+        activePersonRef.current = activePerson;
+    }, [activePerson]);
 
-    const unclaimDevice = useCallback((passcode: string): boolean => {
-        if (passcode.trim() === ENV.ADMIN_PASSCODE) {
-            setClaimedPersonState(null);
-            try {
-                localStorage.removeItem('claimed_person');
-            } catch {
-                // ignore
-            }
-            return true;
-        }
-        return false;
-    }, []);
-
-    const lockSwitcher = useCallback(() => {
-        setIsSwitcherUnlockedState(false);
-        try {
-            sessionStorage.removeItem('admin_switcher_unlocked');
-        } catch {
-            // ignore
-        }
-    }, []);
-
-    const setActivePerson = useCallback((name: string) => {
-        setActivePersonState(name);
-        try {
-            localStorage.setItem('active_person', name);
-            localStorage.setItem('manali_active_person', name);
-        } catch {
-            // ignore
-        }
-    }, []);
+    useEffect(() => {
+        activeTabRef.current = activeTab;
+    }, [activeTab]);
 
     const showToast = useCallback((message: string, icon: string = 'check_circle') => {
         setToast({ message, icon, visible: true });
@@ -148,15 +56,123 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }, ENV.TOAST_DURATION_MS);
     }, []);
 
+    const setActiveTab = useCallback((tab: AppTab) => {
+        activeTabRef.current = tab;
+        setActiveTabState(tab);
+        pushTabPath(tab);
+    }, []);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const handlePopState = () => {
+            const nextTab = getTabFromPathname(window.location.pathname);
+            activeTabRef.current = nextTab;
+            setActiveTabState(nextTab);
+        };
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, []);
+
+    const clearLocalClaim = useCallback(() => {
+        claimedPersonRef.current = null;
+        activePersonRef.current = ENV.DEFAULT_ACTIVE_PERSON;
+        setClaimedPersonState(null);
+        setActivePersonState(ENV.DEFAULT_ACTIVE_PERSON);
+        clearPersistedClaim();
+    }, []);
+
+    const applyLocalClaim = useCallback((name: string) => {
+        claimedPersonRef.current = name;
+        activePersonRef.current = name;
+        setClaimedPersonState(name);
+        setActivePersonState(name);
+        persistClaimedPerson(name);
+    }, []);
+
+    const clearAdminSession = useCallback(() => {
+        clearActiveAdminToken();
+        setIsSwitcherUnlockedState(false);
+        const owned = claimedPersonRef.current;
+        if (owned) {
+            activePersonRef.current = owned;
+            setActivePersonState(owned);
+            persistActivePerson(owned);
+        }
+    }, []);
+
+    const lockSwitcher = useCallback(() => {
+        clearAdminSession();
+        if (activeTabRef.current === 'admin') {
+            activeTabRef.current = 'dashboard';
+            setActiveTabState('dashboard');
+            pushTabPath('dashboard');
+        }
+    }, [clearAdminSession]);
+
+    const {
+        currentDeviceId,
+        deviceState,
+        isDeviceBlocked,
+        accessRestrictionReason,
+        refreshDeviceStatus,
+        claimProfile,
+        requestClaimApproval,
+        unclaimDevice,
+    } = useDeviceSync({
+        claimedPersonRef,
+        activePersonRef,
+        applyLocalClaim,
+        clearLocalClaim,
+        onAdminSessionInvalid: clearAdminSession,
+        showToast,
+    });
+
+    const unlockProfileSwitch = useCallback(
+        async (passcode: string): Promise<boolean> => {
+            if (!passcode.trim()) return false;
+            try {
+                const res = await loginAdminApi(passcode);
+                if (res?.token) {
+                    setActiveAdminToken(res.token, res.expiresAt);
+                    setIsSwitcherUnlockedState(true);
+                    void refreshDeviceStatus();
+                    return true;
+                }
+                return false;
+            } catch {
+                return false;
+            }
+        },
+        [refreshDeviceStatus]
+    );
+
+    const setActivePerson = useCallback((name: string) => {
+        activePersonRef.current = name;
+        setActivePersonState(name);
+        persistActivePerson(name);
+    }, []);
+
+    const isDeviceClaimed = Boolean(claimedPerson);
+    const personLocks = useMemo(() => deviceState?.personLocks || {}, [deviceState]);
+    const blockedPeopleForDevice = useMemo(() => deviceState?.blockedPeople || [], [deviceState]);
+
     const contextValue = useMemo(
         () => ({
             activePerson,
             setActivePerson,
             claimedPerson,
             isDeviceClaimed,
+            currentDeviceId,
+            deviceState,
+            personLocks,
+            blockedPeopleForDevice,
+            isDeviceBlocked,
+            accessRestrictionReason,
             claimProfile,
+            requestClaimApproval,
             unlockProfileSwitch,
             unclaimDevice,
+            refreshDeviceStatus,
             isSwitcherUnlocked,
             lockSwitcher,
             activeTab,
@@ -169,9 +185,17 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
             setActivePerson,
             claimedPerson,
             isDeviceClaimed,
+            currentDeviceId,
+            deviceState,
+            personLocks,
+            blockedPeopleForDevice,
+            isDeviceBlocked,
+            accessRestrictionReason,
             claimProfile,
+            requestClaimApproval,
             unlockProfileSwitch,
             unclaimDevice,
+            refreshDeviceStatus,
             isSwitcherUnlocked,
             lockSwitcher,
             activeTab,
@@ -181,11 +205,7 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
         ]
     );
 
-    return (
-        <ExpenseContext.Provider value={contextValue}>
-            {children}
-        </ExpenseContext.Provider>
-    );
+    return <ExpenseContext.Provider value={contextValue}>{children}</ExpenseContext.Provider>;
 };
 
 export default ExpenseProvider;

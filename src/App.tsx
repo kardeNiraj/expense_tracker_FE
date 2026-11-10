@@ -4,11 +4,14 @@ import { ExpenseProvider, useExpense } from './context';
 import { MobileGate, Header, BottomNav, Toast, InstallPrompt, PullToRefresh, PwaUpdatePrompt } from './components';
 import { apiFetch, queryKeys } from './api';
 import { Dashboard, SplitsPage, AddPage, PeoplePage, ClaimIdentityScreen } from './pages';
+import { DeviceBlockedScreen } from './pages/claim/DeviceBlockedScreen';
 import { ENV } from './config';
 import { setupQueryCachePersistence } from './utils/idbQueryCache';
 import { processOfflineQueue } from './utils/offlineQueue';
+import { syncPersistentDeviceId } from './utils/deviceIdentity';
 
 const AnalyticsPage = lazy(() => import('./pages/analytics/index.tsx'));
+const AdminPage = lazy(() => import('./pages/admin/index.tsx'));
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -26,7 +29,14 @@ const queryClient = new QueryClient({
 });
 
 function MainApp() {
-    const { activeTab, isDeviceClaimed, isSwitcherUnlocked, showToast } = useExpense();
+    const {
+        activeTab,
+        isDeviceClaimed,
+        isDeviceBlocked,
+        isSwitcherUnlocked,
+        refreshDeviceStatus,
+        showToast,
+    } = useExpense();
     const queryClient = useQueryClient();
 
     const handleGlobalRefresh = async () => {
@@ -37,6 +47,7 @@ function MainApp() {
             }
 
             await Promise.allSettled([
+                refreshDeviceStatus(),
                 apiFetch('/people?refresh=true'),
                 apiFetch('/categories?refresh=true'),
                 apiFetch('/trip-info?refresh=true'),
@@ -51,6 +62,35 @@ function MainApp() {
             showToast('Refreshed!', 'sync');
         }
     };
+
+    if (isDeviceBlocked && !isSwitcherUnlocked) {
+        return (
+            <div className="min-h-screen w-full bg-surface-canvas text-on-surface flex flex-col relative font-sans">
+                <PwaUpdatePrompt />
+                <DeviceBlockedScreen />
+                <Toast />
+            </div>
+        );
+    }
+
+    // Direct /admin visit before claiming still renders strict Admin Sign-In Gate
+    if (!isDeviceClaimed && !isSwitcherUnlocked && activeTab === 'admin') {
+        return (
+            <div className="min-h-screen w-full bg-surface-canvas text-on-surface flex flex-col relative font-sans">
+                <PwaUpdatePrompt />
+                <main className="flex-1 w-full max-w-md mx-auto px-4 pt-6 pb-10 relative">
+                    <Suspense
+                        fallback={
+                            <div className="h-56 rounded-3xl bg-surface-card-subtle border border-border-subtle animate-pulse" />
+                        }
+                    >
+                        <AdminPage />
+                    </Suspense>
+                </main>
+                <Toast />
+            </div>
+        );
+    }
 
     // Show device claim & identity selection screen on first load / unclaimed device
     if (!isDeviceClaimed && !isSwitcherUnlocked) {
@@ -95,6 +135,18 @@ function MainApp() {
                             <AnalyticsPage />
                         </Suspense>
                     )}
+                    {activeTab === 'admin' && (
+                        <Suspense
+                            fallback={
+                                <div className="space-y-3 pt-2">
+                                    <div className="h-40 rounded-3xl bg-surface-card-subtle border border-border-subtle animate-pulse" />
+                                    <div className="h-56 rounded-3xl bg-surface-card-subtle border border-border-subtle animate-pulse" />
+                                </div>
+                            }
+                        >
+                            <AdminPage />
+                        </Suspense>
+                    )}
                     {activeTab === 'people' && <PeoplePage />}
                 </main>
             </PullToRefresh>
@@ -113,8 +165,10 @@ export function App() {
 
     useEffect(() => {
         let mounted = true;
-        setupQueryCachePersistence(queryClient)
-            .finally(() => {
+        Promise.allSettled([
+            setupQueryCachePersistence(queryClient),
+            syncPersistentDeviceId(),
+        ]).finally(() => {
                 if (mounted) {
                     setIsCacheReady(true);
                     // Proactively prefetch people details & member list on startup

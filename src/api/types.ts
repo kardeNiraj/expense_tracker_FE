@@ -74,7 +74,7 @@ export interface MonthSpendStats {
     directTotal: number;
     splitRecordedTotal: number;
     expensesCount: number;
-    expenses: ExpenseRecord[];
+    expenses?: ExpenseRecord[];
 }
 
 export interface SpendingsData {
@@ -304,4 +304,121 @@ export interface AnalyticsData {
     insights: AnalyticsInsight[];
     transactions: AnalyticsTransaction[];
 }
+
+// Device Registry & Strict Admin Types
+export type DeviceStatus = 'ACTIVE' | 'BLOCKED';
+
+export interface DeviceAuditEvent {
+    id?: string;
+    action: string;
+    person: string | null;
+    at: string;
+    by: string;
+}
+
+export interface DeviceStateResponse {
+    deviceId: string;
+    exists: boolean;
+    status: DeviceStatus;
+    claimedPerson: string | null;
+    approvedPeople: string[];
+    blockedPeople: string[];
+    pendingPerson: string | null;
+    label: string;
+    platform: string;
+    firstSeenAt: string | null;
+    lastSeenAt: string | null;
+    claimCount: number;
+    personLocks: Record<string, boolean>;
+    claimSyncConflict?: string | null;
+    blockedForActivePerson?: boolean;
+}
+
+export interface AdminLoginResponse {
+    token: string;
+    expiresAt: number;
+    role: string;
+    deviceId: string | null;
+}
+
+export interface AdminPersonDeviceSummary {
+    deviceId: string;
+    label: string;
+    platform: string;
+    status: DeviceStatus;
+    lastSeenAt: string | null;
+    firstSeenAt: string | null;
+}
+
+export interface AdminPersonStat {
+    person: string;
+    claimedCount: number;
+    activeDeviceCount: number;
+    blockedForPersonCount: number;
+    approvedDeviceCount: number;
+    pendingCount: number;
+    isLocked: boolean;
+    isMultiDevice: boolean;
+    devices: AdminPersonDeviceSummary[];
+    trueSpend: number;
+    netPendingBalance: number;
+}
+
+export interface AdminDeviceRecord {
+    deviceId: string;
+    claimedPerson: string | null;
+    approvedPeople: string[];
+    blockedPeople: string[];
+    status: DeviceStatus;
+    label: string;
+    platform: string;
+    userAgent?: string;
+    pendingPerson: string | null;
+    firstSeenAt: string | null;
+    lastSeenAt: string | null;
+    claimCount: number;
+    auditHistory?: DeviceAuditEvent[];
+}
+
+export interface AdminDashboardSummary {
+    totalDevices: number;
+    activeDevices: number;
+    blockedDevices: number;
+    claimedDevices: number;
+    unclaimedDevices: number;
+    pendingApprovalsCount: number;
+    lockedPeopleCount: number;
+    multiDevicePeopleCount: number;
+    totalPeople: number;
+}
+
+export interface AdminRecentEvent extends DeviceAuditEvent {
+    deviceId: string;
+    label?: string;
+    platform?: string;
+}
+
+export interface AdminDashboardData {
+    generatedAt: string;
+    summary: AdminDashboardSummary;
+    personLocks: Record<string, boolean>;
+    personDeviceStats: AdminPersonStat[];
+    pendingApprovals: AdminDeviceRecord[];
+    devices: AdminDeviceRecord[];
+    recentEvents: AdminRecentEvent[];
+}
+
+export interface AdminUpdateDevicePayload {
+    status?: DeviceStatus;
+    label?: string;
+    claimedPerson?: string | null;
+    approvedPeople?: string[];
+    blockedPeople?: string[];
+    blockPerson?: string;
+    unblockPerson?: string;
+    approvePending?: boolean;
+    rejectPending?: boolean;
+    revokeClaim?: boolean;
+}
+
 

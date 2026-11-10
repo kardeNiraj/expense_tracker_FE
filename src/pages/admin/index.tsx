@@ -1,0 +1,227 @@
+import React, { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+    setBulkPersonLocksApi,
+    setPersonLockApi,
+    updateAdminDeviceApi,
+    useAdminDashboard,
+    usePeople,
+} from '../../api';
+import type { AdminUpdateDevicePayload } from '../../api';
+import { useExpense } from '../../context';
+import { triggerHaptic } from '../../utils/haptics';
+import { AdminAccessGate } from './components/AdminAccessGate';
+import { AdminHeroSummary } from './components/AdminHeroSummary';
+import { PendingApprovalsCard } from './components/PendingApprovalsCard';
+import { PersonClaimsOverviewCard } from './components/PersonClaimsOverviewCard';
+import { DeviceRegistryCard } from './components/DeviceRegistryCard';
+import { SecurityAuditCard } from './components/SecurityAuditCard';
+
+export const AdminPage: React.FC = () => {
+    const {
+        isSwitcherUnlocked,
+        currentDeviceId,
+        lockSwitcher,
+        refreshDeviceStatus,
+        showToast,
+    } = useExpense();
+    const queryClient = useQueryClient();
+
+    const { data: people = [] } = usePeople();
+    const {
+        data: dashboard,
+        isLoading,
+        isFetching,
+        isError,
+        error,
+        refetch,
+    } = useAdminDashboard(isSwitcherUnlocked);
+
+    const [busyDeviceId, setBusyDeviceId] = useState<string | null>(null);
+    const [busyPerson, setBusyPerson] = useState<string | null>(null);
+    const [isBulkBusy, setIsBulkBusy] = useState(false);
+
+    if (!isSwitcherUnlocked) {
+        return <AdminAccessGate />;
+    }
+
+    const invalidateAdminAndDevice = async () => {
+        await Promise.allSettled([
+            queryClient.invalidateQueries({ queryKey: ['admin'] }),
+            refreshDeviceStatus(),
+        ]);
+        await refetch();
+    };
+
+    const handleRefresh = async () => {
+        triggerHaptic('light');
+        await refetch();
+        showToast('Admin telemetry refreshed', 'sync');
+    };
+
+    const handleUpdateDevice = async (
+        deviceId: string,
+        updates: AdminUpdateDevicePayload
+    ) => {
+        setBusyDeviceId(deviceId);
+        try {
+            await updateAdminDeviceApi(deviceId, updates);
+            triggerHaptic('success');
+            await invalidateAdminAndDevice();
+            showToast('Device rule updated', 'verified_user');
+        } catch (err) {
+            triggerHaptic('warning');
+            showToast(
+                err instanceof Error ? err.message : 'Failed to update device',
+                'error'
+            );
+        } finally {
+            setBusyDeviceId(null);
+        }
+    };
+
+    const handleToggleLock = async (person: string, locked: boolean) => {
+        setBusyPerson(person);
+        try {
+            await setPersonLockApi(person, locked);
+            triggerHaptic('medium');
+            await invalidateAdminAndDevice();
+            showToast(
+                `${person}'s identity ${locked ? 'locked' : 'unlocked'}`,
+                locked ? 'lock' : 'lock_open'
+            );
+        } catch (err) {
+            triggerHaptic('warning');
+            showToast(
+                err instanceof Error ? err.message : 'Failed to update claim lock',
+                'error'
+            );
+        } finally {
+            setBusyPerson(null);
+        }
+    };
+
+    const handleBulkLock = async (locked: boolean) => {
+        setIsBulkBusy(true);
+        try {
+            await setBulkPersonLocksApi(locked, people);
+            triggerHaptic('success');
+            await invalidateAdminAndDevice();
+            showToast(
+                locked
+                    ? 'All member identities locked for new devices'
+                    : 'All member identities unlocked',
+                locked ? 'lock' : 'lock_open'
+            );
+        } catch (err) {
+            triggerHaptic('warning');
+            showToast(
+                err instanceof Error ? err.message : 'Failed to update bulk locks',
+                'error'
+            );
+        } finally {
+            setIsBulkBusy(false);
+        }
+    };
+
+    const handleExitAdmin = () => {
+        triggerHaptic('light');
+        queryClient.removeQueries({ queryKey: ['admin'] });
+        lockSwitcher();
+        showToast('Exited Admin Console', 'lock');
+    };
+
+    if (isLoading && !dashboard) {
+        return (
+            <div className="space-y-3 pt-2">
+                <div className="h-44 rounded-3xl bg-surface-card-subtle border border-border-subtle animate-pulse" />
+                <div className="grid grid-cols-2 gap-2.5">
+                    <div className="h-24 rounded-2xl bg-surface-card-subtle border border-border-subtle animate-pulse" />
+                    <div className="h-24 rounded-2xl bg-surface-card-subtle border border-border-subtle animate-pulse" />
+                </div>
+                <div className="h-64 rounded-3xl bg-surface-card-subtle border border-border-subtle animate-pulse" />
+            </div>
+        );
+    }
+
+    if (isError && !dashboard) {
+        return (
+            <div className="pt-4">
+                <div className="bg-surface-card border border-negative/30 rounded-3xl p-6 text-center space-y-3">
+                    <span className="material-symbols-outlined text-negative text-[36px]">
+                        gpp_maybe
+                    </span>
+                    <h2 className="headline-md text-on-surface">
+                        Could not load Admin Console
+                    </h2>
+                    <p className="text-xs text-on-surface-variant">
+                        {error instanceof Error ? error.message : 'Unauthorized or network error'}
+                    </p>
+                    <div className="flex items-center justify-center gap-2 pt-1">
+                        <button
+                            type="button"
+                            onClick={() => void refetch()}
+                            className="h-10 px-4 rounded-xl bg-primary text-on-primary text-xs font-bold cursor-pointer"
+                        >
+                            Retry
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleExitAdmin}
+                            className="h-10 px-4 rounded-xl bg-surface-card-subtle text-on-surface text-xs font-semibold cursor-pointer"
+                        >
+                            Exit Admin
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (!dashboard) return null;
+
+    const allKnownPeople = Array.from(
+        new Set([...people, ...dashboard.personDeviceStats.map((s) => s.person)])
+    );
+
+    return (
+        <div className="space-y-4 pb-6">
+            <AdminHeroSummary
+                summary={dashboard.summary}
+                isBusy={isFetching || isBulkBusy}
+                onRefresh={() => void handleRefresh()}
+                onBulkLock={(locked) => void handleBulkLock(locked)}
+                onExitAdmin={handleExitAdmin}
+            />
+
+            <PendingApprovalsCard
+                pendingApprovals={dashboard.pendingApprovals}
+                busyDeviceId={busyDeviceId}
+                onUpdateDevice={(id, updates) => void handleUpdateDevice(id, updates)}
+            />
+
+            <PersonClaimsOverviewCard
+                stats={dashboard.personDeviceStats}
+                currentDeviceId={currentDeviceId}
+                busyPerson={busyPerson}
+                busyDeviceId={busyDeviceId}
+                onToggleLock={(person, locked) => void handleToggleLock(person, locked)}
+                onUpdateDevice={(id, updates) => void handleUpdateDevice(id, updates)}
+            />
+
+            <DeviceRegistryCard
+                devices={dashboard.devices}
+                personStats={dashboard.personDeviceStats}
+                people={allKnownPeople}
+                currentDeviceId={currentDeviceId}
+                busyDeviceId={busyDeviceId}
+                onUpdateDevice={(id, updates) => void handleUpdateDevice(id, updates)}
+            />
+
+            <SecurityAuditCard events={dashboard.recentEvents} />
+        </div>
+    );
+};
+
+export default AdminPage;
+

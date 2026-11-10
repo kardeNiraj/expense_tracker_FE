@@ -1,4 +1,4 @@
-import { apiFetch } from '../api/client';
+import { apiFetch, ApiError } from '../api/client';
 import type { QueryClient } from '@tanstack/react-query';
 import { rollbackMutationInQueryCache } from './offlineRollback';
 import type {
@@ -495,6 +495,16 @@ async function processSingleGroup(
 
             if (isOfflineOrNetworkError(err)) {
                 updateQueuedItem(currentItem.id, { status: 'PENDING' });
+                break;
+            }
+
+            if (err instanceof ApiError && (err.status === 403 || err.status === 401)) {
+                updateQueuedItem(currentItem.id, {
+                    retryCount: (currentItem.retryCount || 0) + 1,
+                    nextRetryAt: Date.now() + 5 * 60 * 1000,
+                    lastError: err.message,
+                    status: 'FAILED',
+                });
                 break;
             }
 

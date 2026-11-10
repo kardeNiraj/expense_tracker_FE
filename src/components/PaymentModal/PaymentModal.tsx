@@ -60,25 +60,34 @@ const PaymentModalContent: React.FC<PaymentModalContentProps> = ({
     const encodedUpiId = encodeURIComponent(toUpiId);
     const encodedName = encodeURIComponent(settlement.to);
     const encodedNote = encodeURIComponent(`Split-${settlement.description || 'Payment'}`.slice(0, 30));
+    const intentQuery = settlement.upiIntent?.startsWith('upi://pay?')
+        ? settlement.upiIntent.slice('upi://pay?'.length)
+        : null;
 
-    // Direct app links if not pre-populated
+    // Direct app links derived from compact upiIntent or fallback VPA fields
     const phonepeLink =
         settlement.appLinks?.phonepe ||
-        (toUpiId
-            ? `phonepe://pay?pa=${encodedUpiId}&pn=${encodedName}&am=${settlement.amount}&cu=INR&tn=${encodedNote}`
-            : undefined);
+        (intentQuery
+            ? `phonepe://pay?${intentQuery}`
+            : toUpiId
+              ? `phonepe://pay?pa=${encodedUpiId}&pn=${encodedName}&am=${settlement.amount}&cu=INR&tn=${encodedNote}`
+              : undefined);
 
     const gpayLink =
         settlement.appLinks?.gpay ||
-        (toUpiId
-            ? `gpay://upi/pay?pa=${encodedUpiId}&pn=${encodedName}&am=${settlement.amount}&cu=INR&tn=${encodedNote}`
-            : undefined);
+        (intentQuery
+            ? `gpay://upi/pay?${intentQuery}`
+            : toUpiId
+              ? `gpay://upi/pay?pa=${encodedUpiId}&pn=${encodedName}&am=${settlement.amount}&cu=INR&tn=${encodedNote}`
+              : undefined);
 
     const paytmLink =
         settlement.appLinks?.paytm ||
-        (toUpiId
-            ? `paytmmp://pay?pa=${encodedUpiId}&pn=${encodedName}&am=${settlement.amount}&cu=INR&tn=${encodedNote}`
-            : undefined);
+        (intentQuery
+            ? `paytmmp://pay?${intentQuery}`
+            : toUpiId
+              ? `paytmmp://pay?pa=${encodedUpiId}&pn=${encodedName}&am=${settlement.amount}&cu=INR&tn=${encodedNote}`
+              : undefined);
 
     const standardLink =
         settlement.appLinks?.standard ||

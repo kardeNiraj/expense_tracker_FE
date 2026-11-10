@@ -317,9 +317,9 @@ export async function setupQueryCachePersistence(queryClient: QueryClient): Prom
         ) {
             const query = event.query;
             if (query.state.data !== undefined) {
-                // Don't persist volatile health checks or temporary error states
+                // Don't persist volatile health checks or admin-restricted caches
                 const keyStr = JSON.stringify(query.queryKey);
-                if (!keyStr.includes('"health"')) {
+                if (!keyStr.includes('"health"') && !keyStr.includes('"admin"')) {
                     persistQueryToIdb(keyStr, query.state.data);
                 }
             }
