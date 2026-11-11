@@ -1,5 +1,6 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { apiFetch } from './client';
+import { ENV } from '../config';
 import type {
     AdminDashboardData,
     AnalyticsData,
@@ -13,6 +14,8 @@ import type {
     TripMetaItem,
     TripInfo,
 } from './types';
+
+const DYNAMIC_LIST_STALE_TIME_MS = Math.min(ENV.QUERY_STALE_TIME_MS, 30_000);
 
 export interface AnalyticsQueryParams {
     person?: string;
@@ -62,7 +65,7 @@ export function usePeople(refresh = false) {
     return useQuery<string[]>({
         queryKey: queryKeys.people(refresh),
         queryFn: () => apiFetch<string[]>(`/people?refresh=${refresh}`),
-        staleTime: 1000 * 60 * 5, // 5 minutes cache
+        staleTime: 1000 * 60 * 2, // 2 minutes cache
         gcTime: 1000 * 60 * 60 * 24 * 7,
         networkMode: 'offlineFirst',
     });
@@ -73,7 +76,7 @@ export function usePeopleDetails(refresh = false) {
     return useQuery<PersonDetail[]>({
         queryKey: queryKeys.peopleDetails(),
         queryFn: () => apiFetch<PersonDetail[]>(`/people/details?refresh=${refresh}`),
-        staleTime: 1000 * 60 * 5, // 5 minutes cache
+        staleTime: 1000 * 60 * 2, // 2 minutes cache
         gcTime: 1000 * 60 * 60 * 24 * 7,
         networkMode: 'offlineFirst',
     });
@@ -93,7 +96,7 @@ export function useSplits(params?: SplitsFilterParams) {
     return useQuery<Split[]>({
         queryKey: queryKeys.splits(params),
         queryFn: () => apiFetch<Split[]>(endpoint),
-        staleTime: 1000 * 60 * 5, // 5 minutes cache
+        staleTime: DYNAMIC_LIST_STALE_TIME_MS,
         gcTime: 1000 * 60 * 60 * 24 * 7,
         networkMode: 'offlineFirst',
     });
@@ -105,7 +108,7 @@ export function useSplitDetails(splitId?: string) {
         queryKey: queryKeys.splitDetails(splitId || ''),
         queryFn: () => apiFetch<Split>(`/split/${splitId}`),
         enabled: Boolean(splitId),
-        staleTime: 1000 * 60 * 10, // 10 minutes
+        staleTime: DYNAMIC_LIST_STALE_TIME_MS,
         gcTime: 1000 * 60 * 60 * 24 * 7,
         networkMode: 'offlineFirst',
     });
@@ -117,7 +120,7 @@ export function useSpendings(payee?: string) {
         queryKey: queryKeys.spendings(payee || ''),
         queryFn: () => apiFetch<SpendingsData>(`/spend/${encodeURIComponent(payee || '')}`),
         enabled: Boolean(payee),
-        staleTime: 1000 * 60 * 5, // 5 minutes
+        staleTime: DYNAMIC_LIST_STALE_TIME_MS,
         gcTime: 1000 * 60 * 60 * 24 * 7,
         networkMode: 'offlineFirst',
     });
@@ -177,7 +180,7 @@ export function useAnalytics(params?: AnalyticsQueryParams & { enabled?: boolean
         queryFn: () => apiFetch<AnalyticsData>(endpoint),
         enabled: params?.enabled ?? true,
         placeholderData: keepPreviousData,
-        staleTime: 1000 * 60 * 3, // 3 minutes cache
+        staleTime: 1000 * 60 * 2, // 2 minutes cache
         gcTime: 1000 * 60 * 60 * 24 * 7,
         networkMode: 'offlineFirst',
     });

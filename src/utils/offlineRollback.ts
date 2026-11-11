@@ -11,6 +11,12 @@ import type {
     SpendingsData,
 } from '../api/types';
 import { queryKeys } from '../api/queries';
+import {
+    applySplitAddToCaches,
+    applySplitRemoveToCaches,
+    applySplitTransformToCaches,
+    withSettlementStatus,
+} from './splitCacheHelpers';
 
 /**
  * Rolls back an optimistic mutation from QueryClient cache when it is cancelled/discarded from queue.
@@ -23,35 +29,56 @@ export function rollbackMutationInQueryCache(item: QueuedItem, queryClient: Quer
                 const p = item.payload as AddSplitPayload;
                 const splitId = p.splitId || item.splitId || item.id;
 
-                // 1. Remove the optimistic split from all splits queries
-                queryClient.setQueriesData<Split[]>({ queryKey: ['splits'] }, (old) => {
-                    if (!old) return old;
-                    return old.filter((s) => s.splitId !== splitId);
-                });
+                // 1. Remove the optimistic split from all matching splits queries
+                applySplitRemoveToCaches(queryClient, splitId);
 
                 // 2. If recordExpense was enabled, deduct from payee's spendings
                 if (p.recordExpense && p.paidBy) {
                     const spendingsKey = queryKeys.spendings(p.paidBy);
+                    const splitTag = `(split: ${splitId})`.toLowerCase();
+                    const matchesSplitExpense = (e: { amount: number; description?: string; timestamp?: string }) => {
+                        if (e.description?.toLowerCase().includes(splitTag)) return true;
+                        if (p.timestamp && e.timestamp && e.timestamp === p.timestamp && e.amount === p.amount) {
+                            return true;
+                        }
+                        return e.amount === p.amount && (!p.description || e.description === p.description);
+                    };
+
                     queryClient.setQueriesData<SpendingsData>(
                         { queryKey: spendingsKey },
                         (old) => {
                             if (!old) return old;
-                            let removed = false;
+                            let removedRecent = false;
                             const recentExpenses = (old.recentExpenses || []).filter((e) => {
-                                if (!removed && e.amount === p.amount && (!p.description || e.description === p.description)) {
-                                    removed = true;
+                                if (!removedRecent && matchesSplitExpense(e)) {
+                                    removedRecent = true;
                                     return false;
                                 }
                                 return true;
                             });
+                            let removedAll = false;
+                            const allExpenses = old.allExpenses
+                                ? old.allExpenses.filter((e) => {
+                                      if (!removedAll && matchesSplitExpense(e)) {
+                                          removedAll = true;
+                                          return false;
+                                      }
+                                      return true;
+                                  })
+                                : undefined;
+
                             return {
                                 ...old,
                                 today: Math.max(0, old.today - p.amount),
                                 currentMonth: Math.max(0, old.currentMonth - p.amount),
                                 total: Math.max(0, old.total - p.amount),
+                                ...(typeof old.splitRecordedTotal === 'number'
+                                    ? { splitRecordedTotal: Math.max(0, old.splitRecordedTotal - p.amount) }
+                                    : {}),
                                 todayExpensesCount: Math.max(0, (old.todayExpensesCount || 1) - 1),
                                 totalExpensesCount: Math.max(0, (old.totalExpensesCount || 1) - 1),
                                 recentExpenses,
+                                ...(allExpenses !== undefined ? { allExpenses } : {}),
                             };
                         }
                     );
@@ -63,26 +90,63 @@ export function rollbackMutationInQueryCache(item: QueuedItem, queryClient: Quer
                 const p = item.payload as AddExpensePayload;
                 if (p.payee) {
                     const spendingsKey = queryKeys.spendings(p.payee);
+                    const matchesDirectExpense = (e: {
+                        amount: number;
+                        description?: string;
+                        timestamp?: string;
+                        isSplitRow?: boolean;
+                    }) => {
+                        if (e.isSplitRow) return false;
+                        if (p.timestamp && e.timestamp && e.timestamp === p.timestamp && e.amount === p.amount) {
+                            return true;
+                        }
+                        return e.amount === p.amount && (!p.description || e.description === p.description);
+                    };
+
                     queryClient.setQueriesData<SpendingsData>(
                         { queryKey: spendingsKey },
                         (old) => {
                             if (!old) return old;
-                            let removed = false;
+                            let removedRecent = false;
                             const recentExpenses = (old.recentExpenses || []).filter((e) => {
-                                if (!removed && e.amount === p.amount && (!p.description || e.description === p.description)) {
-                                    removed = true;
+                                if (!removedRecent && matchesDirectExpense(e)) {
+                                    removedRecent = true;
                                     return false;
                                 }
                                 return true;
                             });
+                            let removedAll = false;
+                            const allExpenses = old.allExpenses
+                                ? old.allExpenses.filter((e) => {
+                                      if (!removedAll && matchesDirectExpense(e)) {
+                                          removedAll = true;
+                                          return false;
+                                      }
+                                      return true;
+                                  })
+                                : undefined;
+
                             return {
                                 ...old,
                                 today: Math.max(0, old.today - p.amount),
                                 currentMonth: Math.max(0, old.currentMonth - p.amount),
                                 total: Math.max(0, old.total - p.amount),
+                                ...(typeof old.directToday === 'number'
+                                    ? { directToday: Math.max(0, old.directToday - p.amount) }
+                                    : {}),
+                                ...(typeof old.directCurrentMonth === 'number'
+                                    ? { directCurrentMonth: Math.max(0, old.directCurrentMonth - p.amount) }
+                                    : {}),
+                                ...(typeof old.directTotal === 'number'
+                                    ? { directTotal: Math.max(0, old.directTotal - p.amount) }
+                                    : {}),
+                                ...(typeof old.directExpensesCount === 'number'
+                                    ? { directExpensesCount: Math.max(0, old.directExpensesCount - 1) }
+                                    : {}),
                                 todayExpensesCount: Math.max(0, (old.todayExpensesCount || 1) - 1),
                                 totalExpensesCount: Math.max(0, (old.totalExpensesCount || 1) - 1),
                                 recentExpenses,
+                                ...(allExpenses !== undefined ? { allExpenses } : {}),
                             };
                         }
                     );
@@ -92,59 +156,35 @@ export function rollbackMutationInQueryCache(item: QueuedItem, queryClient: Quer
 
             case 'ADD_CONTRIBUTION': {
                 const p = item.payload as AddContributionPayload;
-                queryClient.setQueriesData<Split[]>({ queryKey: ['splits'] }, (old) => {
-                    if (!old) return old;
-                    return old.map((s) => {
-                        if (s.splitId !== p.splitId) return s;
-                        let removed = false;
-                        const contributions = (s.contributions || []).filter((c) => {
-                            if (!removed && c.person === p.person && c.amount === p.amount) {
-                                removed = true;
-                                return false;
-                            }
-                            return true;
-                        });
-                        return {
-                            ...s,
-                            contributions,
-                        };
+                applySplitTransformToCaches(queryClient, p.splitId, (s) => {
+                    let removed = false;
+                    const contributions = (s.contributions || []).filter((c) => {
+                        if (!removed && c.person === p.person && c.amount === p.amount) {
+                            removed = true;
+                            return false;
+                        }
+                        return true;
                     });
+                    return {
+                        ...s,
+                        contributions,
+                    };
                 });
                 break;
             }
 
             case 'SETTLE_PARTICIPANT': {
                 const p = item.payload as SettleParticipantPayload;
-                queryClient.setQueriesData<Split[]>({ queryKey: ['splits'] }, (old) => {
-                    if (!old) return old;
-                    return old.map((s) => {
-                        if (s.splitId !== p.splitId) return s;
-                        const settlements = s.settlements.map((settle) => {
-                            const match =
-                                settle.from.trim().toLowerCase() === p.from.trim().toLowerCase() &&
-                                (!p.to || settle.to.trim().toLowerCase() === p.to.trim().toLowerCase());
-                            if (match) {
-                                return { ...settle, status: 'PENDING' as const };
-                            }
-                            return settle;
-                        });
-                        return {
-                            ...s,
-                            settlements,
-                            status: 'ACTIVE' as const,
-                        };
-                    });
-                });
+                applySplitTransformToCaches(queryClient, p.splitId, (s) =>
+                    withSettlementStatus(s, p.from, p.to, p.settled === false)
+                );
                 break;
             }
 
             case 'DELETE_SPLIT': {
                 const p = item.payload as { splitId: string; previousSplit?: Split };
                 if (p.previousSplit) {
-                    queryClient.setQueriesData<Split[]>({ queryKey: ['splits'] }, (old = []) => {
-                        if (old.some((s) => s.splitId === p.splitId)) return old;
-                        return [p.previousSplit!, ...old];
-                    });
+                    applySplitAddToCaches(queryClient, p.previousSplit);
                 }
                 break;
             }
@@ -152,9 +192,13 @@ export function rollbackMutationInQueryCache(item: QueuedItem, queryClient: Quer
             case 'UPDATE_SPLIT': {
                 const p = item.payload as UpdateSplitPayload & { previousSplit?: Split };
                 if (p.previousSplit) {
-                    queryClient.setQueriesData<Split[]>({ queryKey: ['splits'] }, (old = []) => {
-                        return old.map((s) => (s.splitId === p.splitId ? p.previousSplit! : s));
-                    });
+                    const revertedSplit = p.previousSplit;
+                    applySplitTransformToCaches(
+                        queryClient,
+                        p.splitId,
+                        () => revertedSplit,
+                        revertedSplit
+                    );
                 }
                 break;
             }

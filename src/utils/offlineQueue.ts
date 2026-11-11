@@ -63,6 +63,9 @@ export function isOfflineOrNetworkError(error?: unknown): boolean {
         return true;
     }
     if (!error) return false;
+    if (error instanceof ApiError) {
+        return false;
+    }
     const msg = String(error).toLowerCase();
     return (
         error instanceof TypeError ||
@@ -404,6 +407,12 @@ async function executeSingleMutation(item: QueuedItem): Promise<void> {
                     if (q.type === 'ADD_CONTRIBUTION' && (q.payload as AddContributionPayload).splitId === sentId) {
                         (q.payload as AddContributionPayload).splitId = returnedId;
                     }
+                    if (q.type === 'UPDATE_SPLIT' && (q.payload as UpdateSplitPayload).splitId === sentId) {
+                        (q.payload as UpdateSplitPayload).splitId = returnedId;
+                    }
+                    if (q.type === 'DELETE_SPLIT' && (q.payload as { splitId: string }).splitId === sentId) {
+                        (q.payload as { splitId: string }).splitId = returnedId;
+                    }
                 }
                 saveOfflineQueue(currentQueue);
             }
@@ -438,8 +447,9 @@ async function executeSingleMutation(item: QueuedItem): Promise<void> {
 
         case 'DELETE_SPLIT': {
             const { splitId, requestedBy } = item.payload as { splitId: string; requestedBy?: string };
+            const query = requestedBy ? `?requestedBy=${encodeURIComponent(requestedBy)}` : '';
             await apiFetch<{ success: boolean; message: string }>(
-                `/split/${splitId}?requestedBy=${encodeURIComponent(requestedBy || '')}`,
+                `/split/${splitId}${query}`,
                 {
                     method: 'DELETE',
                 }

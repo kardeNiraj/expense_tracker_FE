@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React, { lazy, Suspense, useState } from 'react';
 import { useExpense } from '../../context';
 import { usePeopleDetails, useUpdateUpiMutation, usePeople } from '../../api';
 import { Avatar, SpendHistoryModal } from '../../components';
 import { triggerHaptic } from '../../utils/haptics';
 import type { PersonDetail } from '../../api/types';
+import type { ParsedUpiQr } from '../../utils/qr';
+
+const QrScannerModal = lazy(() => import('../../components/QRScanner/QrScannerModal'));
 
 export function PeoplePage() {
     const { activePerson, claimedPerson, isSwitcherUnlocked, showToast } = useExpense();
@@ -13,6 +16,7 @@ export function PeoplePage() {
 
     const [editingPerson, setEditingPerson] = useState<PersonDetail | null>(null);
     const [upiInput, setUpiInput] = useState('');
+    const [showUpiScanner, setShowUpiScanner] = useState(false);
     const [selectedPersonForSpend, setSelectedPersonForSpend] = useState<string | null>(null);
 
     const handleCopy = (text: string) => {
@@ -194,7 +198,10 @@ export function PeoplePage() {
                             </div>
                             <button
                                 type="button"
-                                onClick={() => setEditingPerson(null)}
+                                onClick={() => {
+                                    setShowUpiScanner(false);
+                                    setEditingPerson(null);
+                                }}
                                 className="w-7 h-7 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-on-surface cursor-pointer"
                             >
                                 <span className="material-symbols-outlined text-[16px]">
@@ -205,27 +212,52 @@ export function PeoplePage() {
 
                         <form onSubmit={handleSaveUpi} className="space-y-3.5">
                             <div>
-                                <label className="text-xs font-semibold text-on-surface-variant block mb-1">
+                                <label
+                                    htmlFor="people-upi-input"
+                                    className="text-xs font-semibold text-on-surface-variant block mb-1"
+                                >
                                     UPI Address (VPA)
                                 </label>
-                                <input
-                                    type="text"
-                                    value={upiInput}
-                                    onChange={(e) => setUpiInput(e.target.value)}
-                                    placeholder="e.g. name@oksbi, phone@paytm"
-                                    className="w-full h-11 px-3 rounded-xl bg-surface-container-low text-sm font-mono font-semibold text-on-surface border border-outline-variant/30 focus:outline-none"
-                                    required
-                                />
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        id="people-upi-input"
+                                        type="text"
+                                        value={upiInput}
+                                        onChange={(e) => setUpiInput(e.target.value)}
+                                        placeholder="e.g. name@oksbi, phone@paytm"
+                                        className="flex-1 h-11 px-3 rounded-xl bg-surface-container-low text-sm font-mono font-semibold text-on-surface border border-outline-variant/30 focus:outline-none focus:border-primary"
+                                        autoCapitalize="none"
+                                        autoCorrect="off"
+                                        required
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            triggerHaptic('light');
+                                            setShowUpiScanner(true);
+                                        }}
+                                        className="h-11 px-3 rounded-xl bg-surface-container hover:bg-primary/10 text-primary border border-outline-variant/30 text-xs font-bold flex items-center gap-1 shrink-0 cursor-pointer transition-colors"
+                                        title="Scan UPI QR code or screenshot to auto-fill"
+                                    >
+                                        <span className="material-symbols-outlined text-[18px]">
+                                            qr_code_scanner
+                                        </span>
+                                        <span>Scan QR</span>
+                                    </button>
+                                </div>
                             </div>
 
                             <p className="text-[11px] text-on-surface-variant leading-relaxed">
-                                Used automatically when participants generate 1-tap UPI payment intents for group settlements.
+                                Used automatically to generate scannable &amp; shareable UPI QR codes for group settlements.
                             </p>
 
                             <div className="flex items-center gap-2 pt-2">
                                 <button
                                     type="button"
-                                    onClick={() => setEditingPerson(null)}
+                                    onClick={() => {
+                                        setShowUpiScanner(false);
+                                        setEditingPerson(null);
+                                    }}
                                     className="flex-1 h-10 rounded-xl bg-surface-container text-on-surface-variant text-xs font-semibold cursor-pointer"
                                 >
                                     Cancel
@@ -241,6 +273,22 @@ export function PeoplePage() {
                         </form>
                     </div>
                 </div>
+            )}
+            {/* Lazy QR Scanner for auto-filling UPI VPA */}
+            {showUpiScanner && (
+                <Suspense fallback={null}>
+                    <QrScannerModal
+                        isOpen={showUpiScanner}
+                        onClose={() => setShowUpiScanner(false)}
+                        onScanUpi={(parsed: ParsedUpiQr) => {
+                            setUpiInput(parsed.upiId);
+                            setShowUpiScanner(false);
+                            showToast(`Filled UPI ID: ${parsed.upiId}`, 'qr_code_scanner');
+                        }}
+                        title={`Scan ${editingPerson?.name || ''}'s UPI QR`}
+                        subtitle="Point camera or upload a UPI QR screenshot"
+                    />
+                </Suspense>
             )}
             {/* Dedicated Month-wise Spend History Breakdown Modal */}
             <SpendHistoryModal

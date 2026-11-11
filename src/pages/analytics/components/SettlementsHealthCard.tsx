@@ -92,7 +92,11 @@ export const SettlementsHealthCard: React.FC<SettlementsHealthCardProps> = ({
             {settlements.counterparties.length === 0 ? (
                 <div className="p-3 rounded-xl bg-status-settled-bg/50 border border-primary/20 flex items-center gap-2 text-xs text-status-settled-text font-medium">
                     <span className="material-symbols-outlined text-[18px]">check_circle</span>
-                    <span>All settlements are 100% cleared!</span>
+                    <span>
+                        {(settlements.offsetSplitsCount ?? 0) > 0
+                            ? `All balances offset pairwise to ₹0 (${settlements.offsetSplitsCount} mutual splits can be closed on Home).`
+                            : 'All settlements are 100% cleared!'}
+                    </span>
                 </div>
             ) : (
                 <div className="space-y-2">
@@ -102,6 +106,9 @@ export const SettlementsHealthCard: React.FC<SettlementsHealthCardProps> = ({
                             6,
                             Math.round((Math.abs(cp.netAmount) / maxCounterparty) * 100)
                         );
+                        const hasOffset =
+                            !isGroupView && cp.toReceive > 0 && cp.toPay > 0;
+                        const offsetVal = Math.round(Math.min(cp.toReceive, cp.toPay) * 100) / 100;
                         return (
                             <div
                                 key={cp.person}
@@ -117,6 +124,9 @@ export const SettlementsHealthCard: React.FC<SettlementsHealthCardProps> = ({
                                             <span className="text-[11px] text-on-surface-variant block">
                                                 {cp.pendingCount} pending{' '}
                                                 {cp.pendingCount === 1 ? 'split' : 'splits'}
+                                                {hasOffset && offsetVal >= 0.01
+                                                    ? ` • ₹${offsetVal.toLocaleString('en-IN')} offset`
+                                                    : ''}
                                             </span>
                                         </div>
                                     </div>

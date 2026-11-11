@@ -3,6 +3,7 @@
 
 interface ImportMetaEnv {
     readonly VITE_API_BASE_URL?: string;
+    readonly VITE_DISABLE_DEV_PROXY?: string;
     readonly VITE_API_TIMEOUT_MS?: string;
     readonly VITE_DEFAULT_TRIP_TITLE?: string;
     readonly VITE_DEFAULT_TRIP_SUBTITLE?: string;

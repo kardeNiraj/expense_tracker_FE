@@ -15,20 +15,12 @@ export interface Contribution {
     amount: number;
 }
 
-export interface SettlementAppLinks {
-    standard?: string;
-    phonepe?: string;
-    gpay?: string;
-    paytm?: string;
-}
-
 export interface Settlement {
     from: string;
     to: string;
     amount: number;
     toUpiId?: string | null;
     upiIntent?: string;
-    appLinks?: SettlementAppLinks;
     status: 'PENDING' | 'SETTLED';
 }
 
@@ -107,10 +99,12 @@ export interface TripInfo {
 
 // Mutation Payloads
 export interface AddExpensePayload {
+    expenseId?: string;
     payee: string;
     category: string;
     amount: number;
     description: string;
+    timestamp?: string;
 }
 
 export interface AddSplitPayload {
@@ -120,6 +114,7 @@ export interface AddSplitPayload {
     category: string;
     paidBy: string;
     createdBy: string;
+    timestamp?: string;
     contributions?: Contribution[];
     participants: string[];
     recordExpense?: boolean;
@@ -214,6 +209,8 @@ export interface AnalyticsSettlementsOverview {
     settledCount: number;
     pendingCount: number;
     settlementRatePct: number;
+    offsetPairsCount?: number;
+    offsetSplitsCount?: number;
     counterparties: AnalyticsCounterparty[];
 }
 

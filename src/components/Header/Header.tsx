@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useExpense } from '../../context';
-import { usePeople, useHealthCheck, useTripInfo } from '../../api';
+import { usePeople, useTripInfo } from '../../api';
 import { Avatar } from '../Avatar';
 import { ENV } from '../../config';
 import { ProfileModal } from './ProfileModal';
@@ -26,15 +26,19 @@ export const Header: React.FC = () => {
     } = useExpense();
 
     const { data: people = [] } = usePeople();
-    const { data: health } = useHealthCheck();
-    const { data: tripInfo, refetch: refetchTripInfo, isFetching: isTripInfoFetching } = useTripInfo();
+    const {
+        data: tripInfo,
+        refetch: refetchTripInfo,
+        isFetching: isTripInfoFetching,
+        isError: isTripInfoError,
+    } = useTripInfo();
     const { isOnline, pendingCount, isSyncing, hasBackoff } = useOfflineSync();
     const [showSwitcher, setShowSwitcher] = useState(false);
     const [showJoinModal, setShowJoinModal] = useState(false);
     const [showSyncModal, setShowSyncModal] = useState(false);
     const [showSpendHistory, setShowSpendHistory] = useState(false);
 
-    const isHealthy = health?.status === 'healthy';
+    const isHealthy = isOnline && !isTripInfoError && (Boolean(tripInfo) || people.length > 0);
     const tripTitle = tripInfo?.title || ENV.DEFAULT_TRIP_TITLE;
     const tripSubtitle = tripInfo?.subtitle || ENV.DEFAULT_TRIP_SUBTITLE;
     const tripIcon = tripInfo?.icon || ENV.DEFAULT_TRIP_ICON;
@@ -84,7 +88,13 @@ export const Header: React.FC = () => {
                             type="button"
                             onClick={() => refetchTripInfo()}
                             className="inline-flex items-center p-0.5 rounded-full hover:bg-surface-container transition-colors cursor-pointer group shrink-0"
-                            title={isHealthy ? 'Connected to API • Tap to refresh trip title' : 'Checking API connection'}
+                            title={
+                                !isOnline
+                                    ? 'Offline • Showing cached data'
+                                    : isHealthy
+                                    ? 'Connected to API • Tap to refresh trip title'
+                                    : 'Checking API connection'
+                            }
                             aria-label="Refresh trip info"
                         >
                             <span

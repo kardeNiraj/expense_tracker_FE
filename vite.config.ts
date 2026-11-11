@@ -1,9 +1,50 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv, type ProxyOptions } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
-export default defineConfig({
+const DEV_API_PROXY_PREFIX = '/__splitnest_api';
+
+function isLocalHostUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return ['localhost', '127.0.0.1', '::1', '[::1]'].includes(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+export default defineConfig(({ command, mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  const rawApiBaseUrl = (env.VITE_API_BASE_URL || 'https://localhost:8081').trim().replace(/\/+$/, '');
+  const useDevProxy =
+    command === 'serve' &&
+    env.VITE_DISABLE_DEV_PROXY !== 'true' &&
+    /^https?:\/\//i.test(rawApiBaseUrl) &&
+    !isLocalHostUrl(rawApiBaseUrl);
+
+  const proxyConfig: Record<string, string | ProxyOptions> | undefined = useDevProxy
+    ? {
+        [DEV_API_PROXY_PREFIX]: {
+          target: rawApiBaseUrl,
+          changeOrigin: true,
+          secure: true,
+          rewrite: (path) => path.replace(/^\/__splitnest_api/, '') || '/',
+          configure: (proxy) => {
+            proxy.on('proxyReq', (proxyReq) => {
+              proxyReq.removeHeader('origin');
+              proxyReq.removeHeader('referer');
+            });
+            proxy.on('proxyRes', (proxyRes) => {
+              delete proxyRes.headers['strict-transport-security'];
+            });
+          },
+        },
+      }
+    : undefined;
+
+  return {
+  ...(proxyConfig ? { server: { proxy: proxyConfig } } : {}),
   build: {
     rollupOptions: {
       output: {
@@ -62,4 +103,5 @@ export default defineConfig({
       },
     }),
   ],
+  };
 })

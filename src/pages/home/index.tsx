@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { lazy, Suspense, useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useExpense } from '../../context';
 import {
@@ -14,9 +14,25 @@ import {
     usePushConfig,
     usePushStatus,
 } from '../../api';
-import { Avatar, PaymentModal, type PaymentSettlementData, CollectQrModal, type CollectQrModalData, SpendHistoryModal } from '../../components';
+import {
+    Avatar,
+    PaymentModal,
+    type PaymentSettlementData,
+    CollectQrModal,
+    type CollectQrModalData,
+    GroupCollectQrModal,
+    type GroupCollectQrModalData,
+    SpendHistoryModal,
+} from '../../components';
 import { triggerHaptic } from '../../utils/haptics';
 import { parseCustomDate, formatPurchaseTime, getCategoryMeta } from '../../utils/formatters';
+import type { ParsedUpiQr } from '../../utils/qr';
+import {
+    computePersonalPairwiseBalances,
+    type PairwiseSettlementRef,
+} from '../../utils/pairwiseNetting';
+
+const QrScannerModal = lazy(() => import('../../components/QRScanner/QrScannerModal'));
 import {
     dismissPushPrompt,
     enablePushNotifications,
@@ -55,10 +71,13 @@ export function Dashboard() {
     const settleMutation = useSettleParticipantMutation();
     const [paymentSettlement, setPaymentSettlement] = useState<PaymentSettlementData | null>(null);
     const [collectSettlement, setCollectSettlement] = useState<CollectQrModalData | null>(null);
+    const [groupCollectData, setGroupCollectData] = useState<GroupCollectQrModalData | null>(null);
+    const [showQrScanner, setShowQrScanner] = useState(false);
     const [settlingKey, setSettlingKey] = useState<string | null>(null);
     const [remindingKey, setRemindingKey] = useState<string | null>(null);
     const [expandedOwed, setExpandedOwed] = useState<Record<string, boolean>>({});
     const [expandedOwedToMe, setExpandedOwedToMe] = useState<Record<string, boolean>>({});
+    const [expandedOffsets, setExpandedOffsets] = useState<Record<string, boolean>>({});
     const [isPushPromptDismissedState, setIsPushPromptDismissedState] = useState(() =>
         isPushPromptDismissed()
     );
@@ -66,7 +85,8 @@ export function Dashboard() {
     const [showIosPushGuide, setShowIosPushGuide] = useState(false);
     const [pushEnabledLocally, setPushEnabledLocally] = useState(false);
 
-    const activeSplits = allSplits.filter((s) => (s.status || 'ACTIVE').toUpperCase() === 'ACTIVE');
+    const visibleSplits = allSplits.filter((s) => (s.status || 'ACTIVE').toUpperCase() !== 'DELETED');
+    const activeSplits = visibleSplits.filter((s) => (s.status || 'ACTIVE').toUpperCase() === 'ACTIVE');
 
     // Date checker for today
     const isTodayDate = (dateStr?: string) => {
@@ -205,126 +225,75 @@ export function Dashboard() {
     // Recent 10 items for the home overview dashboard
     const combinedRecentItems = allPersonalItems.slice(0, 10);
 
-    // Calculate personal settlements from active splits
-    const myOwedSettlements: {
-        splitId: string;
-        description: string;
-        to: string;
-        amount: number;
-        toUpiId?: string | null;
-        upiIntent?: string;
-        appLinks?: import('../../api/types').SettlementAppLinks;
-    }[] = [];
+    // Calculate pairwise-netted personal settlements across active splits
+    const pairwiseBalances = computePersonalPairwiseBalances(
+        activeSplits,
+        activePerson,
+        peopleDetails
+    );
+    const {
+        receivables: groupedOwedToMeList,
+        payables: groupedOwedList,
+        mutualZeroOffsets,
+        totalOwedToYou,
+        totalYouOwe,
+        netBalance,
+        totalOffsetAmount,
+    } = pairwiseBalances;
 
-    const owedToMeSettlements: {
-        splitId: string;
-        description: string;
-        from: string;
-        amount: number;
-    }[] = [];
+    const handleScannedCreditorQr = (parsed: ParsedUpiQr) => {
+        setShowQrScanner(false);
+        const normalizedScannedUpi = parsed.upiId.trim().toLowerCase();
 
-    activeSplits.forEach((split) => {
-        split.settlements?.forEach((s) => {
-            if (s.status === 'PENDING') {
-                if (s.from.toLowerCase() === activePerson.toLowerCase()) {
-                    const personDetail = peopleDetails.find(
-                        (p) => p.name.toLowerCase() === s.to.toLowerCase()
-                    );
-                    const resolvedToUpiId = s.toUpiId || personDetail?.upiId || null;
+        if (typeof navigator !== 'undefined' && navigator.clipboard) {
+            navigator.clipboard.writeText(parsed.upiId).catch(() => {});
+        }
 
-                    myOwedSettlements.push({
-                        splitId: split.splitId,
-                        description: split.description,
-                        to: s.to,
-                        amount: s.amount,
-                        toUpiId: resolvedToUpiId,
-                        upiIntent: s.upiIntent,
-                        appLinks: s.appLinks,
-                    });
-                }
-                if (s.to.toLowerCase() === activePerson.toLowerCase()) {
-                    owedToMeSettlements.push({
-                        splitId: split.splitId,
-                        description: split.description,
-                        from: s.from,
-                        amount: s.amount,
-                    });
-                }
-            }
+        const directoryMatch = peopleDetails.find(
+            (p) => p.upiId?.trim().toLowerCase() === normalizedScannedUpi
+        );
+
+        const matchedGroup =
+            groupedOwedList.find((g) => g.toUpiId?.trim().toLowerCase() === normalizedScannedUpi) ||
+            (directoryMatch
+                ? groupedOwedList.find(
+                      (g) => g.to.toLowerCase() === directoryMatch.name.toLowerCase()
+                  )
+                : undefined) ||
+            (parsed.payeeName
+                ? groupedOwedList.find((g) =>
+                      parsed.payeeName!.toLowerCase().includes(g.to.toLowerCase())
+                  )
+                : undefined);
+
+        if (matchedGroup) {
+            const isMulti = matchedGroup.allSplits.length > 1;
+            setPaymentSettlement({
+                to: matchedGroup.to,
+                from: activePerson,
+                splitId: isMulti ? undefined : matchedGroup.youOweSplits[0]?.splitId,
+                splitIds: isMulti ? matchedGroup.allSplits.map((s) => s.splitId) : undefined,
+                amount: parsed.amount || matchedGroup.netAmount,
+                toUpiId: parsed.upiId,
+                description: matchedGroup.hasMutualOffset
+                    ? `Net after ₹${matchedGroup.offsetAmount.toLocaleString('en-IN')} offset (${matchedGroup.allSplits.length} splits)`
+                    : isMulti
+                      ? `Consolidated payoff (${matchedGroup.allSplits.length} splits)`
+                      : matchedGroup.youOweSplits[0]?.description || 'Split due',
+            });
+            showToast(`Matched pending due to ${matchedGroup.to} • Copied UPI ID`, 'qr_code_scanner');
+            return;
+        }
+
+        setPaymentSettlement({
+            to: directoryMatch?.name || parsed.payeeName || parsed.upiId,
+            from: activePerson,
+            amount: parsed.amount || 0,
+            toUpiId: parsed.upiId,
+            description: parsed.note || 'Scanned UPI QR',
         });
-    });
-
-    const totalYouOwe = myOwedSettlements.reduce((sum, s) => sum + s.amount, 0);
-    const totalOwedToYou = owedToMeSettlements.reduce((sum, s) => sum + s.amount, 0);
-    const netBalance = totalOwedToYou - totalYouOwe;
-
-    // Consolidated Pairwise Grouping for Step 3
-    interface GroupedOwedSettlement {
-        to: string;
-        totalAmount: number;
-        toUpiId?: string | null;
-        upiIntent?: string;
-        appLinks?: import('../../api/types').SettlementAppLinks;
-        splits: {
-            splitId: string;
-            description: string;
-            amount: number;
-        }[];
-    }
-
-    interface GroupedOwedToMeSettlement {
-        from: string;
-        totalAmount: number;
-        splits: {
-            splitId: string;
-            description: string;
-            amount: number;
-        }[];
-    }
-
-    const groupedOwedList = Object.values(
-        myOwedSettlements.reduce<Record<string, GroupedOwedSettlement>>((acc, s) => {
-            if (!acc[s.to]) {
-                acc[s.to] = {
-                    to: s.to,
-                    totalAmount: 0,
-                    toUpiId: s.toUpiId,
-                    upiIntent: s.upiIntent,
-                    appLinks: s.appLinks,
-                    splits: [],
-                };
-            }
-            acc[s.to].totalAmount += s.amount;
-            if (!acc[s.to].toUpiId && s.toUpiId) acc[s.to].toUpiId = s.toUpiId;
-            if (!acc[s.to].upiIntent && s.upiIntent) acc[s.to].upiIntent = s.upiIntent;
-            if (!acc[s.to].appLinks && s.appLinks) acc[s.to].appLinks = s.appLinks;
-            acc[s.to].splits.push({
-                splitId: s.splitId,
-                description: s.description,
-                amount: s.amount,
-            });
-            return acc;
-        }, {})
-    );
-
-    const groupedOwedToMeList = Object.values(
-        owedToMeSettlements.reduce<Record<string, GroupedOwedToMeSettlement>>((acc, s) => {
-            if (!acc[s.from]) {
-                acc[s.from] = {
-                    from: s.from,
-                    totalAmount: 0,
-                    splits: [],
-                };
-            }
-            acc[s.from].totalAmount += s.amount;
-            acc[s.from].splits.push({
-                splitId: s.splitId,
-                description: s.description,
-                amount: s.amount,
-            });
-            return acc;
-        }, {})
-    );
+        showToast(`Scanned & copied UPI ID: ${parsed.upiId}`, 'qr_code_scanner');
+    };
 
     const resolveSplitId = (splitId: string): string => {
         if (!splitId.startsWith('offline_')) return splitId;
@@ -365,21 +334,25 @@ export function Dashboard() {
         }
     };
 
-    const handleSettleMultiple = async (splitIds: string[], fromPerson: string, toPerson: string) => {
-        const key = `multi_${fromPerson}`;
-        setSettlingKey(key);
+    const handleSettleSettlementRefs = async (
+        refs: PairwiseSettlementRef[],
+        lockKey: string,
+        successMessage: string
+    ) => {
+        setSettlingKey(lockKey);
         try {
-            for (const sId of splitIds) {
-                const targetSplitId = resolveSplitId(sId);
-                await settleMutation.mutateAsync({
-                    splitId: targetSplitId,
-                    from: fromPerson,
-                    to: toPerson,
-                    confirmedBy: activePerson,
-                });
-            }
+            await Promise.all(
+                refs.map((ref) =>
+                    settleMutation.mutateAsync({
+                        splitId: resolveSplitId(ref.splitId),
+                        from: ref.from,
+                        to: ref.to,
+                        confirmedBy: activePerson,
+                    })
+                )
+            );
             triggerHaptic('success');
-            showToast(`Confirmed receipt of payment from ${fromPerson}!`, 'check_circle');
+            showToast(successMessage, 'check_circle');
         } catch (err: unknown) {
             triggerHaptic('warning');
             showToast(`Failed to settle: ${String(err)}`, 'error');
@@ -562,9 +535,11 @@ export function Dashboard() {
                             ₹{totalOwedToYou.toLocaleString('en-IN')}
                         </p>
                         <p className="text-[11px] text-on-surface-variant truncate mt-0.5">
-                            {owedToMeSettlements.length > 0
-                                ? `From ${owedToMeSettlements.length} ${owedToMeSettlements.length === 1 ? 'person' : 'people'}`
-                                : 'Nothing pending'}
+                            {groupedOwedToMeList.length > 0
+                                ? `From ${groupedOwedToMeList.length} ${groupedOwedToMeList.length === 1 ? 'person' : 'people'}`
+                                : totalOffsetAmount > 0
+                                  ? `Nothing due (₹${totalOffsetAmount.toLocaleString('en-IN')} offset)`
+                                  : 'Nothing pending'}
                         </p>
                     </div>
                 </div>
@@ -594,9 +569,11 @@ export function Dashboard() {
                             ₹{totalYouOwe.toLocaleString('en-IN')}
                         </p>
                         <p className="text-[11px] text-on-surface-variant truncate mt-0.5">
-                            {myOwedSettlements.length > 0
-                                ? `To ${myOwedSettlements.length} ${myOwedSettlements.length === 1 ? 'person' : 'people'}`
-                                : 'All cleared'}
+                            {groupedOwedList.length > 0
+                                ? `To ${groupedOwedList.length} ${groupedOwedList.length === 1 ? 'person' : 'people'}`
+                                : totalOffsetAmount > 0
+                                  ? `All cleared (₹${totalOffsetAmount.toLocaleString('en-IN')} offset)`
+                                  : 'All cleared'}
                         </p>
                     </div>
                 </div>
@@ -703,6 +680,33 @@ export function Dashboard() {
                 </button>
             </div>
 
+            {/* Camera QR Scanner Quick Action */}
+            <button
+                type="button"
+                onClick={() => {
+                    triggerHaptic('light');
+                    setShowQrScanner(true);
+                }}
+                className="w-full px-3.5 py-2.5 rounded-2xl bg-primary/5 border border-primary/25 hover:border-primary/45 shadow-[0_1px_3px_rgba(15,23,42,0.04)] flex items-center justify-between gap-2.5 active:scale-[0.99] transition-[border-color,transform] cursor-pointer group"
+            >
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
+                        <span className="material-symbols-outlined text-[18px]">qr_code_scanner</span>
+                    </div>
+                    <div className="text-left min-w-0">
+                        <span className="text-xs font-bold text-on-surface block truncate">
+                            Scan Creditor&apos;s UPI QR
+                        </span>
+                        <span className="text-[11px] text-on-surface-variant block truncate">
+                            Read friend&apos;s QR code via camera or gallery &amp; settle dues
+                        </span>
+                    </div>
+                </div>
+                <span className="material-symbols-outlined text-[18px] text-primary group-hover:translate-x-0.5 transition-transform shrink-0">
+                    photo_camera
+                </span>
+            </button>
+
             {/* Quick Link to Dedicated /analytics Route */}
             <button
                 type="button"
@@ -790,22 +794,35 @@ export function Dashboard() {
                 </div>
             )}
 
-            {/* Pending Settlements for Active Person */}
-            {(myOwedSettlements.length > 0 || owedToMeSettlements.length > 0) && (
+            {/* Pending Settlements for Active Person (Pairwise Netted) */}
+            {(groupedOwedList.length > 0 || groupedOwedToMeList.length > 0 || mutualZeroOffsets.length > 0) && (
                 <div className="space-y-2.5">
                     <div className="flex items-center justify-between px-1">
                         <h2 className="text-base font-bold text-on-surface font-headline">
-                            Action Required on Splits
+                            {groupedOwedList.length + groupedOwedToMeList.length > 0
+                                ? 'Action Required on Splits'
+                                : 'Mutual Split Offsets'}
                         </h2>
                         <span className="text-xs text-primary font-semibold">
-                            {myOwedSettlements.length + owedToMeSettlements.length} Pending
+                            {groupedOwedList.length + groupedOwedToMeList.length > 0
+                                ? `${groupedOwedList.length + groupedOwedToMeList.length} ${
+                                      groupedOwedList.length + groupedOwedToMeList.length === 1
+                                          ? 'Balance'
+                                          : 'Balances'
+                                  }`
+                                : `${mutualZeroOffsets.length} Cancelled ₹0`}
                         </span>
                     </div>
 
-                    {/* What you owe (Grouped / Consolidated Pairwise) */}
+                    {/* What you owe (Pairwise Netted) */}
                     {groupedOwedList.map((group, idx) => {
-                        const isMulti = group.splits.length > 1;
+                        const isMulti = group.allSplits.length > 1;
                         const isExpanded = !!expandedOwed[group.to];
+                        const netSubtitle = group.hasMutualOffset
+                            ? `Net after ₹${group.offsetAmount.toLocaleString('en-IN')} offset (₹${group.grossIOwe.toLocaleString('en-IN')} - ₹${group.grossOwedToMe.toLocaleString('en-IN')})`
+                            : group.youOweSplits.length > 1
+                              ? group.youOweSplits.map((s) => s.description).join(', ')
+                              : `For ${group.youOweSplits[0]?.description || 'Split due'}`;
 
                         return (
                             <div
@@ -817,27 +834,30 @@ export function Dashboard() {
                                     <div className="flex items-center gap-3 min-w-0">
                                         <Avatar name={group.to} size="md" />
                                         <div className="min-w-0">
-                                            <div className="flex items-center gap-2 flex-wrap">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
                                                 <h4 className="font-bold text-sm text-on-surface truncate">
                                                     Pay {group.to}
                                                 </h4>
                                                 {isMulti && (
                                                     <span className="px-2 py-0.5 rounded-full bg-secondary-fixed/60 text-on-secondary-fixed text-[10px] font-bold shrink-0">
-                                                        {group.splits.length} splits
+                                                        {group.allSplits.length} splits
+                                                    </span>
+                                                )}
+                                                {group.hasMutualOffset && (
+                                                    <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold shrink-0">
+                                                        ₹{group.offsetAmount.toLocaleString('en-IN')} offset
                                                     </span>
                                                 )}
                                             </div>
                                             <p className="text-xs text-on-surface-variant truncate mt-0.5">
-                                                {isMulti
-                                                    ? group.splits.map((s) => s.description).join(', ')
-                                                    : `For ${group.splits[0].description}`}
+                                                {netSubtitle}
                                             </p>
                                         </div>
                                     </div>
 
                                     <div className="flex items-center gap-1.5 shrink-0">
                                         <span className="font-bold text-base sm:text-lg text-error font-mono tracking-tight">
-                                            ₹{group.totalAmount.toLocaleString('en-IN')}
+                                            ₹{group.netAmount.toLocaleString('en-IN')}
                                         </span>
                                         {isMulti && (
                                             <button
@@ -863,11 +883,13 @@ export function Dashboard() {
                                 {isMulti && isExpanded && (
                                     <div className="pt-2 border-t border-outline-variant/15 space-y-1.5">
                                         <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block px-1">
-                                            Included Splits Breakdown
+                                            {group.hasMutualOffset
+                                                ? 'Pairwise Netting Breakdown'
+                                                : 'Included Splits Breakdown'}
                                         </span>
-                                        {group.splits.map((s) => (
+                                        {group.youOweSplits.map((s, subIdx) => (
                                             <div
-                                                key={`owed-sub-${s.splitId}`}
+                                                key={`owed-sub-${s.splitId}-${subIdx}`}
                                                 className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-xl bg-surface-container-low border border-outline-variant/15"
                                             >
                                                 <span className="text-on-surface truncate font-medium pr-2">
@@ -875,25 +897,41 @@ export function Dashboard() {
                                                 </span>
                                                 <div className="flex items-center gap-2 shrink-0">
                                                     <span className="font-mono text-error font-bold">
-                                                        ₹{s.amount.toLocaleString('en-IN')}
+                                                        {group.hasMutualOffset ? '+' : ''}₹{s.amount.toLocaleString('en-IN')}
                                                     </span>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setPaymentSettlement({
-                                                                to: group.to,
-                                                                from: activePerson,
-                                                                splitId: s.splitId,
-                                                                amount: s.amount,
-                                                                toUpiId: group.toUpiId,
-                                                                description: s.description,
-                                                            });
-                                                        }}
-                                                        className="px-2.5 py-1 rounded-lg bg-surface-container-high text-primary hover:bg-primary/10 text-[11px] font-bold cursor-pointer transition-colors"
-                                                    >
-                                                        Pay
-                                                    </button>
+                                                    {!group.hasMutualOffset && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setPaymentSettlement({
+                                                                    to: group.to,
+                                                                    from: activePerson,
+                                                                    splitId: s.splitId,
+                                                                    amount: s.amount,
+                                                                    toUpiId: s.toUpiId ?? group.toUpiId,
+                                                                    upiIntent: s.upiIntent,
+                                                                    description: s.description,
+                                                                });
+                                                            }}
+                                                            className="px-2.5 py-1 rounded-lg bg-surface-container-high text-primary hover:bg-primary/10 text-[11px] font-bold cursor-pointer transition-colors"
+                                                        >
+                                                            Pay
+                                                        </button>
+                                                    )}
                                                 </div>
+                                            </div>
+                                        ))}
+                                        {group.counterSplits.map((s, subIdx) => (
+                                            <div
+                                                key={`owed-offset-sub-${s.splitId}-${subIdx}`}
+                                                className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-xl bg-status-settled-bg/40 border border-primary/20"
+                                            >
+                                                <span className="text-on-surface truncate font-medium pr-2">
+                                                    Offset: {s.description} ({s.from} owes you)
+                                                </span>
+                                                <span className="font-mono text-primary font-bold shrink-0">
+                                                    -₹{s.amount.toLocaleString('en-IN')}
+                                                </span>
                                             </div>
                                         ))}
                                     </div>
@@ -907,52 +945,107 @@ export function Dashboard() {
                                         </span>
                                     ) : (
                                         <span className="text-[11px] text-on-surface-variant/80 truncate">
-                                            Instant UPI Payment
+                                            No UPI saved — scan {group.to}&apos;s QR
                                         </span>
                                     )}
 
-                                    {group.upiIntent || group.toUpiId ? (
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setPaymentSettlement({
-                                                    to: group.to,
-                                                    from: activePerson,
-                                                    splitId: isMulti ? undefined : group.splits[0].splitId,
-                                                    splitIds: isMulti ? group.splits.map((s) => s.splitId) : undefined,
-                                                    amount: group.totalAmount,
-                                                    toUpiId: group.toUpiId,
-                                                    upiIntent: group.upiIntent,
-                                                    appLinks: group.appLinks,
-                                                    description: isMulti
-                                                        ? `Consolidated payoff (${group.splits.length} splits)`
-                                                        : group.splits[0].description,
-                                                });
-                                            }}
-                                            className="h-9 px-4 rounded-xl bg-primary text-on-primary text-xs font-semibold flex items-center gap-1.5 shadow-xs hover:bg-primary/90 transition-all cursor-pointer active:scale-[0.99] shrink-0"
-                                        >
-                                            <span className="material-symbols-outlined text-[16px]">
-                                                bolt
-                                            </span>
-                                            <span>{isMulti ? 'Pay All' : 'Pay via UPI'}</span>
-                                        </button>
-                                    ) : (
-                                        <span className="text-[11px] text-on-surface-variant font-medium flex items-center gap-1 shrink-0">
-                                            <span className="material-symbols-outlined text-[14px] text-tertiary">
-                                                hourglass_top
-                                            </span>
-                                            <span>Pending {group.to}</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setPaymentSettlement({
+                                                to: group.to,
+                                                from: activePerson,
+                                                splitId: isMulti ? undefined : group.youOweSplits[0]?.splitId,
+                                                splitIds: isMulti ? group.allSplits.map((s) => s.splitId) : undefined,
+                                                amount: group.netAmount,
+                                                toUpiId: group.toUpiId,
+                                                upiIntent: group.upiIntent,
+                                                description: group.hasMutualOffset
+                                                    ? `Net after ₹${group.offsetAmount.toLocaleString('en-IN')} offset (${group.allSplits.length} splits)`
+                                                    : isMulti
+                                                      ? `Consolidated payoff (${group.allSplits.length} splits)`
+                                                      : group.youOweSplits[0]?.description || 'Split due',
+                                            });
+                                        }}
+                                        className="h-9 px-3.5 rounded-xl bg-primary text-on-primary text-xs font-semibold flex items-center gap-1.5 shadow-xs hover:bg-primary/90 transition-colors cursor-pointer active:scale-[0.99] shrink-0"
+                                    >
+                                        <span className="material-symbols-outlined text-[16px]">
+                                            {group.upiIntent || group.toUpiId ? 'qr_code_2' : 'qr_code_scanner'}
                                         </span>
-                                    )}
+                                        <span>
+                                            {group.upiIntent || group.toUpiId
+                                                ? group.hasMutualOffset
+                                                    ? 'Pay Net QR'
+                                                    : isMulti
+                                                      ? 'Pay All QR'
+                                                      : 'Pay via QR'
+                                                : 'Scan & Pay'}
+                                        </span>
+                                    </button>
                                 </div>
                             </div>
                         );
                     })}
 
-                    {/* What others owe you (Creditor: Collect via QR or Settle) */}
+                    {/* Batch Share Named QR Cards to WhatsApp Group */}
+                    {groupedOwedToMeList.length > 0 && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                triggerHaptic('medium');
+                                setGroupCollectData({
+                                    title: 'Share Collect QRs to WhatsApp',
+                                    subtitle: tripInfo?.title
+                                        ? `${tripInfo.title} • Pay ${activePerson}`
+                                        : `Pay ${activePerson}`,
+                                    debtors: groupedOwedToMeList.map((g) => ({
+                                        debtorName: g.from,
+                                        amount: g.netAmount,
+                                        description: g.hasMutualOffset
+                                            ? `Net after ₹${g.offsetAmount.toLocaleString('en-IN')} offset (${g.allSplits.length} splits)`
+                                            : g.owedToMeSplits.length > 1
+                                              ? `${g.owedToMeSplits.length} splits (${g.owedToMeSplits.map((s) => s.description).join(', ')})`
+                                              : g.owedToMeSplits[0]?.description || 'Split share',
+                                        splitCount: g.allSplits.length,
+                                    })),
+                                });
+                            }}
+                            className="w-full px-3.5 py-2.5 rounded-2xl bg-[#25D366]/10 border border-[#25D366]/35 hover:border-[#25D366]/60 flex items-center justify-between gap-2.5 active:scale-[0.99] transition-colors cursor-pointer group"
+                        >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-8 h-8 rounded-xl bg-[#25D366]/20 text-[#15803d] flex items-center justify-center shrink-0">
+                                    <span className="material-symbols-outlined text-[18px]">qr_code_2</span>
+                                </div>
+                                <div className="text-left min-w-0">
+                                    <span className="text-xs font-bold text-on-surface block truncate">
+                                        Share {groupedOwedToMeList.length} Named Collect{' '}
+                                        {groupedOwedToMeList.length === 1 ? 'QR' : 'QRs'} to WhatsApp
+                                    </span>
+                                    <span className="text-[11px] text-on-surface-variant block truncate">
+                                        Send individual UPI QR cards ({groupedOwedToMeList.map((g) => g.from).join(', ')}) in group chat
+                                    </span>
+                                </div>
+                            </div>
+                            <span className="material-symbols-outlined text-[18px] text-[#15803d] shrink-0">
+                                ios_share
+                            </span>
+                        </button>
+                    )}
+
+                    {/* What others owe you (Creditor: Pairwise Netted) */}
                     {groupedOwedToMeList.map((group, idx) => {
-                        const isMulti = group.splits.length > 1;
+                        const isMulti = group.allSplits.length > 1;
                         const isExpanded = !!expandedOwedToMe[group.from];
+                        const netSubtitle = group.hasMutualOffset
+                            ? `Net after ₹${group.offsetAmount.toLocaleString('en-IN')} offset (₹${group.grossOwedToMe.toLocaleString('en-IN')} - ₹${group.grossIOwe.toLocaleString('en-IN')})`
+                            : group.owedToMeSplits.length > 1
+                              ? group.owedToMeSplits.map((s) => s.description).join(', ')
+                              : `For ${group.owedToMeSplits[0]?.description || 'Split due'}`;
+                        const resolvedRefs = group.allSplits.map((s) => ({
+                            splitId: resolveSplitId(s.splitId),
+                            from: s.from,
+                            to: s.to,
+                        }));
 
                         return (
                             <div
@@ -964,27 +1057,30 @@ export function Dashboard() {
                                     <div className="flex items-center gap-3 min-w-0">
                                         <Avatar name={group.from} size="md" />
                                         <div className="min-w-0">
-                                            <div className="flex items-center gap-2 flex-wrap">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
                                                 <h4 className="font-bold text-sm text-on-surface truncate">
                                                     {group.from} owes you
                                                 </h4>
                                                 {isMulti && (
                                                     <span className="px-2 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed text-[10px] font-bold shrink-0">
-                                                        {group.splits.length} splits
+                                                        {group.allSplits.length} splits
+                                                    </span>
+                                                )}
+                                                {group.hasMutualOffset && (
+                                                    <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold shrink-0">
+                                                        ₹{group.offsetAmount.toLocaleString('en-IN')} offset
                                                     </span>
                                                 )}
                                             </div>
                                             <p className="text-xs text-on-surface-variant truncate mt-0.5">
-                                                {isMulti
-                                                    ? group.splits.map((s) => s.description).join(', ')
-                                                    : `For ${group.splits[0].description}`}
+                                                {netSubtitle}
                                             </p>
                                         </div>
                                     </div>
 
                                     <div className="flex items-center gap-1.5 shrink-0">
                                         <span className="font-bold text-base sm:text-lg text-primary font-mono tracking-tight">
-                                            ₹{group.totalAmount.toLocaleString('en-IN')}
+                                            ₹{group.netAmount.toLocaleString('en-IN')}
                                         </span>
                                         {isMulti && (
                                             <button
@@ -1010,11 +1106,13 @@ export function Dashboard() {
                                 {isMulti && isExpanded && (
                                     <div className="pt-2 border-t border-outline-variant/15 space-y-1.5">
                                         <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block px-1">
-                                            Included Splits Breakdown
+                                            {group.hasMutualOffset
+                                                ? 'Pairwise Netting Breakdown'
+                                                : 'Included Splits Breakdown'}
                                         </span>
-                                        {group.splits.map((s) => (
+                                        {group.owedToMeSplits.map((s, subIdx) => (
                                             <div
-                                                key={`owed-to-me-sub-${s.splitId}`}
+                                                key={`owed-to-me-sub-${s.splitId}-${subIdx}`}
                                                 className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-xl bg-surface-container-low border border-outline-variant/15"
                                             >
                                                 <span className="text-on-surface truncate font-medium pr-2">
@@ -1022,60 +1120,77 @@ export function Dashboard() {
                                                 </span>
                                                 <div className="flex items-center gap-1.5 shrink-0">
                                                     <span className="font-mono text-primary font-bold">
-                                                        ₹{s.amount.toLocaleString('en-IN')}
+                                                        {group.hasMutualOffset ? '+' : ''}₹{s.amount.toLocaleString('en-IN')}
                                                     </span>
-                                                    <button
-                                                        type="button"
-                                                        disabled={
-                                                            remindingKey === `${s.splitId}_${group.from}` ||
-                                                            remindingKey === `group_${group.from}`
-                                                        }
-                                                        onClick={() =>
-                                                            void handleRemindDebtor({
-                                                                key: `${s.splitId}_${group.from}`,
-                                                                splitIds: [s.splitId],
-                                                                fromPerson: group.from,
-                                                                toPerson: activePerson,
-                                                            })
-                                                        }
-                                                        className="flex items-center p-1 rounded-md bg-status-awaiting-bg/80 text-status-awaiting-text hover:bg-status-awaiting-bg transition-colors cursor-pointer disabled:opacity-50"
-                                                        title={`Send payment reminder to ${group.from} for ${s.description}`}
-                                                        aria-label={`Remind ${group.from} for ${s.description}`}
-                                                    >
-                                                        <span className="material-symbols-outlined text-[15px]">
-                                                            {remindingKey === `${s.splitId}_${group.from}`
-                                                                ? 'hourglass_top'
-                                                                : 'notifications_active'}
-                                                        </span>
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setCollectSettlement({
-                                                                debtorName: group.from,
-                                                                amount: s.amount,
-                                                                splitId: s.splitId,
-                                                                description: s.description,
-                                                            });
-                                                        }}
-                                                        className="flex items-center p-1 rounded-md bg-surface-container-high text-primary hover:bg-primary/10 transition-colors cursor-pointer"
-                                                        title="Show QR for this item"
-                                                    >
-                                                        <span className="material-symbols-outlined text-[15px]">
-                                                            qr_code_2
-                                                        </span>
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        disabled={settlingKey === `${s.splitId}_${group.from}` || settlingKey === `multi_${group.from}`}
-                                                        onClick={() =>
-                                                            handleSettle(s.splitId, group.from, activePerson)
-                                                        }
-                                                        className="px-2 py-0.5 rounded-md bg-primary-fixed text-on-primary-fixed hover:bg-primary hover:text-on-primary text-[11px] font-bold cursor-pointer disabled:opacity-50 transition-colors"
-                                                    >
-                                                        Confirm
-                                                    </button>
+                                                    {!group.hasMutualOffset && (
+                                                        <>
+                                                            <button
+                                                                type="button"
+                                                                disabled={
+                                                                    remindingKey === `${s.splitId}_${group.from}` ||
+                                                                    remindingKey === `group_${group.from}`
+                                                                }
+                                                                onClick={() =>
+                                                                    void handleRemindDebtor({
+                                                                        key: `${s.splitId}_${group.from}`,
+                                                                        splitIds: [s.splitId],
+                                                                        fromPerson: group.from,
+                                                                        toPerson: activePerson,
+                                                                    })
+                                                                }
+                                                                className="flex items-center p-1 rounded-md bg-status-awaiting-bg/80 text-status-awaiting-text hover:bg-status-awaiting-bg transition-colors cursor-pointer disabled:opacity-50"
+                                                                title={`Send payment reminder to ${group.from} for ${s.description}`}
+                                                                aria-label={`Remind ${group.from} for ${s.description}`}
+                                                            >
+                                                                <span className="material-symbols-outlined text-[15px]">
+                                                                    {remindingKey === `${s.splitId}_${group.from}`
+                                                                        ? 'hourglass_top'
+                                                                        : 'notifications_active'}
+                                                                </span>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setCollectSettlement({
+                                                                        debtorName: group.from,
+                                                                        amount: s.amount,
+                                                                        splitId: s.splitId,
+                                                                        description: s.description,
+                                                                    });
+                                                                }}
+                                                                className="flex items-center p-1 rounded-md bg-surface-container-high text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+                                                                title="Show QR for this item"
+                                                            >
+                                                                <span className="material-symbols-outlined text-[15px]">
+                                                                    qr_code_2
+                                                                </span>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                disabled={settlingKey === `${s.splitId}_${group.from}` || settlingKey === `multi_${group.from}`}
+                                                                onClick={() =>
+                                                                    handleSettle(s.splitId, group.from, activePerson)
+                                                                }
+                                                                className="px-2 py-0.5 rounded-md bg-primary-fixed text-on-primary-fixed hover:bg-primary hover:text-on-primary text-[11px] font-bold cursor-pointer disabled:opacity-50 transition-colors"
+                                                            >
+                                                                Confirm
+                                                            </button>
+                                                        </>
+                                                    )}
                                                 </div>
+                                            </div>
+                                        ))}
+                                        {group.counterSplits.map((s, subIdx) => (
+                                            <div
+                                                key={`owed-to-me-offset-sub-${s.splitId}-${subIdx}`}
+                                                className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-xl bg-error-container/25 border border-error/20"
+                                            >
+                                                <span className="text-on-surface truncate font-medium pr-2">
+                                                    Offset: {s.description} (you owe {s.to})
+                                                </span>
+                                                <span className="font-mono text-error font-bold shrink-0">
+                                                    -₹{s.amount.toLocaleString('en-IN')}
+                                                </span>
                                             </div>
                                         ))}
                                     </div>
@@ -1088,16 +1203,19 @@ export function Dashboard() {
                                         onClick={() => {
                                             setCollectSettlement({
                                                 debtorName: group.from,
-                                                amount: group.totalAmount,
-                                                splitId: isMulti ? undefined : group.splits[0].splitId,
-                                                splitIds: isMulti ? group.splits.map((s) => s.splitId) : undefined,
-                                                description: isMulti
-                                                    ? `${group.splits.length} splits combined`
-                                                    : group.splits[0].description,
+                                                amount: group.netAmount,
+                                                splitId: isMulti ? undefined : resolvedRefs[0]?.splitId,
+                                                splitIds: isMulti ? resolvedRefs.map((r) => r.splitId) : undefined,
+                                                settlementRefs: resolvedRefs,
+                                                description: group.hasMutualOffset
+                                                    ? `Net after ₹${group.offsetAmount.toLocaleString('en-IN')} offset (${group.allSplits.length} splits)`
+                                                    : isMulti
+                                                      ? `${group.allSplits.length} splits combined`
+                                                      : group.owedToMeSplits[0]?.description || 'Split due',
                                             });
                                         }}
                                         className="flex-1 h-9 px-2.5 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface text-xs font-semibold flex items-center justify-center gap-1 transition-colors border border-outline-variant/30 cursor-pointer active:scale-[0.99] whitespace-nowrap"
-                                        title={`Show QR code to collect ₹${group.totalAmount} from ${group.from}`}
+                                        title={`Show QR code to collect ₹${group.netAmount} from ${group.from}`}
                                     >
                                         <span className="material-symbols-outlined text-[17px] text-primary">
                                             qr_code_2
@@ -1111,11 +1229,11 @@ export function Dashboard() {
                                         onClick={() =>
                                             void handleRemindDebtor({
                                                 key: `group_${group.from}`,
-                                                splitIds: group.splits.map((s) => s.splitId),
+                                                splitIds: group.owedToMeSplits.map((s) => s.splitId),
                                                 fromPerson: group.from,
                                                 toPerson: activePerson,
-                                                consolidatedAmount: isMulti ? group.totalAmount : undefined,
-                                                consolidatedCount: isMulti ? group.splits.length : undefined,
+                                                consolidatedAmount: isMulti ? group.netAmount : undefined,
+                                                consolidatedCount: isMulti ? group.allSplits.length : undefined,
                                             })
                                         }
                                         className="h-9 px-2.5 rounded-xl bg-status-awaiting-bg/85 hover:bg-status-awaiting-bg text-status-awaiting-text text-xs font-bold flex items-center justify-center gap-1 transition-colors border border-status-awaiting-text/25 cursor-pointer disabled:opacity-50 active:scale-[0.99] shrink-0 whitespace-nowrap"
@@ -1136,23 +1254,25 @@ export function Dashboard() {
                                         type="button"
                                         disabled={
                                             settlingKey === `multi_${group.from}` ||
-                                            (group.splits.length === 1 && settlingKey === `${group.splits[0].splitId}_${group.from}`)
+                                            settlingKey === `offset_${group.from}` ||
+                                            (group.allSplits.length === 1 &&
+                                                settlingKey === `${group.allSplits[0].splitId}_${group.from}`)
                                         }
                                         onClick={() =>
-                                            isMulti
-                                                ? handleSettleMultiple(
-                                                    group.splits.map((s) => s.splitId),
-                                                    group.from,
-                                                    activePerson
-                                                )
-                                                : handleSettle(
-                                                    group.splits[0].splitId,
-                                                    group.from,
-                                                    activePerson
-                                                )
+                                            group.allSplits.length > 1
+                                                ? void handleSettleSettlementRefs(
+                                                      group.allSplits,
+                                                      `multi_${group.from}`,
+                                                      `Confirmed net ₹${group.netAmount.toLocaleString('en-IN')} settlement with ${group.from}!`
+                                                  )
+                                                : void handleSettle(
+                                                      group.allSplits[0].splitId,
+                                                      group.from,
+                                                      activePerson
+                                                  )
                                         }
-                                        className="flex-1 h-9 px-2.5 rounded-xl bg-primary-fixed hover:bg-primary text-on-primary-fixed hover:text-on-primary text-xs font-bold transition-all flex items-center justify-center gap-1 shadow-2xs disabled:opacity-50 cursor-pointer active:scale-[0.99] whitespace-nowrap"
-                                        title={`Confirm receipt of ₹${group.totalAmount} from ${group.from}`}
+                                        className="flex-1 h-9 px-2.5 rounded-xl bg-primary-fixed hover:bg-primary text-on-primary-fixed hover:text-on-primary text-xs font-bold transition-colors flex items-center justify-center gap-1 shadow-2xs disabled:opacity-50 cursor-pointer active:scale-[0.99] whitespace-nowrap"
+                                        title={`Confirm receipt of ₹${group.netAmount} from ${group.from}`}
                                     >
                                         <span className="material-symbols-outlined text-[16px]">
                                             done_all
@@ -1163,8 +1283,153 @@ export function Dashboard() {
                             </div>
                         );
                     })}
+
+                    {/* Cancelled Mutual Offsets (Zero-Net Pairs, e.g. +50 and -50 = ₹0) */}
+                    {mutualZeroOffsets.map((pair) => {
+                        const isExpanded = !!expandedOffsets[pair.counterparty];
+                        const lockKey = `offset_${pair.counterparty}`;
+                        const isClearing = settlingKey === lockKey;
+
+                        return (
+                            <div
+                                key={`mutual-offset-${pair.counterparty}`}
+                                className="bg-status-settled-bg/45 p-3.5 rounded-2xl border border-primary/25 space-y-2.5 shadow-xs"
+                            >
+                                <div className="flex items-center justify-between gap-2.5">
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className="w-9 h-9 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
+                                            <span className="material-symbols-outlined text-[20px]">
+                                                swap_horiz
+                                            </span>
+                                        </div>
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <h4 className="font-bold text-sm text-on-surface truncate">
+                                                    {activePerson} ↔ {pair.counterparty}
+                                                </h4>
+                                                <span className="px-2 py-0.5 rounded-full bg-primary text-on-primary text-[10px] font-bold font-mono shrink-0">
+                                                    Net ₹0
+                                                </span>
+                                            </div>
+                                            <p className="text-[11px] text-on-surface-variant truncate mt-0.5">
+                                                ₹{pair.offsetAmount.toLocaleString('en-IN')} cancelled across {pair.allSplits.length} mutual splits
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setExpandedOffsets((prev) => ({
+                                                ...prev,
+                                                [pair.counterparty]: !prev[pair.counterparty],
+                                            }))
+                                        }
+                                        className="w-7 h-7 rounded-lg text-on-surface-variant hover:bg-primary/10 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                                        title={isExpanded ? 'Collapse offset details' : 'View offset splits'}
+                                    >
+                                        <span className="material-symbols-outlined text-[20px]">
+                                            {isExpanded ? 'expand_less' : 'expand_more'}
+                                        </span>
+                                    </button>
+                                </div>
+
+                                {isExpanded && (
+                                    <div className="pt-2 border-t border-primary/15 space-y-1.5">
+                                        {pair.owedToMeSplits.map((s, subIdx) => (
+                                            <div
+                                                key={`zero-in-${s.splitId}-${subIdx}`}
+                                                className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-xl bg-surface-container-lowest border border-outline-variant/20"
+                                            >
+                                                <span className="text-on-surface truncate pr-2">
+                                                    {s.from} owes you: <strong>{s.description}</strong>
+                                                </span>
+                                                <span className="font-mono font-bold text-primary shrink-0">
+                                                    +₹{s.amount.toLocaleString('en-IN')}
+                                                </span>
+                                            </div>
+                                        ))}
+                                        {pair.youOweSplits.map((s, subIdx) => (
+                                            <div
+                                                key={`zero-out-${s.splitId}-${subIdx}`}
+                                                className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-xl bg-surface-container-lowest border border-outline-variant/20"
+                                            >
+                                                <span className="text-on-surface truncate pr-2">
+                                                    You owe {s.to}: <strong>{s.description}</strong>
+                                                </span>
+                                                <span className="font-mono font-bold text-error shrink-0">
+                                                    -₹{s.amount.toLocaleString('en-IN')}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                <div className="pt-1.5 border-t border-primary/15 flex items-center justify-between gap-2">
+                                    <span className="text-[11px] text-status-settled-text font-medium truncate">
+                                        Both sides cancel out — no payment needed
+                                    </span>
+                                    <button
+                                        type="button"
+                                        disabled={isClearing}
+                                        onClick={() =>
+                                            void handleSettleSettlementRefs(
+                                                pair.allSplits,
+                                                lockKey,
+                                                `Cleared ${pair.allSplits.length} mutual offset splits with ${pair.counterparty}!`
+                                            )
+                                        }
+                                        className="h-8 px-3 rounded-xl bg-primary text-on-primary text-xs font-bold flex items-center gap-1.5 shadow-2xs hover:bg-primary/90 transition-colors disabled:opacity-50 cursor-pointer shrink-0 active:scale-[0.98]"
+                                        title={`Mark all ${pair.allSplits.length} cancelled splits as settled`}
+                                    >
+                                        <span className="material-symbols-outlined text-[15px]">
+                                            {isClearing ? 'hourglass_top' : 'done_all'}
+                                        </span>
+                                        <span>{isClearing ? 'Clearing...' : 'Clear Offset Splits'}</span>
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
             )}
+
+            {/* Settled Splits History Shortcut when all balances are settled */}
+            {!isSplitsLoading &&
+                groupedOwedList.length === 0 &&
+                groupedOwedToMeList.length === 0 &&
+                mutualZeroOffsets.length === 0 &&
+                visibleSplits.length > 0 && (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            triggerHaptic('light');
+                            setActiveTab('splits');
+                        }}
+                        className="w-full px-3.5 py-2.5 rounded-2xl bg-status-settled-bg/45 border border-primary/25 hover:border-primary/45 shadow-2xs flex items-center justify-between gap-2.5 active:scale-[0.99] transition-colors cursor-pointer group"
+                    >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
+                                <span className="material-symbols-outlined text-[18px]">done_all</span>
+                            </div>
+                            <div className="text-left min-w-0">
+                                <span className="text-xs font-bold text-on-surface block truncate">
+                                    All Splits Settled
+                                </span>
+                                <span className="text-[11px] text-on-surface-variant block truncate">
+                                    {visibleSplits.length}{' '}
+                                    {visibleSplits.length === 1 ? 'split' : 'splits'} saved in split history
+                                </span>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-1 text-[11px] font-bold text-primary shrink-0">
+                            <span>View History</span>
+                            <span className="material-symbols-outlined text-[16px] group-hover:translate-x-0.5 transition-transform">
+                                arrow_forward
+                            </span>
+                        </div>
+                    </button>
+                )}
 
             {/* Recent Expenses List for Active Person */}
             <div className="space-y-3">
@@ -1329,6 +1594,13 @@ export function Dashboard() {
                 data={collectSettlement}
             />
 
+            {/* Batch Multi-Debtor Named QR WhatsApp Share Modal */}
+            <GroupCollectQrModal
+                isOpen={!!groupCollectData}
+                onClose={() => setGroupCollectData(null)}
+                data={groupCollectData}
+            />
+
             {/* Dedicated Month-wise Spend History Breakdown Modal */}
             <SpendHistoryModal
                 isOpen={showSpendHistory}
@@ -1336,6 +1608,19 @@ export function Dashboard() {
                 initialPerson={activePerson}
                 claimedPerson={claimedPerson}
             />
+
+            {/* Lazy Camera / Screenshot QR Scanner */}
+            {showQrScanner && (
+                <Suspense fallback={null}>
+                    <QrScannerModal
+                        isOpen={showQrScanner}
+                        onClose={() => setShowQrScanner(false)}
+                        onScanUpi={handleScannedCreditorQr}
+                        title="Scan Creditor's UPI QR"
+                        subtitle="Matches pending dues or copies UPI ID"
+                    />
+                </Suspense>
+            )}
         </div>
     );
 }

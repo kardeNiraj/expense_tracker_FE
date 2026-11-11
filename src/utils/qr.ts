@@ -561,7 +561,7 @@ export class QRCode {
 }
 
 /**
- * Returns a SVG path string representing the QR modules.
+ * Returns a 2D boolean matrix representing the QR modules.
  */
 export function generateQRMatrix(text: string): boolean[][] {
     const qr = new QRCode(0, QRErrorCorrectLevel.M);
@@ -577,4 +577,424 @@ export function generateQRMatrix(text: string): boolean[][] {
         matrix.push(row);
     }
     return matrix;
+}
+
+export interface BuildUpiPaymentUriOptions {
+    upiId?: string | null;
+    payeeName?: string;
+    amount?: number;
+    note?: string;
+    includeAmount?: boolean;
+}
+
+/**
+ * Builds a clean, NPCI-compatible `upi://pay?...` URI for QR rendering.
+ */
+export function buildUpiPaymentUri({
+    upiId,
+    payeeName,
+    amount,
+    note,
+    includeAmount = true,
+}: BuildUpiPaymentUriOptions): string {
+    const cleanUpi = (upiId || '').trim();
+    if (!cleanUpi) return '';
+
+    const cleanName = (payeeName || 'Payee')
+        .replace(/[^\x20-\x7E]/g, ' ')
+        .trim()
+        .slice(0, 40) || 'Payee';
+
+    const cleanNote = (note || 'SplitNest Payment')
+        .replace(/[^\x20-\x7E]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 30);
+
+    const params: string[] = [
+        `pa=${encodeURIComponent(cleanUpi)}`,
+        `pn=${encodeURIComponent(cleanName)}`,
+    ];
+
+    if (includeAmount && typeof amount === 'number' && Number.isFinite(amount) && amount > 0) {
+        const rounded = Math.round(amount * 100) / 100;
+        params.push(`am=${encodeURIComponent(String(rounded))}`);
+    }
+
+    params.push('cu=INR');
+
+    if (cleanNote) {
+        params.push(`tn=${encodeURIComponent(cleanNote)}`);
+    }
+
+    return `upi://pay?${params.join('&')}`;
+}
+
+export interface ParsedUpiQr {
+    raw: string;
+    upiId: string;
+    payeeName?: string;
+    amount?: number;
+    note?: string;
+    currency?: string;
+}
+
+const VPA_REGEX = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+$/;
+
+/**
+ * Parses a scanned UPI QR payload (`upi://pay?...`) or bare UPI VPA (`user@bank`).
+ * Returns null if the scanned text does not contain a valid UPI address.
+ */
+export function parseUpiQrPayload(rawText: string): ParsedUpiQr | null {
+    const trimmed = rawText.trim();
+    if (!trimmed) return null;
+
+    const lower = trimmed.toLowerCase();
+    if (lower.startsWith('upi://') || lower.includes('pa=')) {
+        const queryIdx = trimmed.indexOf('?');
+        const queryStr = queryIdx >= 0 ? trimmed.slice(queryIdx + 1) : trimmed;
+        try {
+            const params = new URLSearchParams(queryStr);
+            const pa = (params.get('pa') || '').trim();
+            if (!pa || !VPA_REGEX.test(pa)) {
+                return null;
+            }
+            const pn = params.get('pn')?.trim() || undefined;
+            const amRaw = params.get('am')?.trim();
+            const amNum = amRaw ? Number(amRaw) : NaN;
+            const amount = Number.isFinite(amNum) && amNum > 0 ? Math.round(amNum * 100) / 100 : undefined;
+            const note = params.get('tn')?.trim() || params.get('tr')?.trim() || undefined;
+            const currency = params.get('cu')?.trim() || undefined;
+
+            return {
+                raw: trimmed,
+                upiId: pa,
+                payeeName: pn,
+                amount,
+                note,
+                currency,
+            };
+        } catch {
+            return null;
+        }
+    }
+
+    if (VPA_REGEX.test(trimmed)) {
+        return {
+            raw: buildUpiPaymentUri({ upiId: trimmed }),
+            upiId: trimmed,
+        };
+    }
+
+    return null;
+}
+
+export interface RenderUpiQrCardOptions {
+    value: string;
+    title: string;
+    subtitle?: string;
+    amountLabel?: string;
+    upiId?: string;
+    payerLabel?: string;
+}
+
+function drawRoundedRectPath(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    radius: number
+): void {
+    const r = Math.min(radius, width / 2, height / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + width, y, x + width, y + height, r);
+    ctx.arcTo(x + width, y + height, x, y + height, r);
+    ctx.arcTo(x, y + height, x, y, r);
+    ctx.arcTo(x, y, x + width, y, r);
+    ctx.closePath();
+}
+
+/**
+ * Renders a shareable high-contrast PNG payment QR card via Canvas.
+ * Keeping generous white quiet zone around modules ensures reliable
+ * "Scan from Gallery" detection in Google Pay, PhonePe, Paytm, and BHIM.
+ */
+export async function renderUpiQrCardToPngBlob({
+    value,
+    title,
+    subtitle,
+    amountLabel,
+    upiId,
+    payerLabel,
+}: RenderUpiQrCardOptions): Promise<Blob> {
+    if (!value) {
+        throw new Error('QR value is required');
+    }
+
+    const matrix = generateQRMatrix(value);
+    const moduleCount = matrix.length;
+
+    const width = 640;
+    const height = 780;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+        throw new Error('Canvas 2D context unavailable');
+    }
+
+    // Crisp white canvas background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+
+    // Subtle header accent bar
+    ctx.fillStyle = '#065f46';
+    ctx.fillRect(0, 0, width, 14);
+
+    // Header label
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#065f46';
+    ctx.font = 'bold 18px system-ui, -apple-system, sans-serif';
+    ctx.fillText('SPLITNEST UPI PAY', width / 2, 46);
+
+    const cleanPayerLabel = payerLabel?.trim();
+    let cursorY = 92;
+
+    if (cleanPayerLabel) {
+        const pillText = cleanPayerLabel.slice(0, 30).toUpperCase();
+        ctx.font = 'bold 20px system-ui, -apple-system, sans-serif';
+        const pillWidth = Math.min(width - 80, Math.max(220, ctx.measureText(pillText).width + 52));
+        const pillX = (width - pillWidth) / 2;
+        const pillY = 60;
+        const pillHeight = 38;
+
+        drawRoundedRectPath(ctx, pillX, pillY, pillWidth, pillHeight, 19);
+        ctx.fillStyle = '#ecfdf5';
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = '#6ee7b7';
+        ctx.stroke();
+
+        ctx.fillStyle = '#065f46';
+        ctx.fillText(pillText, width / 2, pillY + 26, pillWidth - 24);
+
+        cursorY = 136;
+    }
+
+    // Payee / Title
+    ctx.fillStyle = '#0f172a';
+    ctx.font = cleanPayerLabel
+        ? 'bold 27px system-ui, -apple-system, sans-serif'
+        : 'bold 30px system-ui, -apple-system, sans-serif';
+    ctx.fillText(title.slice(0, 34), width / 2, cursorY, width - 64);
+
+    // Optional amount & QR box vertical positioning
+    let qrTopY = cleanPayerLabel ? 158 : 118;
+    if (amountLabel) {
+        ctx.fillStyle = '#047857';
+        ctx.font = 'bold 34px ui-monospace, SFMono-Regular, monospace';
+        ctx.fillText(amountLabel, width / 2, cursorY + 42, width - 64);
+        qrTopY = cursorY + 62;
+    } else if (subtitle) {
+        ctx.fillStyle = '#475569';
+        ctx.font = '500 20px system-ui, -apple-system, sans-serif';
+        ctx.fillText(subtitle.slice(0, 44), width / 2, cursorY + 38, width - 64);
+        qrTopY = cursorY + 58;
+    }
+
+    // Generous white quiet-zone box around QR code
+    const qrBoxSize = 412;
+    const qrBoxX = (width - qrBoxSize) / 2;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(qrBoxX, qrTopY, qrBoxSize, qrBoxSize);
+
+    const quietModules = 4;
+    const totalModules = moduleCount + quietModules * 2;
+    const cellSize = Math.floor(qrBoxSize / totalModules);
+    const renderedQrSize = cellSize * moduleCount;
+    const originX = Math.floor((width - renderedQrSize) / 2);
+    const originY = Math.floor(qrTopY + (qrBoxSize - renderedQrSize) / 2);
+
+    ctx.fillStyle = '#0b1c30';
+    for (let r = 0; r < moduleCount; r++) {
+        for (let c = 0; c < moduleCount; c++) {
+            if (matrix[r][c]) {
+                ctx.fillRect(
+                    originX + c * cellSize,
+                    originY + r * cellSize,
+                    cellSize,
+                    cellSize
+                );
+            }
+        }
+    }
+
+    // UPI ID, split subtitle & scan instruction footer
+    let footerCursorY = qrTopY + qrBoxSize + 30;
+    if (upiId) {
+        ctx.fillStyle = '#1e293b';
+        ctx.font = '600 21px ui-monospace, SFMono-Regular, monospace';
+        ctx.fillText(upiId, width / 2, footerCursorY, width - 64);
+        footerCursorY += 32;
+    }
+
+    if (subtitle && amountLabel) {
+        ctx.fillStyle = '#475569';
+        ctx.font = '500 18px system-ui, -apple-system, sans-serif';
+        ctx.fillText(subtitle.slice(0, 48), width / 2, footerCursorY, width - 64);
+        footerCursorY += 30;
+    }
+
+    ctx.fillStyle = '#64748b';
+    ctx.font = '500 16px system-ui, -apple-system, sans-serif';
+    ctx.fillText(
+        'Save QR & scan in PhonePe, GPay, Paytm, or BHIM',
+        width / 2,
+        Math.min(height - 20, footerCursorY),
+        width - 64
+    );
+
+    return new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((blob) => {
+            if (blob) {
+                resolve(blob);
+            } else {
+                reject(new Error('Failed to export QR card as PNG'));
+            }
+        }, 'image/png');
+    });
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            if (typeof reader.result === 'string') {
+                resolve(reader.result);
+            } else {
+                reject(new Error('Failed to encode QR image'));
+            }
+        };
+        reader.onerror = () => reject(reader.error || new Error('Failed to read QR blob'));
+        reader.readAsDataURL(blob);
+    });
+}
+
+export interface QrCardShareItem {
+    blob: Blob;
+    fileName: string;
+}
+
+/**
+ * Triggers browser PNG downloads for one or more QR cards cleanly.
+ */
+export async function downloadQrCards(items: QrCardShareItem[]): Promise<void> {
+    for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const dataUrl = await blobToDataUrl(item.blob);
+        const anchor = document.createElement('a');
+        anchor.href = dataUrl;
+        anchor.download = item.fileName;
+        anchor.rel = 'noopener noreferrer';
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+
+        if (i < items.length - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 140));
+        }
+    }
+}
+
+/**
+ * Shares one or multiple prepared QR card `File` objects synchronously on click
+ * (preserving WebKit/Safari transient user activation), with multi-file download fallback.
+ */
+export async function shareQrCardFiles({
+    files,
+    title,
+    text,
+    fallbackItems,
+}: {
+    files: File[];
+    title: string;
+    text?: string;
+    fallbackItems?: QrCardShareItem[];
+}): Promise<'shared' | 'shared_files_only' | 'downloaded' | 'cancelled'> {
+    if (files.length === 0) {
+        return 'cancelled';
+    }
+
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+        const candidates: { data: ShareData; result: 'shared' | 'shared_files_only' }[] = [
+            {
+                data: {
+                    files,
+                    title,
+                    ...(text ? { text } : {}),
+                },
+                result: 'shared',
+            },
+            {
+                data: {
+                    files,
+                    title,
+                },
+                result: text ? 'shared_files_only' : 'shared',
+            },
+            {
+                data: {
+                    files,
+                },
+                result: text ? 'shared_files_only' : 'shared',
+            },
+        ];
+
+        for (const candidate of candidates) {
+            const canShare =
+                typeof navigator.canShare === 'function'
+                    ? navigator.canShare(candidate.data)
+                    : true;
+            if (!canShare) continue;
+
+            try {
+                await navigator.share(candidate.data);
+                return candidate.result;
+            } catch (err) {
+                if (err instanceof DOMException && err.name === 'AbortError') {
+                    return 'cancelled';
+                }
+                // Try simpler payload shape or download fallback on Web Share rejection
+            }
+        }
+    }
+
+    await downloadQrCards(
+        fallbackItems || files.map((file) => ({ blob: file, fileName: file.name }))
+    );
+    return 'downloaded';
+}
+
+/**
+ * Shares the PNG QR card via Web Share API (best on iOS/Android to send/save to Photos/UPI apps),
+ * falling back to direct PNG file download on browsers without file-share support.
+ */
+export async function shareOrDownloadQrCard(
+    blob: Blob,
+    fileName: string,
+    title: string,
+    text?: string
+): Promise<'shared' | 'downloaded' | 'cancelled'> {
+    const file = new File([blob], fileName, { type: 'image/png' });
+    const outcome = await shareQrCardFiles({
+        files: [file],
+        title,
+        text,
+        fallbackItems: [{ blob, fileName }],
+    });
+    return outcome === 'shared_files_only' ? 'shared' : outcome;
 }

@@ -5,9 +5,26 @@
 
 const rawBaseUrl = (import.meta.env.VITE_API_BASE_URL || 'https://localhost:8081').trim().replace(/\/+$/, '');
 
+function isLocalHostUrl(url: string): boolean {
+    try {
+        const parsed = new URL(url);
+        return ['localhost', '127.0.0.1', '::1', '[::1]'].includes(parsed.hostname);
+    } catch {
+        return false;
+    }
+}
+
+const useDevProxy =
+    import.meta.env.DEV &&
+    import.meta.env.VITE_DISABLE_DEV_PROXY !== 'true' &&
+    /^https?:\/\//i.test(rawBaseUrl) &&
+    !isLocalHostUrl(rawBaseUrl);
+
+const resolvedBaseUrl: string = useDevProxy ? '/__splitnest_api' : rawBaseUrl;
+
 export const ENV = {
     // API Configuration
-    API_BASE_URL: rawBaseUrl,
+    API_BASE_URL: resolvedBaseUrl,
     API_TIMEOUT_MS: Math.max(1000, Number(import.meta.env.VITE_API_TIMEOUT_MS) || 30000),
 
     // App Branding Defaults

@@ -4,6 +4,14 @@ import {
     enqueueOfflineMutation,
     processOfflineQueue,
 } from '../utils/offlineQueue';
+import {
+    applySplitAddToCaches,
+    applySplitRemoveToCaches,
+    applySplitTransformToCaches,
+    findCachedSplitById,
+    withSettlementStatus,
+    withUpdatedSplitFields,
+} from '../utils/splitCacheHelpers';
 import type {
     AddExpensePayload,
     AddSplitPayload,
@@ -13,7 +21,22 @@ import type {
     UpdateSplitPayload,
     Split,
     SpendingsData,
+    ExpenseRecord,
 } from './types';
+
+function createClientId(prefix: string): string {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return `${prefix}_${crypto.randomUUID()}`;
+    }
+    return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+}
+
+// Per-invocation WeakMaps avoid module-global race conditions across rapid mutations
+const preparedExpenseMap = new WeakMap<AddExpensePayload, AddExpensePayload>();
+const preparedSplitMap = new WeakMap<AddSplitPayload, AddSplitPayload>();
+const previousUpiMap = new WeakMap<UpdateUpiPayload, string | undefined>();
+const previousDeletedSplitMap = new WeakMap<object, Split | undefined>();
+const previousUpdatedSplitMap = new WeakMap<UpdateSplitPayload, Split | undefined>();
 
 function createOptimisticSplit(payload: AddSplitPayload): Split {
     let settlements: {
@@ -48,9 +71,7 @@ function createOptimisticSplit(payload: AddSplitPayload): Split {
             }));
     }
 
-    const splitId =
-        payload.splitId ||
-        `split_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const splitId = payload.splitId || createClientId('split');
 
     return {
         splitId,
@@ -63,7 +84,7 @@ function createOptimisticSplit(payload: AddSplitPayload): Split {
         contributions: payload.contributions || [],
         settlements,
         status: 'ACTIVE',
-        timestamp: new Date().toISOString(),
+        timestamp: payload.timestamp || new Date().toISOString(),
     };
 }
 
@@ -73,11 +94,16 @@ export function useAddExpenseMutation() {
 
     return useMutation({
         networkMode: 'always',
-        mutationFn: async (payload: AddExpensePayload) => {
-            // Write-Ahead Queue: Always serialize to local queue first
+        mutationFn: async (variables: AddExpensePayload) => {
+            const payload = preparedExpenseMap.get(variables) || {
+                ...variables,
+                expenseId: variables.expenseId || createClientId('exp'),
+                timestamp: variables.timestamp || new Date().toISOString(),
+            };
+            preparedExpenseMap.delete(variables);
+
             enqueueOfflineMutation('ADD_EXPENSE', payload);
 
-            // Trigger background processing with auto-retry
             setTimeout(() => {
                 processOfflineQueue(queryClient).catch((err) => {
                     console.warn('[Queue] Background sync error for ADD_EXPENSE:', err);
@@ -87,32 +113,58 @@ export function useAddExpenseMutation() {
             return { message: 'Saved and queued for sync', status: 'queued', offline: true };
         },
         onMutate: async (newExpense) => {
-            await queryClient.cancelQueries({ queryKey: ['spendings'] });
+            const prepared: AddExpensePayload = {
+                ...newExpense,
+                expenseId: newExpense.expenseId || createClientId('exp'),
+                timestamp: newExpense.timestamp || new Date().toISOString(),
+            };
+            preparedExpenseMap.set(newExpense, prepared);
 
-            const spendingsKey = queryKeys.spendings(newExpense.payee);
+            const spendingsKey = queryKeys.spendings(prepared.payee);
             const prevSpendings = queryClient.getQueryData<SpendingsData>(spendingsKey);
 
+            await queryClient.cancelQueries({ queryKey: ['spendings'] });
+
             if (prevSpendings) {
+                const newRecord: ExpenseRecord = {
+                    category: prepared.category,
+                    amount: prepared.amount,
+                    description: prepared.description,
+                    timestamp: prepared.timestamp,
+                    isSplitRow: false,
+                };
                 queryClient.setQueryData<SpendingsData>(spendingsKey, {
                     ...prevSpendings,
-                    today: prevSpendings.today + newExpense.amount,
-                    currentMonth: prevSpendings.currentMonth + newExpense.amount,
-                    total: prevSpendings.total + newExpense.amount,
+                    today: prevSpendings.today + prepared.amount,
+                    currentMonth: prevSpendings.currentMonth + prepared.amount,
+                    total: prevSpendings.total + prepared.amount,
+                    ...(typeof prevSpendings.directToday === 'number'
+                        ? { directToday: prevSpendings.directToday + prepared.amount }
+                        : {}),
+                    ...(typeof prevSpendings.directCurrentMonth === 'number'
+                        ? { directCurrentMonth: prevSpendings.directCurrentMonth + prepared.amount }
+                        : {}),
+                    ...(typeof prevSpendings.directTotal === 'number'
+                        ? { directTotal: prevSpendings.directTotal + prepared.amount }
+                        : {}),
+                    ...(typeof prevSpendings.directExpensesCount === 'number'
+                        ? { directExpensesCount: prevSpendings.directExpensesCount + 1 }
+                        : {}),
                     todayExpensesCount: prevSpendings.todayExpensesCount + 1,
                     totalExpensesCount: prevSpendings.totalExpensesCount + 1,
-                    recentExpenses: [
-                        {
-                            category: newExpense.category,
-                            amount: newExpense.amount,
-                            description: newExpense.description,
-                            timestamp: new Date().toISOString(),
-                        },
-                        ...prevSpendings.recentExpenses,
-                    ],
+                    recentExpenses: [newRecord, ...(prevSpendings.recentExpenses || [])],
+                    ...(prevSpendings.allExpenses
+                        ? { allExpenses: [newRecord, ...prevSpendings.allExpenses] }
+                        : {}),
                 });
             }
 
             return { prevSpendings, spendingsKey };
+        },
+        onError: (_err, _vars, context) => {
+            if (context?.spendingsKey && context.prevSpendings !== undefined) {
+                queryClient.setQueryData(context.spendingsKey, context.prevSpendings);
+            }
         },
         onSuccess: () => {
             // Optimistic state is safely rendered and stored in IndexedDB.
@@ -127,15 +179,16 @@ export function useAddSplitMutation() {
 
     return useMutation({
         networkMode: 'always',
-        mutationFn: async (payload: AddSplitPayload) => {
-            if (!payload.splitId) {
-                payload.splitId = `split_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-            }
+        mutationFn: async (variables: AddSplitPayload) => {
+            const payload = preparedSplitMap.get(variables) || {
+                ...variables,
+                splitId: variables.splitId || createClientId('split'),
+                timestamp: variables.timestamp || new Date().toISOString(),
+            };
+            preparedSplitMap.delete(variables);
 
-            // Write-Ahead Queue: Always serialize to local queue first
             enqueueOfflineMutation('ADD_SPLIT', payload);
 
-            // Trigger background processing with auto-retry
             setTimeout(() => {
                 processOfflineQueue(queryClient).catch((err) => {
                     console.warn('[Queue] Background sync error for ADD_SPLIT:', err);
@@ -145,48 +198,64 @@ export function useAddSplitMutation() {
             return { ...createOptimisticSplit(payload), offline: true };
         },
         onMutate: async (newSplitPayload) => {
-            if (!newSplitPayload.splitId) {
-                newSplitPayload.splitId = `split_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-            }
+            const prepared: AddSplitPayload = {
+                ...newSplitPayload,
+                splitId: newSplitPayload.splitId || createClientId('split'),
+                timestamp: newSplitPayload.timestamp || new Date().toISOString(),
+            };
+            preparedSplitMap.set(newSplitPayload, prepared);
+
+            const previousSplits = queryClient.getQueriesData<Split[]>({ queryKey: ['splits'] });
+            const spendingsKey = queryKeys.spendings(prepared.paidBy);
+            const prevSpendings = prepared.recordExpense
+                ? queryClient.getQueryData<SpendingsData>(spendingsKey)
+                : undefined;
 
             await queryClient.cancelQueries({ queryKey: ['splits'] });
             await queryClient.cancelQueries({ queryKey: ['spendings'] });
 
-            const optimisticSplit = createOptimisticSplit(newSplitPayload);
+            const optimisticSplit = createOptimisticSplit(prepared);
 
-            // Optimistically update all matching splits queries
-            queryClient.setQueriesData<Split[]>({ queryKey: ['splits'] }, (old) => {
-                if (!old) return [optimisticSplit];
-                return [optimisticSplit, ...old];
-            });
+            // Optimistically update all matching splits queries (respecting status/person filters)
+            applySplitAddToCaches(queryClient, optimisticSplit);
 
             // Optimistically update spendings if recordExpense is true
-            if (newSplitPayload.recordExpense) {
-                const spendingsKey = queryKeys.spendings(newSplitPayload.paidBy);
-                const prevSpendings = queryClient.getQueryData<SpendingsData>(spendingsKey);
-
-                if (prevSpendings) {
-                    queryClient.setQueryData<SpendingsData>(spendingsKey, {
-                        ...prevSpendings,
-                        today: prevSpendings.today + newSplitPayload.amount,
-                        currentMonth: prevSpendings.currentMonth + newSplitPayload.amount,
-                        total: prevSpendings.total + newSplitPayload.amount,
-                        todayExpensesCount: prevSpendings.todayExpensesCount + 1,
-                        totalExpensesCount: prevSpendings.totalExpensesCount + 1,
-                        recentExpenses: [
-                            {
-                                category: newSplitPayload.category,
-                                amount: newSplitPayload.amount,
-                                description: newSplitPayload.description,
-                                timestamp: new Date().toISOString(),
-                            },
-                            ...prevSpendings.recentExpenses,
-                        ],
-                    });
-                }
+            if (prepared.recordExpense && prevSpendings) {
+                const splitRecord: ExpenseRecord = {
+                    category: prepared.category,
+                    amount: prepared.amount,
+                    description: `${prepared.description} (Split: ${optimisticSplit.splitId})`,
+                    timestamp: prepared.timestamp,
+                    isSplitRow: true,
+                };
+                queryClient.setQueryData<SpendingsData>(spendingsKey, {
+                    ...prevSpendings,
+                    today: prevSpendings.today + prepared.amount,
+                    currentMonth: prevSpendings.currentMonth + prepared.amount,
+                    total: prevSpendings.total + prepared.amount,
+                    ...(typeof prevSpendings.splitRecordedTotal === 'number'
+                        ? { splitRecordedTotal: prevSpendings.splitRecordedTotal + prepared.amount }
+                        : {}),
+                    todayExpensesCount: prevSpendings.todayExpensesCount + 1,
+                    totalExpensesCount: prevSpendings.totalExpensesCount + 1,
+                    recentExpenses: [splitRecord, ...(prevSpendings.recentExpenses || [])],
+                    ...(prevSpendings.allExpenses
+                        ? { allExpenses: [splitRecord, ...prevSpendings.allExpenses] }
+                        : {}),
+                });
             }
 
-            return { optimisticSplit };
+            return { optimisticSplit, previousSplits, prevSpendings, spendingsKey };
+        },
+        onError: (_err, _vars, context) => {
+            if (context?.previousSplits) {
+                for (const [key, data] of context.previousSplits) {
+                    queryClient.setQueryData(key, data);
+                }
+            }
+            if (context?.spendingsKey && context.prevSpendings !== undefined) {
+                queryClient.setQueryData(context.spendingsKey, context.prevSpendings);
+            }
         },
         onSuccess: () => {
             // Optimistic state is safely rendered and stored in IndexedDB.
@@ -214,20 +283,30 @@ export function useAddContributionMutation() {
             return { splitId, offline: true } as Split & { offline?: boolean };
         },
         onMutate: async (newContribution) => {
+            const detailKey = queryKeys.splitDetails(newContribution.splitId);
+            const previousSplits = queryClient.getQueriesData<Split[]>({ queryKey: ['splits'] });
+            const previousSplitDetail = queryClient.getQueryData<Split>(detailKey);
             await queryClient.cancelQueries({ queryKey: ['splits'] });
-            queryClient.setQueriesData<Split[]>({ queryKey: ['splits'] }, (old) => {
-                if (!old) return old;
-                return old.map((s) => {
-                    if (s.splitId !== newContribution.splitId) return s;
-                    return {
-                        ...s,
-                        contributions: [
-                            ...(s.contributions || []),
-                            { person: newContribution.person, amount: newContribution.amount },
-                        ],
-                    };
-                });
-            });
+            await queryClient.cancelQueries({ queryKey: detailKey });
+
+            applySplitTransformToCaches(queryClient, newContribution.splitId, (s) => ({
+                ...s,
+                contributions: [
+                    ...(s.contributions || []),
+                    { person: newContribution.person, amount: newContribution.amount },
+                ],
+            }));
+            return { previousSplits, detailKey, previousSplitDetail };
+        },
+        onError: (_err, _vars, context) => {
+            if (context?.previousSplits) {
+                for (const [key, data] of context.previousSplits) {
+                    queryClient.setQueryData(key, data);
+                }
+            }
+            if (context?.detailKey && context.previousSplitDetail !== undefined) {
+                queryClient.setQueryData(context.detailKey, context.previousSplitDetail);
+            }
         },
         onSuccess: () => {
             // Handled when processOfflineQueue invalidates queries
@@ -253,33 +332,27 @@ export function useSettleParticipantMutation() {
             return { splitId: payload.splitId, offline: true } as Split & { offline?: boolean };
         },
         onMutate: async (variables) => {
+            const detailKey = queryKeys.splitDetails(variables.splitId);
+            const previousSplits = queryClient.getQueriesData<Split[]>({ queryKey: ['splits'] });
+            const previousSplitDetail = queryClient.getQueryData<Split>(detailKey);
             await queryClient.cancelQueries({ queryKey: ['splits'] });
+            await queryClient.cancelQueries({ queryKey: detailKey });
 
-            // Optimistically update splits in cache
-            queryClient.setQueriesData<Split[]>({ queryKey: ['splits'] }, (old) => {
-                if (!old) return old;
-                return old.map((s) => {
-                    if (s.splitId !== variables.splitId) return s;
-
-                    const updatedSettlements = s.settlements.map((settle) => {
-                        const match =
-                            settle.from.trim().toLowerCase() === variables.from.trim().toLowerCase() &&
-                            (!variables.to || settle.to.trim().toLowerCase() === variables.to.trim().toLowerCase());
-                        if (match) {
-                            return { ...settle, status: 'SETTLED' as const };
-                        }
-                        return settle;
-                    });
-
-                    const allSettled = updatedSettlements.every((st) => st.status === 'SETTLED');
-
-                    return {
-                        ...s,
-                        settlements: updatedSettlements,
-                        status: allSettled ? ('SETTLED' as const) : s.status,
-                    };
-                });
-            });
+            // Optimistically update splits and detail caches cleanly across status filters
+            applySplitTransformToCaches(queryClient, variables.splitId, (s) =>
+                withSettlementStatus(s, variables.from, variables.to, variables.settled !== false)
+            );
+            return { previousSplits, detailKey, previousSplitDetail };
+        },
+        onError: (_err, _vars, context) => {
+            if (context?.previousSplits) {
+                for (const [key, data] of context.previousSplits) {
+                    queryClient.setQueryData(key, data);
+                }
+            }
+            if (context?.detailKey && context.previousSplitDetail !== undefined) {
+                queryClient.setQueryData(context.detailKey, context.previousSplitDetail);
+            }
         },
         onSuccess: () => {
             // Handled when processOfflineQueue invalidates queries
@@ -288,15 +361,17 @@ export function useSettleParticipantMutation() {
 }
 
 // 5. UPDATE UPI MUTATION WITH WRITE-AHEAD QUEUE
-let lastPreviousUpiId: string | undefined;
-
 export function useUpdateUpiMutation() {
     const queryClient = useQueryClient();
 
     return useMutation({
         networkMode: 'always',
-        mutationFn: async ({ name, upiId, requestedBy }: UpdateUpiPayload) => {
-            const payload = { name, upiId, requestedBy, previousUpiId: lastPreviousUpiId };
+        mutationFn: async (variables: UpdateUpiPayload) => {
+            const { name, upiId, requestedBy } = variables;
+            const previousUpiId = previousUpiMap.get(variables);
+            previousUpiMap.delete(variables);
+
+            const payload = { name, upiId, requestedBy, previousUpiId };
             enqueueOfflineMutation('UPDATE_UPI', payload);
 
             setTimeout(() => {
@@ -307,15 +382,19 @@ export function useUpdateUpiMutation() {
 
             return { message: 'UPI saved locally and queued for sync', status: 'queued', offline: true };
         },
-        onMutate: async ({ name, upiId }) => {
-            await queryClient.cancelQueries({ queryKey: queryKeys.peopleDetails() });
+        onMutate: async (variables) => {
+            const { name, upiId } = variables;
+            const peopleKey = queryKeys.peopleDetails();
+            const prevPeople = queryClient.getQueryData<{ name: string; upiId?: string | null }[]>(peopleKey);
+            const prevPerson = prevPeople?.find(
+                (p) => p.name.trim().toLowerCase() === name.trim().toLowerCase()
+            );
+            previousUpiMap.set(variables, prevPerson?.upiId ?? undefined);
 
-            const people = queryClient.getQueryData<{ name: string; upiId?: string }[]>(queryKeys.peopleDetails());
-            const prevPerson = people?.find((p) => p.name.trim().toLowerCase() === name.trim().toLowerCase());
-            lastPreviousUpiId = prevPerson?.upiId;
+            await queryClient.cancelQueries({ queryKey: peopleKey });
 
-            queryClient.setQueriesData<{ name: string; upiId?: string }[]>(
-                { queryKey: queryKeys.peopleDetails() },
+            queryClient.setQueriesData<{ name: string; upiId?: string | null }[]>(
+                { queryKey: peopleKey },
                 (old) => {
                     if (!old) return old;
                     return old.map((p) => {
@@ -326,6 +405,13 @@ export function useUpdateUpiMutation() {
                     });
                 }
             );
+
+            return { prevPeople, peopleKey };
+        },
+        onError: (_err, _vars, context) => {
+            if (context?.peopleKey && context.prevPeople !== undefined) {
+                queryClient.setQueryData(context.peopleKey, context.prevPeople);
+            }
         },
         onSuccess: () => {
             // Handled when processOfflineQueue invalidates queries
@@ -334,15 +420,17 @@ export function useUpdateUpiMutation() {
 }
 
 // 6. DELETE SPLIT MUTATION WITH WRITE-AHEAD QUEUE
-let lastDeletedSplit: Split | undefined;
-
 export function useDeleteSplitMutation() {
     const queryClient = useQueryClient();
 
     return useMutation({
         networkMode: 'always',
-        mutationFn: async ({ splitId, requestedBy }: { splitId: string; requestedBy?: string }) => {
-            const payload = { splitId, requestedBy, previousSplit: lastDeletedSplit };
+        mutationFn: async (variables: { splitId: string; requestedBy?: string }) => {
+            const { splitId, requestedBy } = variables;
+            const previousSplit = previousDeletedSplitMap.get(variables);
+            previousDeletedSplitMap.delete(variables);
+
+            const payload = { splitId, requestedBy, previousSplit };
             enqueueOfflineMutation('DELETE_SPLIT', payload);
 
             setTimeout(() => {
@@ -353,25 +441,31 @@ export function useDeleteSplitMutation() {
 
             return { success: true, message: `Split ${splitId} deleted locally`, offline: true };
         },
-        onMutate: async ({ splitId }) => {
-            await queryClient.cancelQueries({ queryKey: ['splits'] });
+        onMutate: async (variables) => {
+            const { splitId } = variables;
+            const detailKey = queryKeys.splitDetails(splitId);
+            const previousSplits = queryClient.getQueriesData<Split[]>({ queryKey: ['splits'] });
+            const previousSplitDetail = queryClient.getQueryData<Split>(detailKey);
+            const previousSplit = findCachedSplitById(queryClient, splitId);
+            previousDeletedSplitMap.set(variables, previousSplit);
 
-            const splitsQueries = queryClient.getQueriesData<Split[]>({ queryKey: ['splits'] });
-            let previousSplit: Split | undefined;
-            for (const [, splits] of splitsQueries) {
-                const found = splits?.find((s) => s.splitId === splitId);
-                if (found) {
-                    previousSplit = found;
-                    break;
+            await queryClient.cancelQueries({ queryKey: ['splits'] });
+            await queryClient.cancelQueries({ queryKey: detailKey });
+
+            // Optimistically remove deleted split from all splits caches & detail cache
+            applySplitRemoveToCaches(queryClient, splitId);
+
+            return { previousSplits, detailKey, previousSplitDetail };
+        },
+        onError: (_err, _vars, context) => {
+            if (context?.previousSplits) {
+                for (const [key, data] of context.previousSplits) {
+                    queryClient.setQueryData(key, data);
                 }
             }
-            lastDeletedSplit = previousSplit;
-
-            // Optimistically filter out deleted split from cache
-            queryClient.setQueriesData<Split[]>({ queryKey: ['splits'] }, (old) => {
-                if (!old) return old;
-                return old.filter((s) => s.splitId !== splitId);
-            });
+            if (context?.detailKey && context.previousSplitDetail !== undefined) {
+                queryClient.setQueryData(context.detailKey, context.previousSplitDetail);
+            }
         },
         onSuccess: () => {
             // Handled when processOfflineQueue invalidates queries
@@ -380,15 +474,16 @@ export function useDeleteSplitMutation() {
 }
 
 // 7. UPDATE SPLIT MUTATION WITH WRITE-AHEAD QUEUE
-let lastUpdatedSplit: Split | undefined;
-
 export function useUpdateSplitMutation() {
     const queryClient = useQueryClient();
 
     return useMutation({
         networkMode: 'always',
-        mutationFn: async (payload: UpdateSplitPayload) => {
-            enqueueOfflineMutation('UPDATE_SPLIT', { ...payload, previousSplit: lastUpdatedSplit });
+        mutationFn: async (variables: UpdateSplitPayload) => {
+            const previousSplit = previousUpdatedSplitMap.get(variables);
+            previousUpdatedSplitMap.delete(variables);
+
+            enqueueOfflineMutation('UPDATE_SPLIT', { ...variables, previousSplit });
 
             setTimeout(() => {
                 processOfflineQueue(queryClient).catch((err) => {
@@ -396,40 +491,37 @@ export function useUpdateSplitMutation() {
                 });
             }, 50);
 
-            return { success: true, data: payload as unknown as Split, offline: true };
+            return { success: true, data: variables as unknown as Split, offline: true };
         },
         onMutate: async (payload) => {
-            await queryClient.cancelQueries({ queryKey: ['splits'] });
+            const detailKey = queryKeys.splitDetails(payload.splitId);
+            const previousSplits = queryClient.getQueriesData<Split[]>({ queryKey: ['splits'] });
+            const previousSplitDetail = queryClient.getQueryData<Split>(detailKey);
+            const previousSplit = findCachedSplitById(queryClient, payload.splitId);
+            previousUpdatedSplitMap.set(payload, previousSplit);
 
-            const splitsQueries = queryClient.getQueriesData<Split[]>({ queryKey: ['splits'] });
-            let previousSplit: Split | undefined;
-            for (const [, splits] of splitsQueries) {
-                const found = splits?.find((s) => s.splitId === payload.splitId);
-                if (found) {
-                    previousSplit = found;
-                    break;
+            await queryClient.cancelQueries({ queryKey: ['splits'] });
+            await queryClient.cancelQueries({ queryKey: detailKey });
+
+            // Optimistically update split across list and detail caches
+            applySplitTransformToCaches(queryClient, payload.splitId, (s) =>
+                withUpdatedSplitFields(s, payload)
+            );
+
+            return { previousSplits, detailKey, previousSplitDetail };
+        },
+        onError: (_err, _vars, context) => {
+            if (context?.previousSplits) {
+                for (const [key, data] of context.previousSplits) {
+                    queryClient.setQueryData(key, data);
                 }
             }
-            lastUpdatedSplit = previousSplit;
-
-            // Optimistically update split in cache
-            queryClient.setQueriesData<Split[]>({ queryKey: ['splits'] }, (old) => {
-                if (!old) return old;
-                return old.map((s) => {
-                    if (s.splitId !== payload.splitId) return s;
-                    return {
-                        ...s,
-                        description: payload.description ?? s.description,
-                        category: payload.category ?? s.category,
-                        totalAmount: payload.amount ?? s.totalAmount,
-                        participants: payload.participants ?? s.participants,
-                    };
-                });
-            });
+            if (context?.detailKey && context.previousSplitDetail !== undefined) {
+                queryClient.setQueryData(context.detailKey, context.previousSplitDetail);
+            }
         },
         onSuccess: () => {
             // Handled when processOfflineQueue invalidates queries
         },
     });
 }
-

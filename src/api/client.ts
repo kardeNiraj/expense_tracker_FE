@@ -187,7 +187,6 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
             err instanceof TypeError &&
             !options.signal?.aborted
         ) {
-            isRequestCompressionSupported = false;
             const retryController = new AbortController();
             const retryTimeoutId = setTimeout(() => retryController.abort(), ENV.API_TIMEOUT_MS);
             try {
@@ -198,6 +197,9 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
                     signal: options.signal || retryController.signal,
                 });
                 clearTimeout(retryTimeoutId);
+                // Only latch compression off once an uncompressed request proves the server is reachable
+                // and only the compressed preflight/body failed (never during genuine offline TypeErrors).
+                isRequestCompressionSupported = false;
                 if (!retryResponse.ok) {
                     throw await parseErrorResponse(retryResponse);
                 }
@@ -221,25 +223,34 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
         ) {
             const fallbackBaseUrl = activeBaseUrl.replace(/^https:/, 'http:');
             const fallbackUrl = `${fallbackBaseUrl}${cleanEndpoint}`;
+            const fallbackController = new AbortController();
+            const fallbackTimeoutId = setTimeout(() => fallbackController.abort(), ENV.API_TIMEOUT_MS);
 
-            const fallbackResponse = await fetch(fallbackUrl, {
-                ...options,
-                body: options.body,
-                headers: defaultHeaders,
-            });
+            try {
+                const fallbackResponse = await fetch(fallbackUrl, {
+                    ...options,
+                    body: options.body,
+                    headers: defaultHeaders,
+                    signal: options.signal || fallbackController.signal,
+                });
+                clearTimeout(fallbackTimeoutId);
 
-            if (!fallbackResponse.ok) {
-                throw await parseErrorResponse(fallbackResponse);
+                if (!fallbackResponse.ok) {
+                    throw await parseErrorResponse(fallbackResponse);
+                }
+
+                // Persist the HTTP fallback only for localhost dev servers
+                activeBaseUrl = fallbackBaseUrl;
+
+                const json: ApiResponse<T> | T = await fallbackResponse.json();
+                if (json && typeof json === 'object' && 'data' in json) {
+                    return (json as ApiResponse<T>).data;
+                }
+                return json as T;
+            } catch (fallbackErr) {
+                clearTimeout(fallbackTimeoutId);
+                throw fallbackErr;
             }
-
-            // Persist the HTTP fallback only for localhost dev servers
-            activeBaseUrl = fallbackBaseUrl;
-
-            const json: ApiResponse<T> | T = await fallbackResponse.json();
-            if (json && typeof json === 'object' && 'data' in json) {
-                return (json as ApiResponse<T>).data;
-            }
-            return json as T;
         }
 
         throw err;

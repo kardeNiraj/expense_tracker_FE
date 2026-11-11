@@ -7,7 +7,18 @@ export { default as BottomNav } from './Navigation/BottomNav.tsx';
 export { default as Toast } from './Toast/Toast.tsx';
 export { default as InstallPrompt } from './InstallPrompt/InstallPrompt.tsx';
 export { default as PaymentModal, type PaymentSettlementData, type PaymentModalProps } from './PaymentModal/PaymentModal.tsx';
-export { CollectQrModal, type CollectQrModalData, type CollectQrModalProps } from './PaymentModal/CollectQrModal.tsx';
+export {
+    CollectQrModal,
+    type CollectQrModalData,
+    type CollectQrModalProps,
+    type CollectQrSettlementRef,
+} from './PaymentModal/CollectQrModal.tsx';
+export {
+    GroupCollectQrModal,
+    type GroupCollectQrModalData,
+    type GroupCollectQrModalProps,
+    type GroupCollectDebtorItem,
+} from './PaymentModal/GroupCollectQrModal.tsx';
 export { EditSplitModal, type EditSplitModalProps } from './EditSplitModal/EditSplitModal.tsx';
 export { default as QRCode, type QRCodeProps } from './QRCode/QRCode.tsx';
 export { default as PullToRefresh, type PullToRefreshProps } from './PullToRefresh/PullToRefresh.tsx';

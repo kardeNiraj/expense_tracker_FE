@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useCallback, useSyncExternalStore } from 'react';
+import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
     getOfflineQueue,
     getGroupedOfflineQueue,
@@ -16,37 +16,143 @@ import {
 import { useExpense } from '../context';
 import { triggerHaptic } from './haptics';
 
-export function useOfflineSync() {
-    const queryClient = useQueryClient();
-    const { showToast } = useExpense();
+interface OfflineSyncSnapshot {
+    isOnline: boolean;
+    queue: QueuedItem[];
+    groups: QueuedGroup[];
+    hasBackoff: boolean;
+    isSyncing: boolean;
+}
 
-    const [isOnline, setIsOnline] = useState<boolean>(() =>
-        typeof navigator !== 'undefined' ? navigator.onLine : true
-    );
-    const [queue, setQueue] = useState<QueuedItem[]>(() => getOfflineQueue());
-    const [groups, setGroups] = useState<QueuedGroup[]>(() => getGroupedOfflineQueue());
-    const [isSyncing, setIsSyncing] = useState<boolean>(false);
+type ShowToastFn = (message: string, icon?: string) => void;
 
-    const pendingCount = queue.length;
+const storeListeners = new Set<() => void>();
+
+let latestQueryClient: QueryClient | null = null;
+let latestShowToast: ShowToastFn | null = null;
+
+let queueUnsubscribe: (() => void) | null = null;
+let onlineSyncTimer: ReturnType<typeof setTimeout> | null = null;
+let mountSyncTimer: ReturnType<typeof setTimeout> | null = null;
+let backoffInterval: ReturnType<typeof setInterval> | null = null;
+let listenersAttached = false;
+let syncInFlightPromise: Promise<SyncResult | null> | null = null;
+
+function createSnapshot(
+    isOnline: boolean,
+    isSyncing: boolean,
+    now = Date.now()
+): OfflineSyncSnapshot {
+    const queue = getOfflineQueue();
+    const groups = getGroupedOfflineQueue(now);
     const hasBackoff = groups.some((g) => g.isInBackoff);
+    return {
+        isOnline,
+        queue,
+        groups,
+        hasBackoff,
+        isSyncing,
+    };
+}
 
-    // Sync queue to backend
-    const syncNow = useCallback(async (): Promise<SyncResult | null> => {
-        if (isSyncing || typeof navigator === 'undefined' || !navigator.onLine) {
-            return null;
-        }
+let currentSnapshot: OfflineSyncSnapshot = createSnapshot(
+    typeof navigator !== 'undefined' ? navigator.onLine : true,
+    false
+);
 
-        const count = getOfflineQueue().length;
-        if (count === 0) return null;
+const SERVER_SNAPSHOT: OfflineSyncSnapshot = {
+    isOnline: true,
+    queue: [],
+    groups: [],
+    hasBackoff: false,
+    isSyncing: false,
+};
 
-        setIsSyncing(true);
-        triggerHaptic('light');
+function emitChange(): void {
+    storeListeners.forEach((listener) => listener());
+}
 
+function updateSnapshot(next: OfflineSyncSnapshot): void {
+    currentSnapshot = next;
+    emitChange();
+}
+
+function syncBackoffTicker(): void {
+    const now = Date.now();
+    const needsTicker = currentSnapshot.queue.some(
+        (it) => Boolean(it.nextRetryAt && it.nextRetryAt > now)
+    );
+
+    if (needsTicker && !backoffInterval) {
+        backoffInterval = setInterval(() => {
+            const tickNow = Date.now();
+            const freshQueue = getOfflineQueue();
+            const freshGroups = getGroupedOfflineQueue(tickNow);
+            const stillHasFutureBackoff = freshQueue.some(
+                (it) => Boolean(it.nextRetryAt && it.nextRetryAt > tickNow)
+            );
+            updateSnapshot({
+                isOnline: currentSnapshot.isOnline,
+                isSyncing: currentSnapshot.isSyncing,
+                queue: freshQueue,
+                groups: freshGroups,
+                hasBackoff: freshGroups.some((g) => g.isInBackoff),
+            });
+            if (!stillHasFutureBackoff && backoffInterval) {
+                clearInterval(backoffInterval);
+                backoffInterval = null;
+            }
+        }, 1000);
+    } else if (!needsTicker && backoffInterval) {
+        clearInterval(backoffInterval);
+        backoffInterval = null;
+    }
+}
+
+function refreshQueueSnapshot(): void {
+    const now = Date.now();
+    const freshQueue = getOfflineQueue();
+    const freshGroups = getGroupedOfflineQueue(now);
+    updateSnapshot({
+        isOnline: typeof navigator !== 'undefined' ? navigator.onLine : currentSnapshot.isOnline,
+        isSyncing: currentSnapshot.isSyncing,
+        queue: freshQueue,
+        groups: freshGroups,
+        hasBackoff: freshGroups.some((g) => g.isInBackoff),
+    });
+    syncBackoffTicker();
+}
+
+async function runSyncNow(
+    queryClientArg?: QueryClient,
+    showToastArg?: ShowToastFn
+): Promise<SyncResult | null> {
+    if (typeof navigator === 'undefined' || !navigator.onLine) {
+        return null;
+    }
+
+    if (syncInFlightPromise) {
+        return syncInFlightPromise;
+    }
+
+    const count = getOfflineQueue().length;
+    if (count === 0) return null;
+
+    const qc = queryClientArg || latestQueryClient || undefined;
+    const toast = showToastArg || latestShowToast;
+
+    updateSnapshot({
+        ...currentSnapshot,
+        isSyncing: true,
+    });
+    triggerHaptic('light');
+
+    syncInFlightPromise = (async () => {
         try {
-            const result = await processOfflineQueue(queryClient);
+            const result = await processOfflineQueue(qc);
             if (result.processed > 0) {
                 triggerHaptic('success');
-                showToast(
+                toast?.(
                     `Synced ${result.processed} pending ${result.processed === 1 ? 'record' : 'records'} to cloud!`,
                     'cloud_done'
                 );
@@ -56,38 +162,189 @@ export function useOfflineSync() {
             console.error('Offline sync failed', err);
             return null;
         } finally {
-            setIsSyncing(false);
+            syncInFlightPromise = null;
+            const now = Date.now();
             const freshQueue = getOfflineQueue();
-            setQueue(freshQueue);
-            setGroups(getGroupedOfflineQueue());
+            const freshGroups = getGroupedOfflineQueue(now);
+            updateSnapshot({
+                isOnline: typeof navigator !== 'undefined' ? navigator.onLine : currentSnapshot.isOnline,
+                isSyncing: false,
+                queue: freshQueue,
+                groups: freshGroups,
+                hasBackoff: freshGroups.some((g) => g.isInBackoff),
+            });
+            syncBackoffTicker();
         }
-    }, [isSyncing, queryClient, showToast]);
+    })();
+
+    return syncInFlightPromise;
+}
+
+const handleOnline = () => {
+    updateSnapshot({
+        ...currentSnapshot,
+        isOnline: true,
+    });
+    triggerHaptic('medium');
+    latestShowToast?.('Back online! Syncing pending records...', 'wifi');
+    if (onlineSyncTimer) {
+        clearTimeout(onlineSyncTimer);
+    }
+    // Give network 500ms to establish socket/TLS before sending requests
+    onlineSyncTimer = setTimeout(() => {
+        onlineSyncTimer = null;
+        void runSyncNow();
+    }, 500);
+};
+
+const handleOffline = () => {
+    if (onlineSyncTimer) {
+        clearTimeout(onlineSyncTimer);
+        onlineSyncTimer = null;
+    }
+    updateSnapshot({
+        ...currentSnapshot,
+        isOnline: false,
+    });
+    triggerHaptic('warning');
+    latestShowToast?.('You are offline. Transactions will save locally.', 'cloud_off');
+};
+
+const handleVisibilityChange = () => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'visible' && navigator.onLine) {
+        void runSyncNow();
+    }
+};
+
+function startStoreListeners(): void {
+    if (listenersAttached || typeof window === 'undefined') return;
+    listenersAttached = true;
+
+    currentSnapshot = createSnapshot(
+        typeof navigator !== 'undefined' ? navigator.onLine : true,
+        Boolean(syncInFlightPromise)
+    );
+    syncBackoffTicker();
+
+    queueUnsubscribe = subscribeToOfflineQueue(() => {
+        refreshQueueSnapshot();
+    });
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+
+    if (typeof navigator !== 'undefined' && navigator.onLine && getOfflineQueue().length > 0) {
+        mountSyncTimer = setTimeout(() => {
+            mountSyncTimer = null;
+            void runSyncNow();
+        }, 150);
+    }
+}
+
+function stopStoreListeners(): void {
+    if (!listenersAttached) return;
+    listenersAttached = false;
+
+    if (onlineSyncTimer) {
+        clearTimeout(onlineSyncTimer);
+        onlineSyncTimer = null;
+    }
+    if (mountSyncTimer) {
+        clearTimeout(mountSyncTimer);
+        mountSyncTimer = null;
+    }
+    if (backoffInterval) {
+        clearInterval(backoffInterval);
+        backoffInterval = null;
+    }
+    if (queueUnsubscribe) {
+        queueUnsubscribe();
+        queueUnsubscribe = null;
+    }
+    if (typeof window !== 'undefined') {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+    }
+    if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
+}
+
+function subscribeStore(listener: () => void): () => void {
+    storeListeners.add(listener);
+    if (storeListeners.size === 1) {
+        startStoreListeners();
+    }
+    return () => {
+        storeListeners.delete(listener);
+        if (storeListeners.size === 0) {
+            stopStoreListeners();
+        }
+    };
+}
+
+function getStoreSnapshot(): OfflineSyncSnapshot {
+    return currentSnapshot;
+}
+
+function getServerSnapshot(): OfflineSyncSnapshot {
+    return SERVER_SNAPSHOT;
+}
+
+export function useOfflineSync() {
+    const queryClient = useQueryClient();
+    const { showToast } = useExpense();
+
+    useEffect(() => {
+        latestQueryClient = queryClient;
+        latestShowToast = showToast;
+    }, [queryClient, showToast]);
+
+    const snapshot = useSyncExternalStore(
+        subscribeStore,
+        getStoreSnapshot,
+        getServerSnapshot
+    );
+
+    const syncNow = useCallback((): Promise<SyncResult | null> => {
+        return runSyncNow(queryClient, showToast);
+    }, [queryClient, showToast]);
 
     const retryGroup = useCallback(
         async (groupId: string): Promise<SyncResult | null> => {
-            if (isSyncing || typeof navigator === 'undefined' || !navigator.onLine) {
+            if (syncInFlightPromise || typeof navigator === 'undefined' || !navigator.onLine) {
                 return null;
             }
-            setIsSyncing(true);
+            updateSnapshot({ ...currentSnapshot, isSyncing: true });
             triggerHaptic('medium');
             try {
                 const result = await retryGroupAction(groupId, queryClient);
                 return result;
             } finally {
-                setIsSyncing(false);
-                setQueue(getOfflineQueue());
-                setGroups(getGroupedOfflineQueue());
+                const now = Date.now();
+                const freshQueue = getOfflineQueue();
+                const freshGroups = getGroupedOfflineQueue(now);
+                updateSnapshot({
+                    isOnline: currentSnapshot.isOnline,
+                    isSyncing: false,
+                    queue: freshQueue,
+                    groups: freshGroups,
+                    hasBackoff: freshGroups.some((g) => g.isInBackoff),
+                });
+                syncBackoffTicker();
             }
         },
-        [isSyncing, queryClient]
+        [queryClient]
     );
 
     const discardGroup = useCallback(
         (groupId: string) => {
             triggerHaptic('warning');
             discardGroupAction(groupId, queryClient);
-            setQueue(getOfflineQueue());
-            setGroups(getGroupedOfflineQueue());
+            refreshQueueSnapshot();
             if (typeof navigator !== 'undefined' && navigator.onLine) {
                 queryClient.invalidateQueries();
             }
@@ -100,8 +357,7 @@ export function useOfflineSync() {
         (itemId: string) => {
             triggerHaptic('warning');
             discardMutationAction(itemId, queryClient);
-            setQueue(getOfflineQueue());
-            setGroups(getGroupedOfflineQueue());
+            refreshQueueSnapshot();
             if (typeof navigator !== 'undefined' && navigator.onLine) {
                 queryClient.invalidateQueries();
             }
@@ -113,88 +369,20 @@ export function useOfflineSync() {
     const clearQueue = useCallback(() => {
         triggerHaptic('warning');
         clearOfflineQueue(queryClient);
-        setQueue([]);
-        setGroups([]);
+        refreshQueueSnapshot();
         if (typeof navigator !== 'undefined' && navigator.onLine) {
             queryClient.invalidateQueries();
         }
         showToast('All pending operations cleared', 'delete');
     }, [queryClient, showToast]);
 
-    // Listen to queue changes and online/offline status
-    useEffect(() => {
-        const unsubscribe = subscribeToOfflineQueue((updatedQueue) => {
-            setQueue(updatedQueue);
-            setGroups(getGroupedOfflineQueue());
-        });
-
-        const handleOnline = () => {
-            setIsOnline(true);
-            triggerHaptic('medium');
-            showToast('Back online! Syncing pending records...', 'wifi');
-            // Give network 500ms to establish socket/TLS before sending requests
-            setTimeout(() => {
-                syncNow();
-            }, 500);
-        };
-
-        const handleOffline = () => {
-            setIsOnline(false);
-            triggerHaptic('warning');
-            showToast('You are offline. Transactions will save locally.', 'cloud_off');
-        };
-
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'visible' && navigator.onLine) {
-                syncNow();
-            }
-        };
-
-        window.addEventListener('online', handleOnline);
-        window.addEventListener('offline', handleOffline);
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-
-        // Proactively process pending offline queue on app mount if device is online
-        if (typeof navigator !== 'undefined' && navigator.onLine && getOfflineQueue().length > 0) {
-            setTimeout(() => {
-                syncNow();
-            }, 800);
-        }
-
-        // Periodic tick every 1 second when items are in backoff to refresh countdowns
-        const backoffInterval = setInterval(() => {
-            const currentQueue = getOfflineQueue();
-            const now = Date.now();
-            if (currentQueue.some((it) => it.nextRetryAt && it.nextRetryAt > now)) {
-                setGroups(getGroupedOfflineQueue(now));
-            }
-        }, 1000);
-
-        // Initial check on mount if items are waiting and online
-        let mountTimer: ReturnType<typeof setTimeout> | undefined;
-        if (typeof navigator !== 'undefined' && navigator.onLine && getOfflineQueue().length > 0) {
-            mountTimer = setTimeout(() => {
-                syncNow();
-            }, 100);
-        }
-
-        return () => {
-            if (mountTimer) clearTimeout(mountTimer);
-            clearInterval(backoffInterval);
-            unsubscribe();
-            window.removeEventListener('online', handleOnline);
-            window.removeEventListener('offline', handleOffline);
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-        };
-    }, [syncNow, showToast]);
-
     return {
-        isOnline,
-        pendingCount,
-        queue,
-        groups,
-        hasBackoff,
-        isSyncing,
+        isOnline: snapshot.isOnline,
+        pendingCount: snapshot.queue.length,
+        queue: snapshot.queue,
+        groups: snapshot.groups,
+        hasBackoff: snapshot.hasBackoff,
+        isSyncing: snapshot.isSyncing,
         syncNow,
         retryGroup,
         discardGroup,

@@ -6,6 +6,9 @@ const DEVICE_IDB_RECORD_KEY = 'primary';
 let cachedMemoryDeviceId: string | null = null;
 let activeAdminToken: string | null = null;
 let activeAdminTokenExpiresAt = 0;
+let identityDbPromise: Promise<IDBDatabase | null> | null = null;
+let inFlightSyncPromise: Promise<string> | null = null;
+let hasSyncedPersistentId = false;
 
 function generateUuid(): string {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -20,22 +23,25 @@ function openIdentityDb(): Promise<IDBDatabase | null> {
     if (typeof window === 'undefined' || !('indexedDB' in window)) {
         return Promise.resolve(null);
     }
-    return new Promise((resolve) => {
-        try {
-            const req = indexedDB.open(DEVICE_IDB_NAME, 1);
-            req.onupgradeneeded = (event) => {
-                const db = (event.target as IDBOpenDBRequest).result;
-                if (!db.objectStoreNames.contains(DEVICE_IDB_STORE)) {
-                    db.createObjectStore(DEVICE_IDB_STORE, { keyPath: 'key' });
-                }
-            };
-            req.onsuccess = () => resolve(req.result);
-            req.onerror = () => resolve(null);
-            req.onblocked = () => resolve(null);
-        } catch {
-            resolve(null);
-        }
-    });
+    if (!identityDbPromise) {
+        identityDbPromise = new Promise((resolve) => {
+            try {
+                const req = indexedDB.open(DEVICE_IDB_NAME, 1);
+                req.onupgradeneeded = (event) => {
+                    const db = (event.target as IDBOpenDBRequest).result;
+                    if (!db.objectStoreNames.contains(DEVICE_IDB_STORE)) {
+                        db.createObjectStore(DEVICE_IDB_STORE, { keyPath: 'key' });
+                    }
+                };
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => resolve(null);
+                req.onblocked = () => resolve(null);
+            } catch {
+                resolve(null);
+            }
+        });
+    }
+    return identityDbPromise;
 }
 
 async function readDeviceIdFromIdb(): Promise<string | null> {
@@ -97,33 +103,48 @@ export function getDeviceIdSync(): string {
 /**
  * Reconciles device ID between localStorage and IndexedDB so clearing localStorage
  * alone doesn't silently create duplicate devices if IDB remains intact.
+ * Deduplicates concurrent calls via a shared in-flight promise.
  */
-export async function syncPersistentDeviceId(): Promise<string> {
-    let lsId: string | null = null;
-    try {
-        if (typeof window !== 'undefined' && window.localStorage) {
-            lsId = window.localStorage.getItem(DEVICE_ID_STORAGE_KEY)?.trim() || null;
+export function syncPersistentDeviceId(): Promise<string> {
+    if (hasSyncedPersistentId && cachedMemoryDeviceId) {
+        return Promise.resolve(cachedMemoryDeviceId);
+    }
+    if (inFlightSyncPromise) {
+        return inFlightSyncPromise;
+    }
+
+    inFlightSyncPromise = (async () => {
+        let lsId: string | null = null;
+        try {
+            if (typeof window !== 'undefined' && window.localStorage) {
+                lsId = window.localStorage.getItem(DEVICE_ID_STORAGE_KEY)?.trim() || null;
+            }
+        } catch {
+            lsId = null;
         }
-    } catch {
-        lsId = null;
-    }
 
-    const idbId = await readDeviceIdFromIdb();
-    const resolved = idbId || lsId || cachedMemoryDeviceId || generateUuid();
+        const idbId = await readDeviceIdFromIdb();
+        const resolved = idbId || lsId || cachedMemoryDeviceId || generateUuid();
 
-    cachedMemoryDeviceId = resolved;
-    try {
-        if (typeof window !== 'undefined' && window.localStorage && lsId !== resolved) {
-            window.localStorage.setItem(DEVICE_ID_STORAGE_KEY, resolved);
+        cachedMemoryDeviceId = resolved;
+        hasSyncedPersistentId = true;
+        try {
+            if (typeof window !== 'undefined' && window.localStorage && lsId !== resolved) {
+                window.localStorage.setItem(DEVICE_ID_STORAGE_KEY, resolved);
+            }
+        } catch {
+            // Ignore
         }
-    } catch {
-        // Ignore
-    }
-    if (idbId !== resolved) {
-        await writeDeviceIdToIdb(resolved);
-    }
+        if (idbId !== resolved) {
+            await writeDeviceIdToIdb(resolved);
+        }
 
-    return resolved;
+        return resolved;
+    })().finally(() => {
+        inFlightSyncPromise = null;
+    });
+
+    return inFlightSyncPromise;
 }
 
 /**

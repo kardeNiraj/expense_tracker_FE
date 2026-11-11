@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useExpense } from '../../context';
 import {
     ApiError,
@@ -17,17 +17,25 @@ import {
     type PaymentSettlementData,
     CollectQrModal,
     type CollectQrModalData,
+    GroupCollectQrModal,
+    type GroupCollectQrModalData,
     EditSplitModal,
 } from '../../components';
 import type { Split } from '../../api/types';
 import { triggerHaptic } from '../../utils/haptics';
 import { getCategoryMeta } from '../../utils/formatters';
+import {
+    computeGroupPairwiseNetBalances,
+    computePersonalPairwiseBalances,
+    type MutualZeroOffsetPair,
+} from '../../utils/pairwiseNetting';
 
 export function SplitsPage() {
     const { activePerson, focusedSplitId, setFocusedSplitId, showToast } = useExpense();
-    const [statusFilter, setStatusFilter] = useState<'ACTIVE' | 'SETTLED'>('ACTIVE');
+    const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'SETTLED'>('ALL');
     const [paymentSettlement, setPaymentSettlement] = useState<PaymentSettlementData | null>(null);
     const [collectSettlement, setCollectSettlement] = useState<CollectQrModalData | null>(null);
+    const [groupCollectData, setGroupCollectData] = useState<GroupCollectQrModalData | null>(null);
     const [selectedSplitForContribution, setSelectedSplitForContribution] = useState<Split | null>(null);
     const [splitToDelete, setSplitToDelete] = useState<Split | null>(null);
     const [splitToEdit, setSplitToEdit] = useState<Split | null>(null);
@@ -39,13 +47,38 @@ export function SplitsPage() {
     const lastScrolledSplitRef = useRef<string | null>(null);
 
     const { data: focusedSplitDetail } = useSplitDetails(focusedSplitId || undefined);
-    const effectiveStatusFilter: 'ACTIVE' | 'SETTLED' =
-        focusedSplitId &&
-        (focusedSplitDetail?.status === 'ACTIVE' || focusedSplitDetail?.status === 'SETTLED')
+    const focusedStatus =
+        focusedSplitDetail?.status === 'ACTIVE' || focusedSplitDetail?.status === 'SETTLED'
             ? focusedSplitDetail.status
+            : null;
+    const effectiveStatusFilter: 'ALL' | 'ACTIVE' | 'SETTLED' =
+        focusedSplitId &&
+        focusedStatus &&
+        statusFilter !== 'ALL' &&
+        statusFilter !== focusedStatus
+            ? focusedStatus
             : statusFilter;
 
-    const { data: splits = [], isLoading } = useSplits({ status: effectiveStatusFilter });
+    // Share canonical all-splits query across tabs so counts & settled history stay in sync
+    const { data: rawSplits = [], isLoading } = useSplits();
+
+    const visibleSplits = useMemo(
+        () => rawSplits.filter((s) => (s.status || 'ACTIVE').toUpperCase() !== 'DELETED'),
+        [rawSplits]
+    );
+    const activeSplits = useMemo(
+        () => visibleSplits.filter((s) => (s.status || 'ACTIVE').toUpperCase() !== 'SETTLED'),
+        [visibleSplits]
+    );
+    const settledSplits = useMemo(
+        () => visibleSplits.filter((s) => (s.status || 'ACTIVE').toUpperCase() === 'SETTLED'),
+        [visibleSplits]
+    );
+    const splits = useMemo(() => {
+        if (effectiveStatusFilter === 'ACTIVE') return activeSplits;
+        if (effectiveStatusFilter === 'SETTLED') return settledSplits;
+        return visibleSplits;
+    }, [effectiveStatusFilter, activeSplits, settledSplits, visibleSplits]);
     const { data: tripInfo } = useTripInfo();
     const { data: peopleDetails = [] } = usePeopleDetails();
     const settleMutation = useSettleParticipantMutation();
@@ -97,24 +130,53 @@ export function SplitsPage() {
         setExpandedSplits(next);
     };
 
-    const handleSettle = async (splitId: string, fromPerson: string, toPerson?: string) => {
-        let targetSplitId = splitId;
-        // If splitId was an offline temporary ID, resolve to real synced splitId if available
-        if (targetSplitId.startsWith('offline_')) {
-            const currentSplit = splits.find((s) => s.splitId === splitId);
-            if (currentSplit) {
-                const matchedServerSplit = splits.find(
-                    (s) =>
-                        !s.splitId.startsWith('offline_') &&
-                        s.description === currentSplit.description &&
-                        s.totalAmount === currentSplit.totalAmount &&
-                        s.paidBy.toLowerCase() === currentSplit.paidBy.toLowerCase()
-                );
-                if (matchedServerSplit) {
-                    targetSplitId = matchedServerSplit.splitId;
-                }
+    const resolveSplitId = (splitId: string): string => {
+        if (!splitId.startsWith('offline_')) return splitId;
+        const currentSplit = visibleSplits.find((s) => s.splitId === splitId);
+        if (currentSplit) {
+            const matchedServerSplit = visibleSplits.find(
+                (s) =>
+                    !s.splitId.startsWith('offline_') &&
+                    s.description === currentSplit.description &&
+                    s.totalAmount === currentSplit.totalAmount &&
+                    s.paidBy.toLowerCase() === currentSplit.paidBy.toLowerCase()
+            );
+            if (matchedServerSplit) {
+                return matchedServerSplit.splitId;
             }
         }
+        return splitId;
+    };
+
+    const handleClearMutualOffset = async (pair: MutualZeroOffsetPair) => {
+        const key = `offset_${pair.counterparty}`;
+        setSettlingKey(key);
+        try {
+            await Promise.all(
+                pair.allSplits.map((ref) =>
+                    settleMutation.mutateAsync({
+                        splitId: resolveSplitId(ref.splitId),
+                        from: ref.from,
+                        to: ref.to,
+                        confirmedBy: activePerson,
+                    })
+                )
+            );
+            triggerHaptic('success');
+            showToast(
+                `Cleared ${pair.allSplits.length} mutual offset splits with ${pair.counterparty}!`,
+                'check_circle'
+            );
+        } catch (err: unknown) {
+            triggerHaptic('warning');
+            showToast(`Failed to clear offset splits: ${String(err)}`, 'error');
+        } finally {
+            setSettlingKey(null);
+        }
+    };
+
+    const handleSettle = async (splitId: string, fromPerson: string, toPerson?: string) => {
+        const targetSplitId = resolveSplitId(splitId);
 
         const key = `${splitId}_${fromPerson}`;
         setSettlingKey(key);
@@ -149,9 +211,9 @@ export function SplitsPage() {
 
         let targetSplitId = splitId;
         if (targetSplitId.startsWith('offline_')) {
-            const currentSplit = splits.find((s) => s.splitId === splitId);
+            const currentSplit = visibleSplits.find((s) => s.splitId === splitId);
             if (currentSplit) {
-                const matchedServerSplit = splits.find(
+                const matchedServerSplit = visibleSplits.find(
                     (s) =>
                         !s.splitId.startsWith('offline_') &&
                         s.description === currentSplit.description &&
@@ -229,36 +291,41 @@ export function SplitsPage() {
 
     const handleShareGroupTripSummary = () => {
         triggerHaptic('medium');
-        const activeSplits = splits.filter((s) => s.status === 'ACTIVE');
-        const allPendingSettlements = activeSplits
-            .flatMap((s) => s.settlements || [])
-            .filter((st) => st.status === 'PENDING');
+        const { pairs, cancelledPairs, rawPendingCount } = computeGroupPairwiseNetBalances(
+            activeSplits,
+            peopleDetails
+        );
 
-        if (allPendingSettlements.length === 0) {
+        if (rawPendingCount === 0) {
             showToast('No pending dues to settle across the group!', 'check_circle');
             return;
         }
 
-        // Pairwise aggregation across all splits
-        const pairwiseNet: Record<string, { from: string; to: string; amount: number; toUpiId?: string | null }> = {};
-        allPendingSettlements.forEach((s) => {
-            const key = `${s.from}->${s.to}`;
-            if (!pairwiseNet[key]) {
-                const personDetail = peopleDetails.find((p) => p.name.toLowerCase() === s.to.toLowerCase());
-                const resolvedToUpiId = s.toUpiId || personDetail?.upiId || null;
-                pairwiseNet[key] = { from: s.from, to: s.to, amount: 0, toUpiId: resolvedToUpiId };
-            }
-            pairwiseNet[key].amount += s.amount;
-        });
+        if (pairs.length === 0) {
+            showToast('All pending dues cancel out to ₹0 pairwise!', 'check_circle');
+            return;
+        }
 
         const tripTitle = tripInfo?.title || 'Trip';
         const totalTripSpend = activeSplits.reduce((sum, s) => sum + s.totalAmount, 0);
 
-        const lines = Object.values(pairwiseNet).map(
-            (item) => `• *${item.from}* owes *₹${item.amount.toLocaleString('en-IN')}* to *${item.to}*${item.toUpiId ? ` (UPI: ${item.toUpiId})` : ''}`
+        const lines = pairs.map(
+            (item) =>
+                `• *${item.from}* owes *₹${item.amount.toLocaleString('en-IN')}* to *${item.to}*${
+                    item.hasMutualOffset
+                        ? ` (after ₹${item.offsetAmount.toLocaleString('en-IN')} offset)`
+                        : ''
+                }${item.toUpiId ? ` (UPI: ${item.toUpiId})` : ''}`
         );
 
-        const summaryText = `🏕️ *${tripTitle} - Group Settle-Up Summary* 🏕️\n\n📊 *Total Active Spend:* ₹${totalTripSpend.toLocaleString('en-IN')}\n\n*Pending Dues:*\n${lines.join('\n')}\n\n📲 *View & settle on SplitNest:* ${window.location.origin}`;
+        const cancelledNote =
+            cancelledPairs.length > 0
+                ? `\n\n🔄 *Cancelled to ₹0:* ${cancelledPairs
+                      .map((c) => `${c.personA} ↔ ${c.personB} (₹${c.offsetAmount.toLocaleString('en-IN')})`)
+                      .join(', ')}`
+                : '';
+
+        const summaryText = `🏕️ *${tripTitle} - Group Settle-Up Summary* 🏕️\n\n📊 *Total Active Spend:* ₹${totalTripSpend.toLocaleString('en-IN')}\n\n*Pending Dues:*\n${lines.join('\n')}${cancelledNote}\n\n📲 *View & settle on SplitNest:* ${window.location.origin}`;
 
         const waUrl = `https://wa.me/?text=${encodeURIComponent(summaryText)}`;
         window.open(waUrl, '_blank', 'noopener,noreferrer');
@@ -370,6 +437,23 @@ export function SplitsPage() {
         return null;
     };
 
+    const pairwiseBalances = computePersonalPairwiseBalances(
+        activeSplits,
+        activePerson,
+        peopleDetails
+    );
+
+    const activeReceivableDebtors = pairwiseBalances.receivables.map((item) => ({
+        debtorName: item.from,
+        amount: item.netAmount,
+        description: item.hasMutualOffset
+            ? `Net after ₹${item.offsetAmount.toLocaleString('en-IN')} offset (${item.allSplits.length} splits)`
+            : item.owedToMeSplits.length > 1
+              ? `${item.owedToMeSplits.length} splits (${item.owedToMeSplits.map((s) => s.description).join(', ')})`
+              : item.owedToMeSplits[0]?.description || 'Split due',
+        splitCount: item.allSplits.length,
+    }));
+
     return (
         <div className="flex flex-col w-full pb-12 space-y-4">
             {/* Page Header */}
@@ -384,56 +468,146 @@ export function SplitsPage() {
                 </div>
             </div>
 
-            {/* Filter Toggle: ACTIVE vs SETTLED */}
-            <div className="grid grid-cols-2 gap-2 bg-surface-container-low p-1 rounded-xl border border-outline-variant/30">
-                <button
-                    type="button"
-                    onClick={() => {
-                        setFocusedSplitId(null);
-                        setStatusFilter('ACTIVE');
-                    }}
-                    className={`h-9 rounded-lg text-xs font-bold transition-all cursor-pointer ${effectiveStatusFilter === 'ACTIVE'
-                            ? 'bg-surface-container-lowest text-primary shadow-xs'
-                            : 'text-on-surface-variant hover:text-on-surface'
-                        }`}
-                >
-                    Active Splits
-                </button>
-                <button
-                    type="button"
-                    onClick={() => {
-                        setFocusedSplitId(null);
-                        setStatusFilter('SETTLED');
-                    }}
-                    className={`h-9 rounded-lg text-xs font-bold transition-all cursor-pointer ${effectiveStatusFilter === 'SETTLED'
-                            ? 'bg-surface-container-lowest text-primary shadow-xs'
-                            : 'text-on-surface-variant hover:text-on-surface'
-                        }`}
-                >
-                    Settled Splits
-                </button>
+            {/* Filter Toggle: ALL vs ACTIVE vs SETTLED */}
+            <div className="grid grid-cols-3 gap-1.5 bg-surface-container-low p-1 rounded-xl border border-outline-variant/30">
+                {(
+                    [
+                        { id: 'ALL', label: 'All', count: visibleSplits.length },
+                        { id: 'ACTIVE', label: 'Active', count: activeSplits.length },
+                        { id: 'SETTLED', label: 'Settled', count: settledSplits.length },
+                    ] as const
+                ).map((tab) => {
+                    const isSelected = effectiveStatusFilter === tab.id;
+                    return (
+                        <button
+                            key={tab.id}
+                            type="button"
+                            onClick={() => {
+                                triggerHaptic('selection');
+                                setFocusedSplitId(null);
+                                setStatusFilter(tab.id);
+                            }}
+                            className={`h-9 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5 ${
+                                isSelected
+                                    ? 'bg-surface-container-lowest text-primary shadow-xs'
+                                    : 'text-on-surface-variant hover:text-on-surface'
+                            }`}
+                        >
+                            <span>{tab.label}</span>
+                            <span
+                                className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                                    isSelected
+                                        ? 'bg-primary/12 text-primary'
+                                        : 'bg-outline-variant/25 text-on-surface-variant'
+                                }`}
+                            >
+                                {tab.count}
+                            </span>
+                        </button>
+                    );
+                })}
             </div>
 
-            {/* 1-Tap Group WhatsApp Summary (Step 6) */}
-            {effectiveStatusFilter === 'ACTIVE' && splits.length > 0 && (
-                <button
-                    type="button"
-                    onClick={handleShareGroupTripSummary}
-                    className="w-full h-11 px-3.5 rounded-xl bg-surface-container-low border border-outline-variant/30 text-xs font-semibold text-on-surface flex items-center justify-between hover:bg-surface-container transition-all active:scale-[0.99] cursor-pointer shadow-xs"
-                >
-                    <div className="flex items-center gap-2 min-w-0">
-                        <span className="w-6 h-6 rounded-full bg-[#25D366]/15 flex items-center justify-center shrink-0">
-                            <span className="material-symbols-outlined text-[#25D366] text-[16px]">
+            {/* 1-Tap Group WhatsApp Summary & Multi-Debtor QR Share */}
+            {(effectiveStatusFilter === 'ALL' || effectiveStatusFilter === 'ACTIVE') && activeSplits.length > 0 && (
+                activeReceivableDebtors.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-2">
+                        <button
+                            type="button"
+                            onClick={handleShareGroupTripSummary}
+                            className="h-11 px-3 rounded-xl bg-surface-container-low border border-outline-variant/30 text-xs font-semibold text-on-surface flex items-center justify-center gap-1.5 hover:bg-surface-container transition-colors active:scale-[0.99] cursor-pointer shadow-xs"
+                        >
+                            <span className="material-symbols-outlined text-[#25D366] text-[17px] shrink-0">
                                 chat
                             </span>
-                        </span>
-                        <span className="truncate">Share Group Debt Summary to WhatsApp</span>
+                            <span className="truncate">Debt Summary</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                triggerHaptic('medium');
+                                setGroupCollectData({
+                                    title: 'Share Collect QRs to WhatsApp',
+                                    subtitle: tripInfo?.title
+                                        ? `${tripInfo.title} • Pay ${activePerson}`
+                                        : `Pay ${activePerson}`,
+                                    debtors: activeReceivableDebtors,
+                                });
+                            }}
+                            className="h-11 px-3 rounded-xl bg-[#25D366]/12 border border-[#25D366]/35 hover:border-[#25D366]/60 text-xs font-bold text-[#15803d] flex items-center justify-center gap-1.5 transition-colors active:scale-[0.99] cursor-pointer shadow-xs"
+                        >
+                            <span className="material-symbols-outlined text-[17px] shrink-0">
+                                qr_code_2
+                            </span>
+                            <span className="truncate">
+                                Share {activeReceivableDebtors.length}{' '}
+                                {activeReceivableDebtors.length === 1 ? 'Collect QR' : 'Collect QRs'}
+                            </span>
+                        </button>
                     </div>
-                    <div className="flex items-center gap-1 text-[11px] font-bold text-primary shrink-0">
-                        <span>Send</span>
-                        <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-                    </div>
-                </button>
+                ) : (
+                    <button
+                        type="button"
+                        onClick={handleShareGroupTripSummary}
+                        className="w-full h-11 px-3.5 rounded-xl bg-surface-container-low border border-outline-variant/30 text-xs font-semibold text-on-surface flex items-center justify-between hover:bg-surface-container transition-all active:scale-[0.99] cursor-pointer shadow-xs"
+                    >
+                        <div className="flex items-center gap-2 min-w-0">
+                            <span className="w-6 h-6 rounded-full bg-[#25D366]/15 flex items-center justify-center shrink-0">
+                                <span className="material-symbols-outlined text-[#25D366] text-[16px]">
+                                    chat
+                                </span>
+                            </span>
+                            <span className="truncate">Share Group Debt Summary to WhatsApp</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-[11px] font-bold text-primary shrink-0">
+                            <span>Send</span>
+                            <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                        </div>
+                    </button>
+                )
+            )}
+
+            {/* Zero-Net Cancelled Mutual Offset Banner */}
+            {(effectiveStatusFilter === 'ALL' || effectiveStatusFilter === 'ACTIVE') && pairwiseBalances.mutualZeroOffsets.length > 0 && (
+                <div className="space-y-2">
+                    {pairwiseBalances.mutualZeroOffsets.map((pair) => {
+                        const isClearing = settlingKey === `offset_${pair.counterparty}`;
+                        return (
+                            <div
+                                key={`splits-offset-${pair.counterparty}`}
+                                className="px-3.5 py-2.5 rounded-2xl bg-status-settled-bg/45 border border-primary/25 flex items-center justify-between gap-2.5 shadow-2xs"
+                            >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="w-8 h-8 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
+                                        <span className="material-symbols-outlined text-[18px]">
+                                            swap_horiz
+                                        </span>
+                                    </div>
+                                    <div className="min-w-0">
+                                        <span className="text-xs font-bold text-on-surface block truncate">
+                                            {activePerson} ↔ {pair.counterparty} • Net ₹0
+                                        </span>
+                                        <span className="text-[11px] text-on-surface-variant block truncate">
+                                            ₹{pair.offsetAmount.toLocaleString('en-IN')} cancelled across {pair.allSplits.length} mutual splits
+                                        </span>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    disabled={isClearing}
+                                    onClick={() => void handleClearMutualOffset(pair)}
+                                    className="h-8 px-2.5 rounded-xl bg-primary text-on-primary text-[11px] font-bold flex items-center gap-1 shadow-2xs hover:bg-primary/90 transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+                                    title={`Mark both directions (${pair.allSplits.length} splits) as settled`}
+                                >
+                                    <span className="material-symbols-outlined text-[14px]">
+                                        {isClearing ? 'hourglass_top' : 'done_all'}
+                                    </span>
+                                    <span>{isClearing ? 'Clearing...' : 'Clear Splits'}</span>
+                                </button>
+                            </div>
+                        );
+                    })}
+                </div>
             )}
 
             {/* Splits List */}
@@ -442,14 +616,67 @@ export function SplitsPage() {
                     Loading splits from server...
                 </div>
             ) : splits.length === 0 ? (
-                <div className="bg-surface-container-lowest p-8 rounded-2xl text-center text-xs text-on-surface-variant border border-outline-variant/30 space-y-2">
-                    <span className="material-symbols-outlined text-4xl text-outline-variant">
-                        receipt_long
+                <div className="bg-surface-container-lowest p-8 rounded-2xl text-center text-xs text-on-surface-variant border border-outline-variant/30 space-y-2.5">
+                    <span
+                        className={`material-symbols-outlined text-4xl ${
+                            effectiveStatusFilter === 'ACTIVE' && settledSplits.length > 0
+                                ? 'text-primary'
+                                : 'text-outline-variant'
+                        }`}
+                    >
+                        {effectiveStatusFilter === 'ACTIVE' && settledSplits.length > 0
+                            ? 'task_alt'
+                            : 'receipt_long'}
                     </span>
                     <p className="font-semibold text-sm text-on-surface">
-                        No {effectiveStatusFilter.toLowerCase()} splits found
+                        {effectiveStatusFilter === 'ACTIVE' && settledSplits.length > 0
+                            ? 'All splits are settled!'
+                            : effectiveStatusFilter === 'SETTLED'
+                              ? 'No settled splits yet'
+                              : 'No splits recorded yet'}
                     </p>
-                    <p>Create a new split anytime from the Add tab.</p>
+                    <p>
+                        {effectiveStatusFilter === 'ACTIVE' && settledSplits.length > 0
+                            ? `${settledSplits.length} completed ${settledSplits.length === 1 ? 'split is' : 'splits are'} saved in your split history.`
+                            : effectiveStatusFilter === 'SETTLED' && activeSplits.length > 0
+                              ? `${activeSplits.length} active ${activeSplits.length === 1 ? 'split is' : 'splits are'} still waiting to be settled.`
+                              : 'Create a new split anytime from the Add tab.'}
+                    </p>
+                    {effectiveStatusFilter === 'ACTIVE' && settledSplits.length > 0 && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                triggerHaptic('light');
+                                setFocusedSplitId(null);
+                                setStatusFilter('SETTLED');
+                            }}
+                            className="inline-flex items-center gap-1.5 h-9 px-4 rounded-xl bg-primary/10 hover:bg-primary/15 text-primary text-xs font-bold transition-colors cursor-pointer"
+                        >
+                            <span>
+                                View {settledSplits.length} Settled{' '}
+                                {settledSplits.length === 1 ? 'Split' : 'Splits'}
+                            </span>
+                            <span className="material-symbols-outlined text-[15px]">
+                                arrow_forward
+                            </span>
+                        </button>
+                    )}
+                    {effectiveStatusFilter === 'SETTLED' && activeSplits.length > 0 && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                triggerHaptic('light');
+                                setFocusedSplitId(null);
+                                setStatusFilter('ACTIVE');
+                            }}
+                            className="inline-flex items-center gap-1.5 h-9 px-4 rounded-xl bg-primary/10 hover:bg-primary/15 text-primary text-xs font-bold transition-colors cursor-pointer"
+                        >
+                            <span>View {activeSplits.length} Active Splits</span>
+                            <span className="material-symbols-outlined text-[15px]">
+                                arrow_forward
+                            </span>
+                        </button>
+                    )}
                 </div>
             ) : (
                 <div className="space-y-3">
@@ -480,6 +707,18 @@ export function SplitsPage() {
                             split.createdBy?.toLowerCase() === activePerson.toLowerCase() ||
                             split.paidBy?.toLowerCase() === activePerson.toLowerCase();
                         const catMeta = getCategoryMeta(split.category);
+                        const splitCreditorDebtors = (split.settlements || [])
+                            .filter(
+                                (st) =>
+                                    st.status === 'PENDING' &&
+                                    st.to.toLowerCase() === activePerson.toLowerCase()
+                            )
+                            .map((st) => ({
+                                debtorName: st.from,
+                                amount: Math.round(st.amount * 100) / 100,
+                                description: split.description,
+                                splitCount: 1,
+                            }));
 
                         return (
                             <div
@@ -740,6 +979,34 @@ export function SplitsPage() {
                                                                 </div>
                                                             )}
 
+                                                            {/* Pairwise Net Context Hint (when mutual offset applies) */}
+                                                            {isPending &&
+                                                                (isCreditor || isDebtor) &&
+                                                                (() => {
+                                                                    const otherKey = (isCreditor ? s.from : s.to)
+                                                                        .trim()
+                                                                        .toLowerCase();
+                                                                    const netMeta =
+                                                                        pairwiseBalances.counterpartyLookup[otherKey];
+                                                                    if (!netMeta || !netMeta.hasMutualOffset) {
+                                                                        return null;
+                                                                    }
+                                                                    const hintText =
+                                                                        netMeta.netSigned === 0
+                                                                            ? `Overall pairwise net with ${netMeta.counterparty}: ₹0 (₹${netMeta.offsetAmount.toLocaleString('en-IN')} offset)`
+                                                                            : netMeta.netSigned > 0
+                                                                              ? `Overall pairwise net: ${netMeta.counterparty} owes ₹${netMeta.netSigned.toLocaleString('en-IN')} (after ₹${netMeta.offsetAmount.toLocaleString('en-IN')} offset)`
+                                                                              : `Overall pairwise net: You owe ${netMeta.counterparty} ₹${Math.abs(netMeta.netSigned).toLocaleString('en-IN')} (after ₹${netMeta.offsetAmount.toLocaleString('en-IN')} offset)`;
+                                                                    return (
+                                                                        <div className="px-2 py-1 rounded-lg bg-primary/8 border border-primary/20 text-[11px] font-medium text-primary flex items-center gap-1.5">
+                                                                            <span className="material-symbols-outlined text-[14px] shrink-0">
+                                                                                swap_horiz
+                                                                            </span>
+                                                                            <span className="truncate">{hintText}</span>
+                                                                        </div>
+                                                                    );
+                                                                })()}
+
                                                             {/* Row 3: Action Buttons (Dedicated Line Below Details) */}
                                                             {isPending && (
                                                                 <>
@@ -768,7 +1035,9 @@ export function SplitsPage() {
                                                                                 type="button"
                                                                                 disabled={
                                                                                     remindingKey === `${split.splitId}_${s.from}` ||
-                                                                                    settlingKey === `${split.splitId}_${s.from}`
+                                                                                    settlingKey === `${split.splitId}_${s.from}` ||
+                                                                                    settlingKey === `offset_${s.from}` ||
+                                                                                    settlingKey === `offset_${s.to}`
                                                                                 }
                                                                                 onClick={() => void handleRemind(split.splitId, s.from, s.to)}
                                                                                 className="h-8.5 px-2.5 rounded-xl bg-status-awaiting-bg/85 hover:bg-status-awaiting-bg text-status-awaiting-text border border-status-awaiting-text/25 text-xs font-bold flex items-center justify-center gap-1 transition-colors disabled:opacity-50 cursor-pointer active:scale-[0.99] shrink-0 whitespace-nowrap"
@@ -788,7 +1057,11 @@ export function SplitsPage() {
                                                                             </button>
                                                                             <button
                                                                                 type="button"
-                                                                                disabled={settlingKey === `${split.splitId}_${s.from}`}
+                                                                                disabled={
+                                                                                    settlingKey === `${split.splitId}_${s.from}` ||
+                                                                                    settlingKey === `offset_${s.from}` ||
+                                                                                    settlingKey === `offset_${s.to}`
+                                                                                }
                                                                                 onClick={() => handleSettle(split.splitId, s.from, s.to)}
                                                                                 className="flex-1 h-8.5 px-2.5 rounded-xl bg-primary-fixed hover:bg-primary text-on-primary-fixed hover:text-on-primary text-xs font-bold transition-all flex items-center justify-center gap-1 shadow-2xs disabled:opacity-50 cursor-pointer active:scale-[0.99] whitespace-nowrap"
                                                                                 title={`Confirm you have received ₹${s.amount} from ${s.from}`}
@@ -802,41 +1075,36 @@ export function SplitsPage() {
                                                                         </div>
                                                                     )}
 
-                                                                    {/* Debtor: Pay via UPI or Waiting */}
+                                                                    {/* Debtor: Pay via QR / Scan Camera QR */}
                                                                     {isDebtor && (() => {
                                                                         const resolvedUpiId = s.toUpiId || peopleDetails.find((p) => p.name.toLowerCase() === s.to.toLowerCase())?.upiId;
+                                                                        const hasUpi = Boolean(s.upiIntent || resolvedUpiId);
                                                                         return (
                                                                             <div className="pt-2 border-t border-outline-variant/15 flex items-center gap-2">
-                                                                                {s.upiIntent || resolvedUpiId ? (
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={() =>
-                                                                                            setPaymentSettlement({
-                                                                                                to: s.to,
-                                                                                                from: s.from,
-                                                                                                amount: s.amount,
-                                                                                                toUpiId: resolvedUpiId,
-                                                                                                upiIntent: s.upiIntent,
-                                                                                                appLinks: s.appLinks,
-                                                                                                description: split.description,
-                                                                                                splitId: split.splitId,
-                                                                                            })
-                                                                                        }
-                                                                                        className="w-full h-8.5 px-3 rounded-xl bg-primary text-on-primary text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs hover:bg-primary/90 transition-all cursor-pointer active:scale-[0.99]"
-                                                                                    >
-                                                                                        <span className="material-symbols-outlined text-[16px]">
-                                                                                            bolt
-                                                                                        </span>
-                                                                                        <span>Pay ₹{s.amount.toLocaleString('en-IN')} via UPI</span>
-                                                                                    </button>
-                                                                                ) : (
-                                                                                    <div className="w-full flex items-center justify-center text-[11px] text-tertiary font-medium gap-1 py-0.5">
-                                                                                        <span className="material-symbols-outlined text-[13px]">
-                                                                                            hourglass_top
-                                                                                        </span>
-                                                                                        <span>Waiting for {s.to} to confirm or add UPI</span>
-                                                                                    </div>
-                                                                                )}
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() =>
+                                                                                        setPaymentSettlement({
+                                                                                            to: s.to,
+                                                                                            from: s.from,
+                                                                                            amount: s.amount,
+                                                                                            toUpiId: resolvedUpiId,
+                                                                                            upiIntent: s.upiIntent,
+                                                                                            description: split.description,
+                                                                                            splitId: split.splitId,
+                                                                                        })
+                                                                                    }
+                                                                                    className="w-full h-8.5 px-3 rounded-xl bg-primary text-on-primary text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs hover:bg-primary/90 transition-all cursor-pointer active:scale-[0.99]"
+                                                                                >
+                                                                                    <span className="material-symbols-outlined text-[16px]">
+                                                                                        {hasUpi ? 'qr_code_2' : 'qr_code_scanner'}
+                                                                                    </span>
+                                                                                    <span>
+                                                                                        {hasUpi
+                                                                                            ? `Pay ₹${s.amount.toLocaleString('en-IN')} via QR`
+                                                                                            : `Scan ${s.to}'s QR (₹${s.amount.toLocaleString('en-IN')})`}
+                                                                                    </span>
+                                                                                </button>
                                                                             </div>
                                                                         );
                                                                     })()}
@@ -855,34 +1123,61 @@ export function SplitsPage() {
                                             </div>
                                         </div>
 
-                                        {/* WhatsApp Group Summary Section */}
-                                        {split.notifications?.groupSummary && (
-                                            <div className="pt-2 flex items-center justify-between gap-2 border-t border-outline-variant/20">
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        handleShareWhatsapp(split.notifications?.groupSummary)
-                                                    }
-                                                    className="flex-1 h-9 rounded-xl bg-surface-container text-on-surface text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-surface-container-high transition-colors cursor-pointer border border-outline-variant/20"
-                                                >
-                                                    <span className="material-symbols-outlined text-[#25D366] text-[18px]">
-                                                        chat
-                                                    </span>
-                                                    <span>Share on WhatsApp</span>
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        handleCopyText(split.notifications?.groupSummary)
-                                                    }
-                                                    className="h-9 px-3 rounded-xl bg-surface-container-low text-on-surface-variant hover:text-on-surface text-xs font-semibold flex items-center gap-1 cursor-pointer border border-outline-variant/20"
-                                                    title="Copy Summary"
-                                                >
-                                                    <span className="material-symbols-outlined text-[16px]">
-                                                        content_copy
-                                                    </span>
-                                                    <span>Copy</span>
-                                                </button>
+                                        {/* Multi-Debtor Named QR Share + WhatsApp Group Summary */}
+                                        {(splitCreditorDebtors.length > 0 || split.notifications?.groupSummary) && (
+                                            <div className="pt-2 space-y-2 border-t border-outline-variant/20">
+                                                {splitCreditorDebtors.length > 0 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            triggerHaptic('medium');
+                                                            setGroupCollectData({
+                                                                title: `Share QRs — ${split.description}`,
+                                                                subtitle: `Split total ₹${split.totalAmount.toLocaleString('en-IN')}`,
+                                                                debtors: splitCreditorDebtors,
+                                                            });
+                                                        }}
+                                                        className="w-full h-9 px-3 rounded-xl bg-[#25D366]/12 border border-[#25D366]/35 hover:border-[#25D366]/60 text-[#15803d] text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                                                    >
+                                                        <span className="material-symbols-outlined text-[16px]">
+                                                            qr_code_2
+                                                        </span>
+                                                        <span>
+                                                            Share {splitCreditorDebtors.length} Named{' '}
+                                                            {splitCreditorDebtors.length === 1 ? 'QR' : 'QRs'} to WhatsApp
+                                                        </span>
+                                                    </button>
+                                                )}
+
+                                                {split.notifications?.groupSummary && (
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                handleShareWhatsapp(split.notifications?.groupSummary)
+                                                            }
+                                                            className="flex-1 h-9 rounded-xl bg-surface-container text-on-surface text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-surface-container-high transition-colors cursor-pointer border border-outline-variant/20"
+                                                        >
+                                                            <span className="material-symbols-outlined text-[#25D366] text-[18px]">
+                                                                chat
+                                                            </span>
+                                                            <span>Share on WhatsApp</span>
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                handleCopyText(split.notifications?.groupSummary)
+                                                            }
+                                                            className="h-9 px-3 rounded-xl bg-surface-container-low text-on-surface-variant hover:text-on-surface text-xs font-semibold flex items-center gap-1 cursor-pointer border border-outline-variant/20"
+                                                            title="Copy Summary"
+                                                        >
+                                                            <span className="material-symbols-outlined text-[16px]">
+                                                                content_copy
+                                                            </span>
+                                                            <span>Copy</span>
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
 
@@ -1048,6 +1343,13 @@ export function SplitsPage() {
                 isOpen={!!collectSettlement}
                 onClose={() => setCollectSettlement(null)}
                 data={collectSettlement}
+            />
+
+            {/* Batch Multi-Debtor Named QR WhatsApp Share Modal */}
+            <GroupCollectQrModal
+                isOpen={!!groupCollectData}
+                onClose={() => setGroupCollectData(null)}
+                data={groupCollectData}
             />
 
             {/* Edit Split Modal */}

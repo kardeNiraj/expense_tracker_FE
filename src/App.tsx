@@ -22,8 +22,9 @@ const queryClient = new QueryClient({
     defaultOptions: {
         queries: {
             networkMode: 'offlineFirst',
-            refetchOnWindowFocus: false,
-            staleTime: ENV.QUERY_STALE_TIME_MS || 1000 * 60 * 5,
+            refetchOnWindowFocus: true,
+            refetchOnReconnect: true,
+            staleTime: ENV.QUERY_STALE_TIME_MS || 1000 * 60,
             gcTime: 1000 * 60 * 60 * 24 * 7, // 7 days cache retention
             retry: 1,
         },
@@ -235,8 +236,12 @@ export function App() {
 
     useEffect(() => {
         let mounted = true;
+        const initialTab =
+            typeof window !== 'undefined' ? getTabFromPathname(window.location.pathname) : 'dashboard';
         Promise.allSettled([
-            setupQueryCachePersistence(queryClient),
+            setupQueryCachePersistence(queryClient, {
+                deferAnalytics: initialTab !== 'analytics',
+            }),
             syncPersistentDeviceId(),
         ]).finally(() => {
                 if (mounted) {
@@ -266,7 +271,13 @@ export function App() {
             <div className="min-h-screen w-full bg-surface text-primary flex items-center justify-center font-sans">
                 <div className="flex flex-col items-center gap-3 animate-pulse">
                     <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-xs">
-                        <span className="material-symbols-outlined text-[28px]">landscape</span>
+                        <svg
+                            viewBox="0 0 24 24"
+                            className="w-7 h-7 fill-current"
+                            aria-hidden="true"
+                        >
+                            <path d="M14 6l-3.75 5 2.85 3.8-1.6 1.2C9.81 13.75 7 10 7 10l-6 8h22L14 6z" />
+                        </svg>
                     </div>
                     <span className="text-xs font-semibold tracking-wider uppercase font-mono text-on-surface-variant">
                         SplitNest

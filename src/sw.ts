@@ -1,5 +1,7 @@
 /// <reference lib="webworker" />
 import { clientsClaim } from 'workbox-core';
+import { CacheableResponsePlugin } from 'workbox-cacheable-response';
+import { ExpirationPlugin } from 'workbox-expiration';
 import {
     cleanupOutdatedCaches,
     createHandlerBoundToURL,
@@ -7,6 +9,7 @@ import {
     precacheAndRoute,
 } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
+import { CacheFirst, StaleWhileRevalidate } from 'workbox-strategies';
 
 declare let self: ServiceWorkerGlobalScope;
 
@@ -52,10 +55,33 @@ const appShellUrl = `${baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`}index.htm
 if (getCacheKeyForURL(appShellUrl)) {
     registerRoute(
         new NavigationRoute(createHandlerBoundToURL(appShellUrl), {
-            denylist: [/^\/api/],
+            denylist: [/^\/api/, /^\/__splitnest_api/],
         })
     );
 }
+
+// Cache Google Fonts stylesheets & font files so iOS/Android PWA cold starts avoid network waits
+registerRoute(
+    ({ url }) => url.origin === 'https://fonts.googleapis.com',
+    new StaleWhileRevalidate({
+        cacheName: 'google-fonts-stylesheets',
+        plugins: [
+            new CacheableResponsePlugin({ statuses: [0, 200] }),
+            new ExpirationPlugin({ maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 30 }),
+        ],
+    })
+);
+
+registerRoute(
+    ({ url }) => url.origin === 'https://fonts.gstatic.com',
+    new CacheFirst({
+        cacheName: 'google-fonts-webfonts',
+        plugins: [
+            new CacheableResponsePlugin({ statuses: [0, 200] }),
+            new ExpirationPlugin({ maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 }),
+        ],
+    })
+);
 
 self.addEventListener('message', (event) => {
     const data = event.data as { type?: string } | undefined;
