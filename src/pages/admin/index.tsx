@@ -12,6 +12,7 @@ import { useExpense } from '../../context';
 import { triggerHaptic } from '../../utils/haptics';
 import { AdminAccessGate } from './components/AdminAccessGate';
 import { AdminHeroSummary } from './components/AdminHeroSummary';
+import { AdminPushCard } from './components/AdminPushCard';
 import { PendingApprovalsCard } from './components/PendingApprovalsCard';
 import { PersonClaimsOverviewCard } from './components/PersonClaimsOverviewCard';
 import { DeviceRegistryCard } from './components/DeviceRegistryCard';
@@ -193,6 +194,8 @@ export const AdminPage: React.FC = () => {
                 onBulkLock={(locked) => void handleBulkLock(locked)}
                 onExitAdmin={handleExitAdmin}
             />
+
+            <AdminPushCard />
 
             <PendingApprovalsCard
                 pendingApprovals={dashboard.pendingApprovals}

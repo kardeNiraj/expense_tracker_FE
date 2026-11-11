@@ -1,6 +1,7 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { ExpenseProvider, useExpense } from './context';
+import { getTabFromPathname } from './context/expenseStorage';
 import { MobileGate, Header, BottomNav, Toast, InstallPrompt, PullToRefresh, PwaUpdatePrompt } from './components';
 import { apiFetch, queryKeys } from './api';
 import { Dashboard, SplitsPage, AddPage, PeoplePage, ClaimIdentityScreen } from './pages';
@@ -9,6 +10,10 @@ import { ENV } from './config';
 import { setupQueryCachePersistence } from './utils/idbQueryCache';
 import { processOfflineQueue } from './utils/offlineQueue';
 import { syncPersistentDeviceId } from './utils/deviceIdentity';
+import {
+    resetPushSyncSession,
+    syncExistingPushSubscription,
+} from './utils/pushNotifications';
 
 const AnalyticsPage = lazy(() => import('./pages/analytics/index.tsx'));
 const AdminPage = lazy(() => import('./pages/admin/index.tsx'));
@@ -31,6 +36,9 @@ const queryClient = new QueryClient({
 function MainApp() {
     const {
         activeTab,
+        setActiveTab,
+        setFocusedSplitId,
+        claimedPerson,
         isDeviceClaimed,
         isDeviceBlocked,
         isSwitcherUnlocked,
@@ -38,6 +46,68 @@ function MainApp() {
         showToast,
     } = useExpense();
     const queryClient = useQueryClient();
+
+    useEffect(() => {
+        if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
+            return;
+        }
+
+        const handleSwMessage = (event: MessageEvent) => {
+            const msg = event.data as
+                | {
+                      type?: string;
+                      url?: string;
+                      splitId?: string | null;
+                  }
+                | undefined;
+
+            if (!msg?.type) return;
+
+            if (msg.type === 'PUSH_RECEIVED' || msg.type === 'NAVIGATE_TO') {
+                void queryClient.invalidateQueries({ queryKey: ['splits'] });
+                void queryClient.invalidateQueries({ queryKey: ['spendings'] });
+                void queryClient.invalidateQueries({ queryKey: ['analytics'] });
+                void queryClient.invalidateQueries({ queryKey: ['admin'] });
+                void queryClient.invalidateQueries({ queryKey: ['device', 'me'] });
+            }
+
+            if (msg.type === 'NAVIGATE_TO') {
+                if (msg.url) {
+                    try {
+                        const parsed = new URL(msg.url, window.location.origin);
+                        setActiveTab(getTabFromPathname(parsed.pathname));
+                        const urlSplitId = parsed.searchParams.get('splitId');
+                        const targetSplitId = msg.splitId || urlSplitId || null;
+                        if (targetSplitId) {
+                            setFocusedSplitId(targetSplitId);
+                        }
+                    } catch {
+                        if (msg.splitId) {
+                            setActiveTab('splits');
+                            setFocusedSplitId(msg.splitId);
+                        }
+                    }
+                } else if (msg.splitId) {
+                    setActiveTab('splits');
+                    setFocusedSplitId(msg.splitId);
+                }
+            }
+
+            if (msg.type === 'PUSH_SUBSCRIPTION_CHANGED') {
+                resetPushSyncSession();
+                void syncExistingPushSubscription({
+                    person: claimedPerson,
+                    force: true,
+                });
+                void queryClient.invalidateQueries({ queryKey: queryKeys.pushStatus() });
+            }
+        };
+
+        navigator.serviceWorker.addEventListener('message', handleSwMessage);
+        return () => {
+            navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+        };
+    }, [claimedPerson, queryClient, setActiveTab, setFocusedSplitId]);
 
     const handleGlobalRefresh = async () => {
         try {

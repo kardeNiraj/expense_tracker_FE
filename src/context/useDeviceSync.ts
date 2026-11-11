@@ -16,6 +16,10 @@ import {
     subscribeToAccessErrors,
     syncPersistentDeviceId,
 } from '../utils/deviceIdentity';
+import {
+    disablePushNotifications,
+    syncExistingPushSubscription,
+} from '../utils/pushNotifications';
 
 interface DeviceTransition {
     blocked: boolean;
@@ -132,15 +136,30 @@ export function useDeviceSync({
     const applyServerDeviceState = useCallback(
         (serverState: DeviceStateResponse) => {
             setDeviceState(serverState);
+            const hasAdmin = Boolean(getActiveAdminToken());
             const transition = resolveDeviceTransition(
                 serverState,
                 claimedPersonRef.current,
-                Boolean(getActiveAdminToken())
+                hasAdmin
             );
             setIsDeviceBlocked(transition.blocked);
             setAccessRestrictionReason(transition.reason);
 
-            if (transition.action === 'clear') clearLocalClaim();
+            if (transition.blocked || transition.action === 'clear') {
+                if (transition.action === 'clear') clearLocalClaim();
+                void disablePushNotifications({ markPaused: false });
+            } else {
+                const effectivePerson =
+                    transition.action === 'apply' && transition.claimName
+                        ? transition.claimName
+                        : serverState.claimedPerson;
+                if (effectivePerson || hasAdmin) {
+                    void syncExistingPushSubscription({
+                        person: effectivePerson || null,
+                    });
+                }
+            }
+
             if (transition.action === 'apply' && transition.claimName) {
                 applyLocalClaim(transition.claimName);
             }
@@ -212,6 +231,7 @@ export function useDeviceSync({
             if (event.code === 'DEVICE_BLOCKED') {
                 setIsDeviceBlocked(true);
                 setAccessRestrictionReason(event.message);
+                void disablePushNotifications({ markPaused: false });
                 return;
             }
             if (event.code === 'ADMIN_UNAUTHORIZED') {
@@ -230,7 +250,9 @@ export function useDeviceSync({
             try {
                 const state = await claimDeviceApi(name);
                 applyServerDeviceState(state);
-                applyLocalClaim(state.claimedPerson || name);
+                const resolvedName = state.claimedPerson || name;
+                applyLocalClaim(resolvedName);
+                void syncExistingPushSubscription({ person: resolvedName });
                 return { ok: true };
             } catch (err) {
                 return toClaimErrorResult(
@@ -260,6 +282,7 @@ export function useDeviceSync({
             const state = await unclaimDeviceApi();
             setDeviceState(state);
             clearLocalClaim();
+            void disablePushNotifications({ markPaused: false });
             return true;
         } catch {
             return false;

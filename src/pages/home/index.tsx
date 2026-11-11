@@ -1,24 +1,42 @@
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useExpense } from '../../context';
 import {
+    ApiError,
+    queryKeys,
+    remindSplitDebtorApi,
     useSpendings,
     useSplits,
     useSettleParticipantMutation,
     useTripInfo,
     usePeople,
     usePeopleDetails,
+    usePushConfig,
+    usePushStatus,
 } from '../../api';
 import { Avatar, PaymentModal, type PaymentSettlementData, CollectQrModal, type CollectQrModalData, SpendHistoryModal } from '../../components';
 import { triggerHaptic } from '../../utils/haptics';
 import { parseCustomDate, formatPurchaseTime, getCategoryMeta } from '../../utils/formatters';
+import {
+    dismissPushPrompt,
+    enablePushNotifications,
+    getNotificationPermissionState,
+    isIosSafariNotStandalone,
+    isPushPausedLocally,
+    isPushPromptDismissed,
+    isPushSupported,
+} from '../../utils/pushNotifications';
 
 export function Dashboard() {
-    const { activePerson, claimedPerson, setActiveTab, showToast } = useExpense();
+    const { activePerson, claimedPerson, isDeviceClaimed, setActiveTab, showToast } = useExpense();
+    const queryClient = useQueryClient();
     const { data: spendings, isLoading: isSpendingsLoading } = useSpendings(activePerson);
     const { data: allSplits = [], isLoading: isSplitsLoading } = useSplits();
     const { data: tripInfo } = useTripInfo();
     const { data: people = [], refetch: refetchPeople } = usePeople();
     const { data: peopleDetails = [], refetch: refetchPeopleDetails } = usePeopleDetails();
+    const { data: pushConfig } = usePushConfig(isDeviceClaimed);
+    const { data: pushStatus } = usePushStatus(isDeviceClaimed);
     const [showSpendHistory, setShowSpendHistory] = useState(false);
 
     // Proactively fetch people and UPI details if not present on initial dashboard mount
@@ -38,8 +56,15 @@ export function Dashboard() {
     const [paymentSettlement, setPaymentSettlement] = useState<PaymentSettlementData | null>(null);
     const [collectSettlement, setCollectSettlement] = useState<CollectQrModalData | null>(null);
     const [settlingKey, setSettlingKey] = useState<string | null>(null);
+    const [remindingKey, setRemindingKey] = useState<string | null>(null);
     const [expandedOwed, setExpandedOwed] = useState<Record<string, boolean>>({});
     const [expandedOwedToMe, setExpandedOwedToMe] = useState<Record<string, boolean>>({});
+    const [isPushPromptDismissedState, setIsPushPromptDismissedState] = useState(() =>
+        isPushPromptDismissed()
+    );
+    const [isEnablingPush, setIsEnablingPush] = useState(false);
+    const [showIosPushGuide, setShowIosPushGuide] = useState(false);
+    const [pushEnabledLocally, setPushEnabledLocally] = useState(false);
 
     const activeSplits = allSplits.filter((s) => (s.status || 'ACTIVE').toUpperCase() === 'ACTIVE');
 
@@ -363,6 +388,109 @@ export function Dashboard() {
         }
     };
 
+    const handleRemindDebtor = async ({
+        key,
+        splitIds,
+        fromPerson,
+        toPerson,
+        consolidatedAmount,
+        consolidatedCount,
+    }: {
+        key: string;
+        splitIds: string[];
+        fromPerson: string;
+        toPerson: string;
+        consolidatedAmount?: number;
+        consolidatedCount?: number;
+    }) => {
+        if (remindingKey === key) return;
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+            triggerHaptic('warning');
+            showToast('Internet connection required to send reminders.', 'cloud_off');
+            return;
+        }
+
+        const resolvedIds = splitIds
+            .map((id) => resolveSplitId(id))
+            .filter((id) => !id.startsWith('offline_'));
+
+        if (resolvedIds.length === 0) {
+            triggerHaptic('warning');
+            showToast('Split is still syncing offline. Retry in a moment.', 'hourglass_top');
+            return;
+        }
+
+        setRemindingKey(key);
+        try {
+            const res = await remindSplitDebtorApi({
+                splitId: resolvedIds[0],
+                from: fromPerson,
+                to: toPerson,
+                requestedBy: activePerson,
+                ...(consolidatedCount && consolidatedCount > 1
+                    ? { consolidatedAmount, consolidatedCount }
+                    : {}),
+            });
+            if (res.delivered > 0) {
+                triggerHaptic('success');
+                showToast(res.message, 'notifications_active');
+            } else {
+                triggerHaptic('light');
+                showToast(res.message, 'notifications_off');
+            }
+        } catch (err: unknown) {
+            triggerHaptic('warning');
+            if (err instanceof ApiError) {
+                showToast(err.message, err.status === 429 ? 'schedule' : 'error');
+            } else {
+                showToast('Failed to send payment reminder.', 'error');
+            }
+        } finally {
+            setRemindingKey(null);
+        }
+    };
+
+    const pushSupported = isPushSupported();
+    const iosNeedsInstall = isIosSafariNotStandalone();
+    const permissionState = getNotificationPermissionState();
+    const showPushOptInCard =
+        isDeviceClaimed &&
+        !isPushPromptDismissedState &&
+        !pushEnabledLocally &&
+        !isPushPausedLocally() &&
+        Boolean(pushConfig?.configured) &&
+        (iosNeedsInstall ||
+            (pushSupported &&
+                permissionState === 'default' &&
+                !pushStatus?.subscribed));
+
+    const handleEnableDashboardPush = async () => {
+        if (isEnablingPush) return;
+        if (iosNeedsInstall) {
+            setShowIosPushGuide((prev) => !prev);
+            return;
+        }
+        triggerHaptic('light');
+        setIsEnablingPush(true);
+        try {
+            const res = await enablePushNotifications({
+                person: claimedPerson,
+                config: pushConfig,
+            });
+            if (res.ok) {
+                setPushEnabledLocally(true);
+                triggerHaptic('success');
+                await queryClient.invalidateQueries({ queryKey: queryKeys.pushStatus() });
+                showToast(res.message || 'Push alerts enabled!', 'notifications_active');
+            } else {
+                triggerHaptic('warning');
+                showToast(res.message || 'Could not enable push alerts', 'notifications_off');
+            }
+        } finally {
+            setIsEnablingPush(false);
+        }
+    };
+
     const isDataLoading = isSpendingsLoading || isSplitsLoading;
 
     return (
@@ -602,6 +730,66 @@ export function Dashboard() {
                 </span>
             </button>
 
+            {/* Compact Web Push Opt-In Banner */}
+            {showPushOptInCard && (
+                <div className="bg-surface-card border border-border-subtle rounded-2xl p-3.5 shadow-[0_1px_3px_rgba(15,23,42,0.05)] space-y-2">
+                    <div className="flex items-center justify-between gap-2.5">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                                <span className="material-symbols-outlined text-[18px]">
+                                    notifications_active
+                                </span>
+                            </div>
+                            <div className="min-w-0">
+                                <span className="text-xs font-bold text-on-surface block truncate">
+                                    Enable Split &amp; Settle-Up Alerts
+                                </span>
+                                <span className="text-[11px] text-on-surface-variant block truncate">
+                                    {iosNeedsInstall
+                                        ? 'Add to Home Screen on iOS to receive alerts'
+                                        : 'Get notified on new splits, reminders & confirmations'}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                            <button
+                                type="button"
+                                disabled={isEnablingPush}
+                                onClick={() => void handleEnableDashboardPush()}
+                                className="h-8 px-3 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary-dark transition-colors cursor-pointer disabled:opacity-50"
+                            >
+                                {isEnablingPush
+                                    ? '...'
+                                    : iosNeedsInstall
+                                    ? showIosPushGuide
+                                        ? 'Hide'
+                                        : 'How?'
+                                    : 'Enable'}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    dismissPushPrompt();
+                                    setIsPushPromptDismissedState(true);
+                                }}
+                                className="w-7 h-7 rounded-lg text-on-surface-variant hover:bg-surface-container flex items-center justify-center cursor-pointer transition-colors"
+                                aria-label="Dismiss push notifications prompt"
+                                title="Dismiss"
+                            >
+                                <span className="material-symbols-outlined text-[16px]">close</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {iosNeedsInstall && showIosPushGuide && (
+                        <p className="text-[11px] text-on-surface-variant bg-surface-container-low rounded-xl px-3 py-2 border border-outline-variant/20">
+                            Tap <strong className="text-on-surface">Share → Add to Home Screen</strong> in Safari, open SplitNest from your Home Screen, then tap <strong className="text-on-surface">Enable</strong> in Profile or this card.
+                        </p>
+                    )}
+                </div>
+            )}
+
             {/* Pending Settlements for Active Person */}
             {(myOwedSettlements.length > 0 || owedToMeSettlements.length > 0) && (
                 <div className="space-y-2.5">
@@ -838,6 +1026,30 @@ export function Dashboard() {
                                                     </span>
                                                     <button
                                                         type="button"
+                                                        disabled={
+                                                            remindingKey === `${s.splitId}_${group.from}` ||
+                                                            remindingKey === `group_${group.from}`
+                                                        }
+                                                        onClick={() =>
+                                                            void handleRemindDebtor({
+                                                                key: `${s.splitId}_${group.from}`,
+                                                                splitIds: [s.splitId],
+                                                                fromPerson: group.from,
+                                                                toPerson: activePerson,
+                                                            })
+                                                        }
+                                                        className="flex items-center p-1 rounded-md bg-status-awaiting-bg/80 text-status-awaiting-text hover:bg-status-awaiting-bg transition-colors cursor-pointer disabled:opacity-50"
+                                                        title={`Send payment reminder to ${group.from} for ${s.description}`}
+                                                        aria-label={`Remind ${group.from} for ${s.description}`}
+                                                    >
+                                                        <span className="material-symbols-outlined text-[15px]">
+                                                            {remindingKey === `${s.splitId}_${group.from}`
+                                                                ? 'hourglass_top'
+                                                                : 'notifications_active'}
+                                                        </span>
+                                                    </button>
+                                                    <button
+                                                        type="button"
                                                         onClick={() => {
                                                             setCollectSettlement({
                                                                 debtorName: group.from,
@@ -869,8 +1081,8 @@ export function Dashboard() {
                                     </div>
                                 )}
 
-                                {/* Actions Row: Show QR & Confirm All / Confirm */}
-                                <div className="pt-2 border-t border-outline-variant/15 flex items-center gap-2">
+                                {/* Actions Row: Show QR, Remind & Confirm */}
+                                <div className="pt-2 border-t border-outline-variant/15 flex items-center gap-1.5">
                                     <button
                                         type="button"
                                         onClick={() => {
@@ -884,13 +1096,40 @@ export function Dashboard() {
                                                     : group.splits[0].description,
                                             });
                                         }}
-                                        className="flex-1 h-9 px-3 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors border border-outline-variant/30 cursor-pointer active:scale-[0.99]"
+                                        className="flex-1 h-9 px-2.5 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface text-xs font-semibold flex items-center justify-center gap-1 transition-colors border border-outline-variant/30 cursor-pointer active:scale-[0.99] whitespace-nowrap"
                                         title={`Show QR code to collect ₹${group.totalAmount} from ${group.from}`}
                                     >
-                                        <span className="material-symbols-outlined text-[18px] text-primary">
+                                        <span className="material-symbols-outlined text-[17px] text-primary">
                                             qr_code_2
                                         </span>
                                         <span>Show QR</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        disabled={remindingKey === `group_${group.from}`}
+                                        onClick={() =>
+                                            void handleRemindDebtor({
+                                                key: `group_${group.from}`,
+                                                splitIds: group.splits.map((s) => s.splitId),
+                                                fromPerson: group.from,
+                                                toPerson: activePerson,
+                                                consolidatedAmount: isMulti ? group.totalAmount : undefined,
+                                                consolidatedCount: isMulti ? group.splits.length : undefined,
+                                            })
+                                        }
+                                        className="h-9 px-2.5 rounded-xl bg-status-awaiting-bg/85 hover:bg-status-awaiting-bg text-status-awaiting-text text-xs font-bold flex items-center justify-center gap-1 transition-colors border border-status-awaiting-text/25 cursor-pointer disabled:opacity-50 active:scale-[0.99] shrink-0 whitespace-nowrap"
+                                        title={`Send push payment reminder to ${group.from}`}
+                                        aria-label={`Remind ${group.from}`}
+                                    >
+                                        <span className="material-symbols-outlined text-[16px]">
+                                            {remindingKey === `group_${group.from}`
+                                                ? 'hourglass_top'
+                                                : 'notifications_active'}
+                                        </span>
+                                        <span>
+                                            {remindingKey === `group_${group.from}` ? 'Sending' : 'Remind'}
+                                        </span>
                                     </button>
 
                                     <button
@@ -912,7 +1151,7 @@ export function Dashboard() {
                                                     activePerson
                                                 )
                                         }
-                                        className="flex-1 h-9 px-3 rounded-xl bg-primary-fixed hover:bg-primary text-on-primary-fixed hover:text-on-primary text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs disabled:opacity-50 cursor-pointer active:scale-[0.99]"
+                                        className="flex-1 h-9 px-2.5 rounded-xl bg-primary-fixed hover:bg-primary text-on-primary-fixed hover:text-on-primary text-xs font-bold transition-all flex items-center justify-center gap-1 shadow-2xs disabled:opacity-50 cursor-pointer active:scale-[0.99] whitespace-nowrap"
                                         title={`Confirm receipt of ₹${group.totalAmount} from ${group.from}`}
                                     >
                                         <span className="material-symbols-outlined text-[16px]">

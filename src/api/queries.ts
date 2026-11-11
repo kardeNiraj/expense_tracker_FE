@@ -6,6 +6,8 @@ import type {
     AnalyticsRange,
     DeviceStateResponse,
     PersonDetail,
+    PushDeviceStatusResponse,
+    PushPublicConfig,
     Split,
     SpendingsData,
     TripMetaItem,
@@ -40,6 +42,8 @@ export const queryKeys = {
     health: () => ['health'] as const,
     deviceMe: () => ['device', 'me'] as const,
     adminAnalytics: (refresh = false) => ['admin', 'analytics', { refresh }] as const,
+    pushConfig: () => ['notifications', 'config'] as const,
+    pushStatus: () => ['notifications', 'status'] as const,
 };
 
 // 1. Categories Query
@@ -204,5 +208,29 @@ export function useAdminDashboard(enabled = true, refresh = false) {
         gcTime: 0,
         networkMode: 'online',
         retry: false,
+    });
+}
+
+// 13. Web Push Server Config (VAPID Public Key)
+export function usePushConfig(enabled = true) {
+    return useQuery<PushPublicConfig>({
+        queryKey: queryKeys.pushConfig(),
+        queryFn: () => apiFetch<PushPublicConfig>('/notifications/vapid-public-key'),
+        enabled,
+        staleTime: 1000 * 60 * 10,
+        networkMode: 'online',
+        retry: 1,
+    });
+}
+
+// 14. Current Device Web Push Subscription Status
+export function usePushStatus(enabled = true) {
+    return useQuery<PushDeviceStatusResponse>({
+        queryKey: queryKeys.pushStatus(),
+        queryFn: () => apiFetch<PushDeviceStatusResponse>('/notifications/status'),
+        enabled,
+        staleTime: 1000 * 30,
+        networkMode: 'online',
+        retry: 1,
     });
 }

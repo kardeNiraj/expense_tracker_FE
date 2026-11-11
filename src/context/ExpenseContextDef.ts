@@ -29,6 +29,8 @@ export interface ExpenseContextType {
     lockSwitcher: () => void;
     activeTab: AppTab;
     setActiveTab: (tab: AppTab) => void;
+    focusedSplitId: string | null;
+    setFocusedSplitId: (splitId: string | null) => void;
     toast: { message: string; icon?: string; visible: boolean };
     showToast: (message: string, icon?: string) => void;
 }

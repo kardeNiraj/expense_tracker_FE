@@ -421,4 +421,65 @@ export interface AdminUpdateDevicePayload {
     revokeClaim?: boolean;
 }
 
+// Web Push Notifications Types (Standard VAPID / Web Push API)
+export interface PushPublicConfig {
+    enabled: boolean;
+    configured: boolean;
+    publicKey: string;
+    cooldownSeconds: number;
+}
+
+export interface PushDeviceStatusResponse extends PushPublicConfig {
+    subscribed: boolean;
+    subscribedDevicesCount: number;
+    isAdminSubscribed: boolean;
+}
+
+export interface WebPushSubscriptionPayload {
+    endpoint: string;
+    expirationTime?: number | null;
+    keys: {
+        p256dh: string;
+        auth: string;
+    };
+}
+
+export interface PushSubscribeResponse {
+    subscriptionId: string;
+    deviceId: string | null;
+    person: string | null;
+    isAdmin: boolean;
+    status: 'ACTIVE' | 'DISABLED' | 'GONE';
+    configured: boolean;
+}
+
+export interface RemindParticipantPayload {
+    splitId: string;
+    from: string;
+    to?: string;
+    requestedBy?: string;
+    consolidatedAmount?: number;
+    consolidatedCount?: number;
+}
+
+export interface RemindParticipantResponse {
+    configured: boolean;
+    targetPerson: string;
+    subscribedDevices: number;
+    delivered: number;
+    failed: number;
+    pruned?: number;
+    amount: number;
+    message: string;
+}
+
+export interface TestPushResponse {
+    configured: boolean;
+    targeted: number;
+    delivered: number;
+    pruned: number;
+    failed: number;
+    message: string;
+}
+
 

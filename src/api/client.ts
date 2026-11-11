@@ -45,13 +45,21 @@ export class ApiError extends Error {
     status: number;
     code?: string;
     person?: string | null;
+    retryAfterSeconds?: number;
 
-    constructor(message: string, status: number, code?: string, person?: string | null) {
+    constructor(
+        message: string,
+        status: number,
+        code?: string,
+        person?: string | null,
+        retryAfterSeconds?: number
+    ) {
         super(message);
         this.name = 'ApiError';
         this.status = status;
         this.code = code;
         this.person = person;
+        this.retryAfterSeconds = retryAfterSeconds;
     }
 }
 
@@ -60,6 +68,7 @@ async function parseErrorResponse(response: Response): Promise<ApiError> {
     let parsedMessage = errorText || response.statusText || 'Request failed';
     let code: string | undefined;
     let person: string | null | undefined;
+    let retryAfterSeconds: number | undefined;
 
     if (errorText) {
         try {
@@ -68,16 +77,18 @@ async function parseErrorResponse(response: Response): Promise<ApiError> {
                 error?: string;
                 code?: string;
                 person?: string | null;
+                retryAfterSeconds?: number;
             };
             parsedMessage = json.message || json.error || parsedMessage;
             code = json.code;
             person = json.person;
+            retryAfterSeconds = json.retryAfterSeconds;
         } catch {
             // Leave raw error text
         }
     }
 
-    const err = new ApiError(parsedMessage, response.status, code, person);
+    const err = new ApiError(parsedMessage, response.status, code, person, retryAfterSeconds);
 
     if (response.status === 401 || response.status === 403) {
         notifyAccessError({

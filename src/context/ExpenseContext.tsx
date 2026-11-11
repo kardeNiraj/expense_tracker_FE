@@ -1,13 +1,16 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { AppTab } from './ExpenseContextDef';
 import { ExpenseContext } from './ExpenseContextDef';
 import { ENV } from '../config';
+import { queryKeys } from '../api';
 import { loginAdminApi } from '../api/deviceApi';
 import {
     clearActiveAdminToken,
     getActiveAdminToken,
     setActiveAdminToken,
 } from '../utils/deviceIdentity';
+import { syncExistingPushSubscription } from '../utils/pushNotifications';
 import {
     clearPersistedClaim,
     getTabFromPathname,
@@ -20,6 +23,7 @@ import {
 import { useDeviceSync } from './useDeviceSync';
 
 export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const queryClient = useQueryClient();
     const [claimedPerson, setClaimedPersonState] = useState<string | null>(readInitialClaimedPerson);
     const [isSwitcherUnlocked, setIsSwitcherUnlockedState] = useState<boolean>(() =>
         Boolean(getActiveAdminToken())
@@ -28,6 +32,10 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const [activeTab, setActiveTabState] = useState<AppTab>(() =>
         typeof window !== 'undefined' ? getTabFromPathname(window.location.pathname) : 'dashboard'
     );
+    const [focusedSplitId, setFocusedSplitIdState] = useState<string | null>(() => {
+        if (typeof window === 'undefined') return null;
+        return new URLSearchParams(window.location.search).get('splitId')?.trim() || null;
+    });
     const [toast, setToast] = useState<{ message: string; icon?: string; visible: boolean }>({
         message: '',
         visible: false,
@@ -60,6 +68,19 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
         activeTabRef.current = tab;
         setActiveTabState(tab);
         pushTabPath(tab);
+    }, []);
+
+    const setFocusedSplitId = useCallback((splitId: string | null) => {
+        const clean = splitId ? splitId.trim() : null;
+        setFocusedSplitIdState(clean);
+        if (typeof window !== 'undefined' && !clean) {
+            const url = new URL(window.location.href);
+            if (url.searchParams.has('splitId')) {
+                url.searchParams.delete('splitId');
+                const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+                window.history.replaceState(window.history.state, '', nextUrl);
+            }
+        }
     }, []);
 
     useEffect(() => {
@@ -136,6 +157,16 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
                     setActiveAdminToken(res.token, res.expiresAt);
                     setIsSwitcherUnlockedState(true);
                     void refreshDeviceStatus();
+                    void syncExistingPushSubscription({
+                        person: claimedPersonRef.current,
+                        force: true,
+                    }).then((synced) => {
+                        if (synced) {
+                            void queryClient.invalidateQueries({
+                                queryKey: queryKeys.pushStatus(),
+                            });
+                        }
+                    });
                     return true;
                 }
                 return false;
@@ -143,7 +174,7 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 return false;
             }
         },
-        [refreshDeviceStatus]
+        [queryClient, refreshDeviceStatus]
     );
 
     const setActivePerson = useCallback((name: string) => {
@@ -177,6 +208,8 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
             lockSwitcher,
             activeTab,
             setActiveTab,
+            focusedSplitId,
+            setFocusedSplitId,
             toast,
             showToast,
         }),
@@ -200,6 +233,8 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
             lockSwitcher,
             activeTab,
             setActiveTab,
+            focusedSplitId,
+            setFocusedSplitId,
             toast,
             showToast,
         ]

@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useExpense } from '../../context';
 import {
+    ApiError,
+    remindSplitDebtorApi,
     useSplits,
+    useSplitDetails,
     useTripInfo,
     useSettleParticipantMutation,
     useAddContributionMutation,
@@ -21,7 +24,7 @@ import { triggerHaptic } from '../../utils/haptics';
 import { getCategoryMeta } from '../../utils/formatters';
 
 export function SplitsPage() {
-    const { activePerson, showToast } = useExpense();
+    const { activePerson, focusedSplitId, setFocusedSplitId, showToast } = useExpense();
     const [statusFilter, setStatusFilter] = useState<'ACTIVE' | 'SETTLED'>('ACTIVE');
     const [paymentSettlement, setPaymentSettlement] = useState<PaymentSettlementData | null>(null);
     const [collectSettlement, setCollectSettlement] = useState<CollectQrModalData | null>(null);
@@ -32,17 +35,44 @@ export function SplitsPage() {
     const [contributionPerson, setContributionPerson] = useState('');
     const [expandedSplits, setExpandedSplits] = useState<Record<string, boolean>>({});
     const [settlingKey, setSettlingKey] = useState<string | null>(null);
+    const [remindingKey, setRemindingKey] = useState<string | null>(null);
+    const lastScrolledSplitRef = useRef<string | null>(null);
 
-    const { data: splits = [], isLoading } = useSplits({ status: statusFilter });
+    const { data: focusedSplitDetail } = useSplitDetails(focusedSplitId || undefined);
+    const effectiveStatusFilter: 'ACTIVE' | 'SETTLED' =
+        focusedSplitId &&
+        (focusedSplitDetail?.status === 'ACTIVE' || focusedSplitDetail?.status === 'SETTLED')
+            ? focusedSplitDetail.status
+            : statusFilter;
+
+    const { data: splits = [], isLoading } = useSplits({ status: effectiveStatusFilter });
     const { data: tripInfo } = useTripInfo();
     const { data: peopleDetails = [] } = usePeopleDetails();
     const settleMutation = useSettleParticipantMutation();
     const contributeMutation = useAddContributionMutation();
     const deleteMutation = useDeleteSplitMutation();
 
+    useEffect(() => {
+        if (!focusedSplitId) {
+            lastScrolledSplitRef.current = null;
+            return;
+        }
+        if (lastScrolledSplitRef.current === focusedSplitId) {
+            return;
+        }
+        const targetEl = document.getElementById(`split-card-${focusedSplitId}`);
+        if (targetEl) {
+            lastScrolledSplitRef.current = focusedSplitId;
+            targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, [focusedSplitId, splits.length, effectiveStatusFilter]);
+
     const isExpanded = (splitId: string, index: number) => {
         if (expandedSplits[splitId] !== undefined) {
             return expandedSplits[splitId];
+        }
+        if (focusedSplitId && splitId === focusedSplitId) {
+            return true;
         }
         // By default expand the first split for quick context, keep the rest shrunk
         return index === 0;
@@ -105,6 +135,65 @@ export function SplitsPage() {
             showToast(`Failed to settle: ${String(err)}`, 'error');
         } finally {
             setSettlingKey(null);
+        }
+    };
+
+    const handleRemind = async (splitId: string, fromPerson: string, toPerson: string) => {
+        const key = `${splitId}_${fromPerson}`;
+        if (remindingKey === key) return;
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+            triggerHaptic('warning');
+            showToast('Internet connection required to send reminders.', 'cloud_off');
+            return;
+        }
+
+        let targetSplitId = splitId;
+        if (targetSplitId.startsWith('offline_')) {
+            const currentSplit = splits.find((s) => s.splitId === splitId);
+            if (currentSplit) {
+                const matchedServerSplit = splits.find(
+                    (s) =>
+                        !s.splitId.startsWith('offline_') &&
+                        s.description === currentSplit.description &&
+                        s.totalAmount === currentSplit.totalAmount &&
+                        s.paidBy.toLowerCase() === currentSplit.paidBy.toLowerCase()
+                );
+                if (matchedServerSplit) {
+                    targetSplitId = matchedServerSplit.splitId;
+                }
+            }
+        }
+
+        if (targetSplitId.startsWith('offline_')) {
+            triggerHaptic('warning');
+            showToast('Split is still syncing offline. Retry in a moment.', 'hourglass_top');
+            return;
+        }
+
+        setRemindingKey(key);
+        try {
+            const res = await remindSplitDebtorApi({
+                splitId: targetSplitId,
+                from: fromPerson,
+                to: toPerson,
+                requestedBy: activePerson,
+            });
+            if (res.delivered > 0) {
+                triggerHaptic('success');
+                showToast(res.message, 'notifications_active');
+            } else {
+                triggerHaptic('light');
+                showToast(res.message, 'notifications_off');
+            }
+        } catch (err: unknown) {
+            triggerHaptic('warning');
+            if (err instanceof ApiError) {
+                showToast(err.message, err.status === 429 ? 'schedule' : 'error');
+            } else {
+                showToast('Failed to send reminder.', 'error');
+            }
+        } finally {
+            setRemindingKey(null);
         }
     };
 
@@ -299,8 +388,11 @@ export function SplitsPage() {
             <div className="grid grid-cols-2 gap-2 bg-surface-container-low p-1 rounded-xl border border-outline-variant/30">
                 <button
                     type="button"
-                    onClick={() => setStatusFilter('ACTIVE')}
-                    className={`h-9 rounded-lg text-xs font-bold transition-all cursor-pointer ${statusFilter === 'ACTIVE'
+                    onClick={() => {
+                        setFocusedSplitId(null);
+                        setStatusFilter('ACTIVE');
+                    }}
+                    className={`h-9 rounded-lg text-xs font-bold transition-all cursor-pointer ${effectiveStatusFilter === 'ACTIVE'
                             ? 'bg-surface-container-lowest text-primary shadow-xs'
                             : 'text-on-surface-variant hover:text-on-surface'
                         }`}
@@ -309,8 +401,11 @@ export function SplitsPage() {
                 </button>
                 <button
                     type="button"
-                    onClick={() => setStatusFilter('SETTLED')}
-                    className={`h-9 rounded-lg text-xs font-bold transition-all cursor-pointer ${statusFilter === 'SETTLED'
+                    onClick={() => {
+                        setFocusedSplitId(null);
+                        setStatusFilter('SETTLED');
+                    }}
+                    className={`h-9 rounded-lg text-xs font-bold transition-all cursor-pointer ${effectiveStatusFilter === 'SETTLED'
                             ? 'bg-surface-container-lowest text-primary shadow-xs'
                             : 'text-on-surface-variant hover:text-on-surface'
                         }`}
@@ -320,7 +415,7 @@ export function SplitsPage() {
             </div>
 
             {/* 1-Tap Group WhatsApp Summary (Step 6) */}
-            {statusFilter === 'ACTIVE' && splits.length > 0 && (
+            {effectiveStatusFilter === 'ACTIVE' && splits.length > 0 && (
                 <button
                     type="button"
                     onClick={handleShareGroupTripSummary}
@@ -352,7 +447,7 @@ export function SplitsPage() {
                         receipt_long
                     </span>
                     <p className="font-semibold text-sm text-on-surface">
-                        No {statusFilter.toLowerCase()} splits found
+                        No {effectiveStatusFilter.toLowerCase()} splits found
                     </p>
                     <p>Create a new split anytime from the Add tab.</p>
                 </div>
@@ -389,10 +484,11 @@ export function SplitsPage() {
                         return (
                             <div
                                 key={split.splitId}
+                                id={`split-card-${split.splitId}`}
                                 className={`bg-surface-container-lowest rounded-2xl border transition-all ${expanded
                                         ? 'p-4 border-outline-variant/40 space-y-3.5 shadow-sm'
                                         : 'p-3.5 border-outline-variant/30 hover:border-primary/40 hover:bg-surface-container-lowest/80 shadow-xs'
-                                    }`}
+                                    } ${focusedSplitId === split.splitId ? 'ring-2 ring-primary/40 border-primary/50' : ''}`}
                             >
                                 {/* Split Header / Accordion Trigger */}
                                 <div
@@ -647,9 +743,9 @@ export function SplitsPage() {
                                                             {/* Row 3: Action Buttons (Dedicated Line Below Details) */}
                                                             {isPending && (
                                                                 <>
-                                                                    {/* Creditor: Collect via QR & Confirm Received */}
+                                                                    {/* Creditor: Collect via QR, Remind & Confirm */}
                                                                     {isCreditor && (
-                                                                        <div className="pt-2 border-t border-outline-variant/15 flex items-center gap-2">
+                                                                        <div className="pt-2 border-t border-outline-variant/15 flex items-center gap-1.5">
                                                                             <button
                                                                                 type="button"
                                                                                 onClick={() =>
@@ -660,25 +756,48 @@ export function SplitsPage() {
                                                                                         description: split.description,
                                                                                     })
                                                                                 }
-                                                                                className="flex-1 h-8.5 px-3 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors border border-outline-variant/30 cursor-pointer active:scale-[0.99]"
+                                                                                className="flex-1 h-8.5 px-2.5 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface text-xs font-semibold flex items-center justify-center gap-1 transition-colors border border-outline-variant/30 cursor-pointer active:scale-[0.99] whitespace-nowrap"
                                                                                 title={`Show QR code to collect ₹${s.amount} from ${s.from}`}
                                                                             >
-                                                                                <span className="material-symbols-outlined text-[17px] text-primary">
+                                                                                <span className="material-symbols-outlined text-[16px] text-primary">
                                                                                     qr_code_2
                                                                                 </span>
                                                                                 <span>Show QR</span>
                                                                             </button>
                                                                             <button
                                                                                 type="button"
+                                                                                disabled={
+                                                                                    remindingKey === `${split.splitId}_${s.from}` ||
+                                                                                    settlingKey === `${split.splitId}_${s.from}`
+                                                                                }
+                                                                                onClick={() => void handleRemind(split.splitId, s.from, s.to)}
+                                                                                className="h-8.5 px-2.5 rounded-xl bg-status-awaiting-bg/85 hover:bg-status-awaiting-bg text-status-awaiting-text border border-status-awaiting-text/25 text-xs font-bold flex items-center justify-center gap-1 transition-colors disabled:opacity-50 cursor-pointer active:scale-[0.99] shrink-0 whitespace-nowrap"
+                                                                                title={`Send push payment reminder to ${s.from}`}
+                                                                                aria-label={`Remind ${s.from}`}
+                                                                            >
+                                                                                <span className="material-symbols-outlined text-[15px]">
+                                                                                    {remindingKey === `${split.splitId}_${s.from}`
+                                                                                        ? 'hourglass_top'
+                                                                                        : 'notifications_active'}
+                                                                                </span>
+                                                                                <span>
+                                                                                    {remindingKey === `${split.splitId}_${s.from}`
+                                                                                        ? 'Sending'
+                                                                                        : 'Remind'}
+                                                                                </span>
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
                                                                                 disabled={settlingKey === `${split.splitId}_${s.from}`}
                                                                                 onClick={() => handleSettle(split.splitId, s.from, s.to)}
-                                                                                className="flex-1 h-8.5 px-3 rounded-xl bg-primary-fixed hover:bg-primary text-on-primary-fixed hover:text-on-primary text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs disabled:opacity-50 cursor-pointer active:scale-[0.99]"
+                                                                                className="flex-1 h-8.5 px-2.5 rounded-xl bg-primary-fixed hover:bg-primary text-on-primary-fixed hover:text-on-primary text-xs font-bold transition-all flex items-center justify-center gap-1 shadow-2xs disabled:opacity-50 cursor-pointer active:scale-[0.99] whitespace-nowrap"
                                                                                 title={`Confirm you have received ₹${s.amount} from ${s.from}`}
+                                                                                aria-label={`Confirm receipt of ₹${s.amount} from ${s.from}`}
                                                                             >
                                                                                 <span className="material-symbols-outlined text-[15px]">
                                                                                     done_all
                                                                                 </span>
-                                                                                <span>Confirm Received</span>
+                                                                                <span>Confirm</span>
                                                                             </button>
                                                                         </div>
                                                                     )}

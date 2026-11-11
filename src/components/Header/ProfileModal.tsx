@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Avatar } from '../Avatar';
 import { triggerHaptic } from '../../utils/haptics';
 import { reloadApp } from '../../utils/pwaReload';
+import { ProfilePushControl } from './ProfilePushControl';
 import type { ClaimActionResult } from '../../context/ExpenseContextDef';
 
 interface ProfileModalProps {
@@ -451,6 +452,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                             </button>
                         </div>
                     )}
+
+                    {/* Web Push Notifications Control */}
+                    <ProfilePushControl
+                        claimedPerson={claimedPerson}
+                        showToast={showToast}
+                    />
 
                     <div className="flex items-center justify-between text-xs px-0.5">
                         <div className="flex items-center gap-1.5 text-on-surface-variant min-w-0">
