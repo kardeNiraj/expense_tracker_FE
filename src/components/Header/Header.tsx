@@ -9,6 +9,7 @@ import { SyncStatusModal } from '../SyncModal/SyncStatusModal';
 import { SpendHistoryModal } from '../SpendHistory/SpendHistoryModal';
 import { useOfflineSync } from '../../utils/useOfflineSync';
 import { triggerHaptic } from '../../utils/haptics';
+import { AppIcon } from '../Icon/AppIcon';
 
 export const Header: React.FC = () => {
     const {
@@ -60,9 +61,7 @@ export const Header: React.FC = () => {
                             aria-label="Invite trip members"
                         >
                             <div className="w-9 h-9 rounded-xl bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center text-primary shadow-xs shrink-0 transition-colors">
-                                <span className="material-symbols-outlined text-[20px]">
-                                    {tripIcon}
-                                </span>
+                                <AppIcon name={tripIcon} className="text-[20px]" />
                             </div>
                             {/* Trip title & subtitle: Hidden on mobile to avoid squashing offline & profile chips, visible on sm: screens */}
                             <div className="hidden sm:flex flex-col min-w-0">
@@ -73,9 +72,7 @@ export const Header: React.FC = () => {
                                     >
                                         {tripTitle}
                                     </span>
-                                    <span className="material-symbols-outlined text-[15px] text-primary/50 group-hover:text-primary transition-colors">
-                                        qr_code_2
-                                    </span>
+                                    <AppIcon name="qr_code_2" className="text-[15px] text-primary/50 group-hover:text-primary transition-colors" />
                                 </div>
                                 <span className="text-[10px] text-primary font-semibold tracking-wider uppercase font-mono truncate">
                                     {tripSubtitle}
@@ -130,15 +127,16 @@ export const Header: React.FC = () => {
                                 }`}
                                 title="Tap to view sync status & per-split queue"
                             >
-                                <span className={`material-symbols-outlined text-[14px] ${isSyncing ? 'animate-spin' : ''}`}>
-                                    {!isOnline
+                                <AppIcon
+                                    name={!isOnline
                                         ? 'cloud_off'
                                         : isSyncing
                                         ? 'sync'
                                         : hasBackoff
                                         ? 'timer'
                                         : 'cloud_queue'}
-                                </span>
+                                    className={`text-[14px] ${isSyncing ? 'animate-spin' : ''}`}
+                                />
                                 <span>
                                     {!isOnline
                                         ? pendingCount > 0
@@ -178,23 +176,21 @@ export const Header: React.FC = () => {
                                         className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-primary text-on-primary ring-1.5 ring-surface flex items-center justify-center shadow-2xs"
                                         title="Admin Mode Active"
                                     >
-                                        <span className="material-symbols-outlined text-[9px] leading-none">admin_panel_settings</span>
+                                        <AppIcon name="admin_panel_settings" className="text-[9px] leading-none" />
                                     </span>
                                 ) : isDeviceClaimed ? (
                                     <span
                                         className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-secondary text-on-secondary ring-1.5 ring-surface flex items-center justify-center shadow-2xs"
                                         title={`Device locked to ${claimedPerson}`}
                                     >
-                                        <span className="material-symbols-outlined text-[8.5px] leading-none">lock</span>
+                                        <AppIcon name="lock" className="text-[8.5px] leading-none" />
                                     </span>
                                 ) : null}
                             </div>
                             <span className="truncate max-w-[85px]">
                                 {activePerson} {isSwitcherUnlocked ? '(Admin)' : isDeviceClaimed ? '(You)' : ''}
                             </span>
-                            <span className="material-symbols-outlined text-on-surface-variant text-[16px]">
-                                arrow_drop_down
-                            </span>
+                            <AppIcon name="arrow_drop_down" className="text-on-surface-variant text-[16px]" />
                         </button>
                     </div>
                 </div>

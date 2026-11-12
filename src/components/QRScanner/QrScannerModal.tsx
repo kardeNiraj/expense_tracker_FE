@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import jsQR from 'jsqr';
 import { parseUpiQrPayload, type ParsedUpiQr } from '../../utils/qr';
 import { triggerHaptic } from '../../utils/haptics';
+import { AppIcon } from '../Icon/AppIcon';
 
 export interface QrScannerModalProps {
     isOpen: boolean;
@@ -335,7 +336,7 @@ const QrScannerContent: React.FC<QrScannerContentProps> = ({
                 <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-outline-variant/20">
                     <div className="flex items-center gap-2.5 min-w-0">
                         <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                            <span className="material-symbols-outlined text-[20px]">qr_code_scanner</span>
+                            <AppIcon name="qr_code_scanner" className="text-[20px]" />
                         </div>
                         <div className="min-w-0">
                             <h3 className="font-bold text-sm text-on-surface truncate">{title}</h3>
@@ -348,7 +349,7 @@ const QrScannerContent: React.FC<QrScannerContentProps> = ({
                         className="w-8 h-8 rounded-full hover:bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer shrink-0"
                         aria-label="Close scanner"
                     >
-                        <span className="material-symbols-outlined text-[20px]">close</span>
+                        <AppIcon name="close" className="text-[20px]" />
                     </button>
                 </div>
 
@@ -375,9 +376,7 @@ const QrScannerContent: React.FC<QrScannerContentProps> = ({
 
                         {cameraStatus === 'starting' && (
                             <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white text-xs gap-2">
-                                <span className="material-symbols-outlined text-[28px] animate-pulse">
-                                    photo_camera
-                                </span>
+                                <AppIcon name="photo_camera" className="text-[28px] animate-pulse" />
                                 <span>Starting rear camera...</span>
                             </div>
                         )}
@@ -393,9 +392,7 @@ const QrScannerContent: React.FC<QrScannerContentProps> = ({
                                 }`}
                                 aria-label={torchOn ? 'Turn flashlight off' : 'Turn flashlight on'}
                             >
-                                <span className="material-symbols-outlined text-[16px]">
-                                    {torchOn ? 'flashlight_off' : 'flashlight_on'}
-                                </span>
+                                <AppIcon name={torchOn ? 'flashlight_off' : 'flashlight_on'} className="text-[16px]" />
                                 <span>{torchOn ? 'Torch On' : 'Torch'}</span>
                             </button>
                         )}
@@ -403,7 +400,7 @@ const QrScannerContent: React.FC<QrScannerContentProps> = ({
                 ) : (
                     <div className="p-4 rounded-2xl bg-surface-container-low border border-outline-variant/30 text-center space-y-2.5">
                         <div className="w-11 h-11 rounded-2xl bg-tertiary/15 text-tertiary flex items-center justify-center mx-auto">
-                            <span className="material-symbols-outlined text-[24px]">no_photography</span>
+                            <AppIcon name="no_photography" className="text-[24px]" />
                         </div>
                         <p className="text-xs text-on-surface-variant leading-relaxed">
                             {cameraError}
@@ -413,9 +410,7 @@ const QrScannerContent: React.FC<QrScannerContentProps> = ({
 
                 {scanWarning && (
                     <div className="p-3 rounded-xl bg-tertiary-container/35 border border-tertiary/30 text-xs text-on-tertiary-container flex items-start gap-2">
-                        <span className="material-symbols-outlined text-[16px] text-tertiary shrink-0 mt-0.5">
-                            warning
-                        </span>
+                        <AppIcon name="warning" className="text-[16px] text-tertiary shrink-0 mt-0.5" />
                         <span className="flex-1">{scanWarning}</span>
                     </div>
                 )}
@@ -436,9 +431,7 @@ const QrScannerContent: React.FC<QrScannerContentProps> = ({
                         onClick={() => fileInputRef.current?.click()}
                         className="h-11 px-3 rounded-xl bg-primary text-on-primary text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs hover:bg-primary/90 active:scale-[0.98] transition-colors cursor-pointer disabled:opacity-50"
                     >
-                        <span className="material-symbols-outlined text-[18px]">
-                            {isDecodingPhoto ? 'hourglass_top' : 'add_photo_alternate'}
-                        </span>
+                        <AppIcon name={isDecodingPhoto ? 'hourglass_top' : 'add_photo_alternate'} className="text-[18px]" />
                         <span>{isDecodingPhoto ? 'Reading...' : 'Upload QR Photo'}</span>
                     </button>
 
@@ -447,9 +440,7 @@ const QrScannerContent: React.FC<QrScannerContentProps> = ({
                         onClick={() => setShowManualFallback((prev) => !prev)}
                         className="h-11 px-3 rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant/30 text-on-surface text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                     >
-                        <span className="material-symbols-outlined text-[17px] text-primary">
-                            edit
-                        </span>
+                        <AppIcon name="edit" className="text-[17px] text-primary" />
                         <span>Paste UPI</span>
                     </button>
                 </div>

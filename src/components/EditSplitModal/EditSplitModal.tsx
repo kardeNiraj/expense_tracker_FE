@@ -4,6 +4,7 @@ import { useCategories, usePeople, useUpdateSplitMutation, useAddContributionMut
 import { useExpense } from '../../context';
 import { triggerHaptic } from '../../utils/haptics';
 import { DEFAULT_CATEGORIES } from '../../config';
+import { AppIcon } from '../Icon/AppIcon';
 
 export interface EditSplitModalProps {
     isOpen: boolean;
@@ -186,7 +187,7 @@ const EditSplitContent: React.FC<EditSplitContentProps> = ({ split, onClose }) =
                 <div className="p-4 border-b border-outline-variant/20 flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-2.5 min-w-0">
                         <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                            <span className="material-symbols-outlined text-[20px]">edit</span>
+                            <AppIcon name="edit" className="text-[20px]" />
                         </div>
                         <div className="min-w-0">
                             <h3 className="font-bold text-base text-on-surface truncate">Edit Split</h3>
@@ -198,9 +199,10 @@ const EditSplitContent: React.FC<EditSplitContentProps> = ({ split, onClose }) =
                     <button
                         type="button"
                         onClick={onClose}
+                        aria-label="Close edit split modal"
                         className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer shrink-0"
                     >
-                        <span className="material-symbols-outlined text-[20px]">close</span>
+                        <AppIcon name="close" className="text-[20px]" />
                     </button>
                 </div>
 
@@ -209,9 +211,7 @@ const EditSplitContent: React.FC<EditSplitContentProps> = ({ split, onClose }) =
                     {/* Guard Alert if partial dues are settled */}
                     {hasSettled && (
                         <div className="p-3 rounded-xl bg-secondary-fixed/20 border border-secondary/30 flex items-start gap-2.5 text-xs text-on-surface">
-                            <span className="material-symbols-outlined text-secondary text-[18px] shrink-0 mt-0.5">
-                                lock
-                            </span>
+                            <AppIcon name="lock" className="text-secondary text-[18px] shrink-0 mt-0.5" />
                             <div className="space-y-0.5">
                                 <span className="font-bold block">Amount & Participants Locked</span>
                                 <p className="text-[11px] text-on-surface-variant leading-relaxed">
@@ -229,7 +229,7 @@ const EditSplitContent: React.FC<EditSplitContentProps> = ({ split, onClose }) =
                             </label>
                             {hasSettled && (
                                 <span className="text-[10px] font-semibold text-secondary flex items-center gap-0.5">
-                                    <span className="material-symbols-outlined text-[12px]">lock</span>
+                                    <AppIcon name="lock" className="text-[12px]" />
                                     <span>Locked</span>
                                 </span>
                             )}
@@ -349,9 +349,7 @@ const EditSplitContent: React.FC<EditSplitContentProps> = ({ split, onClose }) =
                                     >
                                         <span>{person}</span>
                                         {isChecked && (
-                                            <span className="material-symbols-outlined text-primary text-[18px]">
-                                                check
-                                            </span>
+                                            <AppIcon name="check" className="text-primary text-[18px]" />
                                         )}
                                     </button>
                                 );
@@ -363,7 +361,7 @@ const EditSplitContent: React.FC<EditSplitContentProps> = ({ split, onClose }) =
                     <div className="bg-surface-container-low rounded-2xl p-4 border border-outline-variant/30 space-y-3">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                                <span className="material-symbols-outlined text-[18px] text-primary">payments</span>
+                                <AppIcon name="payments" className="text-[18px] text-primary" />
                                 <span className="text-xs font-bold text-on-surface">Upfront Contributions</span>
                                 {currentContributions.length > 0 && (
                                     <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-primary/10 text-primary border border-primary/20">
@@ -380,7 +378,7 @@ const EditSplitContent: React.FC<EditSplitContentProps> = ({ split, onClose }) =
                                     }}
                                     className="text-xs font-semibold text-primary hover:underline flex items-center gap-1 cursor-pointer"
                                 >
-                                    <span className="material-symbols-outlined text-[15px]">add</span>
+                                    <AppIcon name="add" className="text-[15px]" />
                                     <span>Add Contribution</span>
                                 </button>
                             )}
@@ -429,9 +427,10 @@ const EditSplitContent: React.FC<EditSplitContentProps> = ({ split, onClose }) =
                                             setIsAddingContrib(false);
                                             setContribAmount('');
                                         }}
+                                        aria-label="Cancel adding contribution"
                                         className="w-6 h-6 rounded-full flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high cursor-pointer"
                                     >
-                                        <span className="material-symbols-outlined text-[16px]">close</span>
+                                        <AppIcon name="close" className="text-[16px]" />
                                     </button>
                                 </div>
 
@@ -513,9 +512,7 @@ const EditSplitContent: React.FC<EditSplitContentProps> = ({ split, onClose }) =
                                         onClick={handleAddContribution}
                                         className="flex-1 h-8 rounded-lg bg-primary text-on-primary text-xs font-bold shadow-xs hover:bg-primary/90 flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
                                     >
-                                        <span className="material-symbols-outlined text-[14px]">
-                                            {isSavingContrib ? 'hourglass_top' : 'check'}
-                                        </span>
+                                        <AppIcon name={isSavingContrib ? 'hourglass_top' : 'check'} className="text-[14px]" />
                                         <span>{isSavingContrib ? 'Adding...' : 'Add Contribution'}</span>
                                     </button>
                                 </div>
@@ -539,9 +536,7 @@ const EditSplitContent: React.FC<EditSplitContentProps> = ({ split, onClose }) =
                         disabled={isSaving}
                         className="flex-1 h-11 rounded-xl bg-primary text-on-primary text-xs font-bold shadow-xs hover:bg-primary/90 transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                     >
-                        <span className="material-symbols-outlined text-[16px]">
-                            {isSaving ? 'hourglass_top' : 'check'}
-                        </span>
+                        <AppIcon name={isSaving ? 'hourglass_top' : 'check'} className="text-[16px]" />
                         <span>{isSaving ? 'Saving...' : 'Save Changes'}</span>
                     </button>
                 </div>

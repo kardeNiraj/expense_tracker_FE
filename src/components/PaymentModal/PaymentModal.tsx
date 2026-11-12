@@ -10,6 +10,7 @@ import {
     shareOrDownloadQrCard,
     type ParsedUpiQr,
 } from '../../utils/qr';
+import { AppIcon } from '../Icon/AppIcon';
 
 const QrScannerModal = lazy(() => import('../QRScanner/QrScannerModal'));
 
@@ -198,7 +199,7 @@ const PaymentModalContent: React.FC<PaymentModalContentProps> = ({
                             className="w-8 h-8 rounded-full hover:bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
                             aria-label="Close"
                         >
-                            <span className="material-symbols-outlined text-[20px]">close</span>
+                            <AppIcon name="close" className="text-[20px]" />
                         </button>
                     </div>
 
@@ -219,9 +220,7 @@ const PaymentModalContent: React.FC<PaymentModalContentProps> = ({
                                             title="Copy amount"
                                             aria-label="Copy amount"
                                         >
-                                            <span className="material-symbols-outlined text-[16px]">
-                                                {copiedAmount ? 'check' : 'content_copy'}
-                                            </span>
+                                            <AppIcon name={copiedAmount ? 'check' : 'content_copy'} className="text-[16px]" />
                                         </button>
                                     </>
                                 ) : (
@@ -289,9 +288,7 @@ const PaymentModalContent: React.FC<PaymentModalContentProps> = ({
                                     onClick={() => void handleShareOrSaveQr()}
                                     className="h-10 px-3 rounded-xl bg-primary text-on-primary font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs hover:bg-primary/90 active:scale-[0.98] transition-colors cursor-pointer disabled:opacity-50"
                                 >
-                                    <span className="material-symbols-outlined text-[16px]">
-                                        {isSharingQr ? 'hourglass_top' : 'ios_share'}
-                                    </span>
+                                    <AppIcon name={isSharingQr ? 'hourglass_top' : 'ios_share'} className="text-[16px]" />
                                     <span>{isSharingQr ? 'Preparing...' : 'Save / Share QR'}</span>
                                 </button>
 
@@ -303,9 +300,7 @@ const PaymentModalContent: React.FC<PaymentModalContentProps> = ({
                                     }}
                                     className="h-10 px-3 rounded-xl bg-surface-container-high hover:bg-surface-container text-on-surface font-semibold text-xs flex items-center justify-center gap-1.5 border border-outline-variant/30 active:scale-[0.98] transition-colors cursor-pointer"
                                 >
-                                    <span className="material-symbols-outlined text-[16px] text-primary">
-                                        qr_code_scanner
-                                    </span>
+                                    <AppIcon name="qr_code_scanner" className="text-[16px] text-primary" />
                                     <span>Scan QR</span>
                                 </button>
                             </div>
@@ -313,9 +308,7 @@ const PaymentModalContent: React.FC<PaymentModalContentProps> = ({
                     ) : (
                         <div className="bg-tertiary-container/30 border border-tertiary/30 rounded-2xl p-4 space-y-3">
                             <div className="flex items-start gap-2 text-xs text-on-tertiary-container">
-                                <span className="material-symbols-outlined text-[18px] text-tertiary shrink-0 mt-0.5">
-                                    warning
-                                </span>
+                                <AppIcon name="warning" className="text-[18px] text-tertiary shrink-0 mt-0.5" />
                                 <div>
                                     <span className="font-semibold block">No UPI ID saved for {settlement.to}</span>
                                     <span>Point your camera at {settlement.to}&apos;s PhonePe/GPay QR to read &amp; copy their UPI ID instantly.</span>
@@ -330,7 +323,7 @@ const PaymentModalContent: React.FC<PaymentModalContentProps> = ({
                                 }}
                                 className="w-full h-11 rounded-xl bg-primary text-on-primary text-xs font-bold flex items-center justify-center gap-2 shadow-xs hover:bg-primary/90 active:scale-[0.98] transition-colors cursor-pointer"
                             >
-                                <span className="material-symbols-outlined text-[18px]">qr_code_scanner</span>
+                                <AppIcon name="qr_code_scanner" className="text-[18px]" />
                                 <span>Open Camera &amp; Scan {settlement.to}&apos;s QR</span>
                             </button>
                         </div>
@@ -341,9 +334,7 @@ const PaymentModalContent: React.FC<PaymentModalContentProps> = ({
                         <div className="bg-primary/5 border border-primary/20 rounded-2xl p-3 space-y-2">
                             <div className="flex items-center justify-between gap-2">
                                 <span className="text-[11px] font-bold text-primary flex items-center gap-1">
-                                    <span className="material-symbols-outlined text-[15px]">
-                                        {scannedQr ? 'qr_code_scanner' : 'verified'}
-                                    </span>
+                                    <AppIcon name={scannedQr ? 'qr_code_scanner' : 'verified'} className="text-[15px]" />
                                     <span>
                                         {scannedQr
                                             ? isScannedMatch
@@ -376,9 +367,7 @@ const PaymentModalContent: React.FC<PaymentModalContentProps> = ({
                                             : 'bg-primary/10 text-primary hover:bg-primary hover:text-on-primary'
                                     }`}
                                 >
-                                    <span className="material-symbols-outlined text-[14px]">
-                                        {copiedUpi ? 'check' : 'content_copy'}
-                                    </span>
+                                    <AppIcon name={copiedUpi ? 'check' : 'content_copy'} className="text-[14px]" />
                                     <span>{copiedUpi ? 'Copied!' : 'Copy'}</span>
                                 </button>
                             </div>
@@ -392,7 +381,7 @@ const PaymentModalContent: React.FC<PaymentModalContentProps> = ({
                             onClick={handleNotifyPaidOnWhatsapp}
                             className="w-full h-11 px-3.5 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-colors active:scale-[0.98] cursor-pointer"
                         >
-                            <span className="material-symbols-outlined text-[18px]">task_alt</span>
+                            <AppIcon name="task_alt" className="text-[18px]" />
                             <span>I&apos;ve Paid — Notify {settlement.to} on WhatsApp</span>
                         </button>
 
@@ -402,9 +391,7 @@ const PaymentModalContent: React.FC<PaymentModalContentProps> = ({
                                 onClick={handleShareWhatsAppPayment}
                                 className="w-full h-9 px-3.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-semibold text-xs flex items-center justify-center gap-1.5 border border-outline-variant/30 transition-colors cursor-pointer"
                             >
-                                <span className="material-symbols-outlined text-[16px] text-primary">
-                                    share
-                                </span>
+                                <AppIcon name="share" className="text-[16px] text-primary" />
                                 <span>Copy &amp; Share Details via WhatsApp</span>
                             </button>
                         )}

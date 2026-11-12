@@ -1,4 +1,5 @@
 import React, { useId, useState } from 'react';
+import { AppIcon } from '../../components';
 import { useExpense } from '../../context';
 
 export const DeviceBlockedScreen: React.FC = () => {
@@ -50,7 +51,7 @@ export const DeviceBlockedScreen: React.FC = () => {
         <div className="min-h-screen w-full bg-surface-canvas text-on-surface flex flex-col items-center justify-center px-5 py-10 max-w-md mx-auto">
             <div className="w-full bg-surface-card border border-border-subtle rounded-3xl p-6 shadow-xs space-y-5 text-center">
                 <div className="mx-auto w-14 h-14 rounded-2xl bg-error-container text-negative flex items-center justify-center">
-                    <span className="material-symbols-outlined text-[30px]">gpp_bad</span>
+                    <AppIcon name="gpp_bad" className="text-[30px]" />
                 </div>
 
                 <div className="space-y-1.5">
@@ -82,9 +83,7 @@ export const DeviceBlockedScreen: React.FC = () => {
                         disabled={isChecking}
                         className="w-full h-11 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary-dark transition-colors cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
                     >
-                        <span className="material-symbols-outlined text-[18px]">
-                            refresh
-                        </span>
+                        <AppIcon name="refresh" className="text-[18px]" />
                         <span>{isChecking ? 'Checking status...' : 'Check Access Again'}</span>
                     </button>
 

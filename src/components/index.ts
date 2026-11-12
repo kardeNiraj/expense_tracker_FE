@@ -25,3 +25,17 @@ export { default as PullToRefresh, type PullToRefreshProps } from './PullToRefre
 export { default as PwaUpdatePrompt } from './PwaReload/PwaUpdatePrompt.tsx';
 export { SyncStatusModal, type SyncStatusModalProps } from './SyncModal/SyncStatusModal.tsx';
 export { SpendHistoryModal } from './SpendHistory/SpendHistoryModal.tsx';
+export { AppIcon, type AppIconProps } from './Icon/AppIcon.tsx';
+export {
+    AppShellSkeleton,
+    DashboardPendingSkeleton,
+    RecentExpensesSkeleton,
+    SplitsSkeleton,
+    AddPageSkeleton,
+    PeopleSkeleton,
+    SpendHistorySkeleton,
+    ClaimMembersSkeleton,
+    ClaimIdentitySkeleton,
+    AnalyticsSkeleton,
+    AdminSkeleton,
+} from './Skeleton/AppSkeleton.tsx';

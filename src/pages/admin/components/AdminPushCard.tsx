@@ -12,6 +12,7 @@ import {
     isPushSupported,
     sendTestPushNotification,
 } from '../../../utils/pushNotifications';
+import { AppIcon } from '../../../components';
 
 interface AdminPushStatusInput {
     iosNeedsInstall: boolean;
@@ -182,9 +183,7 @@ export const AdminPushCard: React.FC = () => {
                                 : 'bg-primary/10 text-primary'
                         }`}
                     >
-                        <span className="material-symbols-outlined text-[19px]">
-                            {isAdminAlertsReady ? 'notifications_active' : 'notification_important'}
-                        </span>
+                        <AppIcon name={isAdminAlertsReady ? 'notifications_active' : 'notification_important'} className="text-[19px]" />
                     </div>
                     <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -214,9 +213,7 @@ export const AdminPushCard: React.FC = () => {
                                 onClick={() => void handleTest()}
                                 className="flex-1 h-8.5 px-3 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
                             >
-                                <span className="material-symbols-outlined text-[15px]">
-                                    send
-                                </span>
+                                <AppIcon name="send" className="text-[15px]" />
                                 <span>{isTesting ? 'Sending...' : 'Send Test Alert'}</span>
                             </button>
                             <button
@@ -235,9 +232,7 @@ export const AdminPushCard: React.FC = () => {
                             onClick={() => void handleEnableOrSync()}
                             className="w-full h-9 px-3.5 rounded-xl bg-primary hover:bg-primary-dark text-on-primary text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
                         >
-                            <span className="material-symbols-outlined text-[16px]">
-                                notifications_active
-                            </span>
+                            <AppIcon name="notifications_active" className="text-[16px]" />
                             <span>{actionLabel}</span>
                         </button>
                     )}

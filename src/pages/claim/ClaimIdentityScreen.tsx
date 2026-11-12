@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useExpense } from '../../context';
 import { usePeople, usePeopleDetails, useTripInfo } from '../../api';
 import { Avatar } from '../../components/Avatar';
+import { AppIcon, ClaimMembersSkeleton } from '../../components';
 import { ENV } from '../../config';
 import { ClaimAdminModal, ClaimConfirmModal } from './ClaimModals';
 
@@ -110,7 +111,7 @@ export const ClaimIdentityScreen: React.FC = () => {
             <div className="relative z-10 space-y-4 pt-2">
                 <div className="flex items-center gap-2.5">
                     <div className="w-10 h-10 rounded-2xl bg-primary text-on-primary flex items-center justify-center shadow-xs">
-                        <span className="material-symbols-outlined text-[24px]">{tripIcon}</span>
+                        <AppIcon name={tripIcon} className="text-[24px]" />
                     </div>
                     <div>
                         <span className="label-pill text-primary uppercase block">
@@ -161,16 +162,7 @@ export const ClaimIdentityScreen: React.FC = () => {
                     <span className="text-[11px] text-primary font-medium">Tap your name</span>
                 </div>
 
-                {isLoading && (
-                    <div className="space-y-2.5 pt-1">
-                        {[1, 2, 3, 4].map((i) => (
-                            <div
-                                key={i}
-                                className="h-16 rounded-2xl bg-surface-card-subtle animate-pulse flex items-center px-4 gap-3 border border-border-subtle"
-                            />
-                        ))}
-                    </div>
-                )}
+                {isLoading && <ClaimMembersSkeleton />}
 
                 {isError && (
                     <div className="p-4 rounded-2xl bg-error-container text-on-error-container text-xs text-center space-y-2">
@@ -224,9 +216,7 @@ export const ClaimIdentityScreen: React.FC = () => {
                                             )}
                                             {!isBlocked && isLocked && (
                                                 <span className="px-1.5 py-0.5 rounded-full bg-status-pending-bg text-status-pending-text text-[10px] font-bold flex items-center gap-0.5">
-                                                    <span className="material-symbols-outlined text-[11px]">
-                                                        lock
-                                                    </span>
+                                                    <AppIcon name="lock" className="text-[11px]" />
                                                     <span>Protected</span>
                                                 </span>
                                             )}
@@ -257,9 +247,7 @@ export const ClaimIdentityScreen: React.FC = () => {
                                 >
                                     <span>{isBlocked ? 'Blocked' : isLocked ? 'Verify' : `I'm ${person}`}</span>
                                     {!isBlocked && (
-                                        <span className="material-symbols-outlined text-[14px]">
-                                            {isLocked ? 'approval_delegation' : 'arrow_forward'}
-                                        </span>
+                                        <AppIcon name={isLocked ? 'approval_delegation' : 'arrow_forward'} className="text-[14px]" />
                                     )}
                                 </span>
                             </button>
@@ -279,9 +267,7 @@ export const ClaimIdentityScreen: React.FC = () => {
                     }}
                     className="text-xs text-on-surface-variant hover:text-primary transition-colors font-medium flex items-center gap-1.5 py-1 px-3 rounded-lg hover:bg-surface-card-subtle cursor-pointer"
                 >
-                    <span className="material-symbols-outlined text-[16px]">
-                        admin_panel_settings
-                    </span>
+                    <AppIcon name="admin_panel_settings" className="text-[16px]" />
                     <span>Trip Organizer / Admin? Unlock all profiles</span>
                 </button>
                 <span className="text-[10px] text-outline font-mono text-center">

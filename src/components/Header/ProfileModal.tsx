@@ -4,6 +4,7 @@ import { triggerHaptic } from '../../utils/haptics';
 import { reloadApp } from '../../utils/pwaReload';
 import { ProfilePushControl } from './ProfilePushControl';
 import type { ClaimActionResult } from '../../context/ExpenseContextDef';
+import { AppIcon } from '../Icon/AppIcon';
 
 interface ProfileModalProps {
     isOpen: boolean;
@@ -115,13 +116,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 <div className="p-4 border-b border-outline-variant/20 flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-2.5 min-w-0">
                         <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                            <span className="material-symbols-outlined text-[20px]">
-                                {isSwitcherUnlocked
+                            <AppIcon
+                                name={isSwitcherUnlocked
                                     ? 'admin_panel_settings'
                                     : isDeviceClaimed
                                         ? 'verified_user'
                                         : 'switch_account'}
-                            </span>
+                                className="text-[20px]"
+                            />
                         </div>
                         <div className="min-w-0">
                             <h3 className="font-bold text-base text-on-surface truncate">
@@ -146,7 +148,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                         className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer shrink-0"
                         title="Close"
                     >
-                        <span className="material-symbols-outlined text-[20px]">close</span>
+                        <AppIcon name="close" className="text-[20px]" />
                     </button>
                 </div>
 
@@ -161,9 +163,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                                     <div>
                                         <div className="font-bold text-sm text-on-surface flex items-center gap-1.5">
                                             <span>{claimedPerson}</span>
-                                            <span className="material-symbols-outlined text-primary text-[15px]">
-                                                lock
-                                            </span>
+                                            <AppIcon name="lock" className="text-primary text-[15px]" />
                                         </div>
                                         <p className="text-[11px] text-on-surface-variant">
                                             This device is locked to your profile to prevent unauthorized settlements.
@@ -215,9 +215,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                                     disabled={isSubmitting}
                                     className="flex-1 h-11 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-colors cursor-pointer disabled:opacity-60 shadow-xs flex items-center justify-center gap-1.5"
                                 >
-                                    <span className="material-symbols-outlined text-[16px]">
-                                        lock_open
-                                    </span>
+                                    <AppIcon name="lock_open" className="text-[16px]" />
                                     <span>{isSubmitting ? 'Verifying...' : 'Unlock Switcher'}</span>
                                 </button>
                             </div>
@@ -231,9 +229,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                             {isSwitcherUnlocked && (
                                 <div className="p-3 rounded-2xl bg-primary-fixed/25 border border-primary/30 flex items-center justify-between text-xs gap-2">
                                     <div className="flex items-center gap-2 min-w-0">
-                                        <span className="material-symbols-outlined text-primary text-[18px] shrink-0">
-                                            admin_panel_settings
-                                        </span>
+                                        <AppIcon name="admin_panel_settings" className="text-primary text-[18px] shrink-0" />
                                         <div className="min-w-0">
                                             <span className="font-bold text-on-surface block truncate">
                                                 Admin Mode Active
@@ -321,7 +317,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                                                         )}
                                                         {isOwner && (
                                                             <span className="px-1.5 py-0.2 rounded-md bg-secondary-fixed text-on-secondary-fixed text-[10px] font-bold flex items-center gap-0.5">
-                                                                <span className="material-symbols-outlined text-[10px]">lock</span>
+                                                                <AppIcon name="lock" className="text-[10px]" />
                                                                 <span>Device Owner</span>
                                                             </span>
                                                         )}
@@ -369,9 +365,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                     {isSwitcherUnlocked && onOpenAdminConsole && (
                         <div className="flex items-center justify-between text-xs px-0.5 pb-1.5 border-b border-outline-variant/15">
                             <div className="flex items-center gap-1.5 text-on-surface-variant min-w-0">
-                                <span className="material-symbols-outlined text-primary text-[17px] shrink-0">
-                                    shield_person
-                                </span>
+                                <AppIcon name="shield_person" className="text-primary text-[17px] shrink-0" />
                                 <div className="min-w-0">
                                     <span className="font-bold text-on-surface block text-[11px] leading-tight">
                                         Admin Console &amp; Device Control
@@ -390,7 +384,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                                 className="h-8 px-2.5 rounded-xl bg-primary text-on-primary text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors hover:bg-primary-dark"
                             >
                                 <span>Open</span>
-                                <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+                                <AppIcon name="arrow_forward" className="text-[14px]" />
                             </button>
                         </div>
                     )}
@@ -398,9 +392,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                     {onOpenSpendHistory && (
                         <div className="flex items-center justify-between text-xs px-0.5 pb-1 border-b border-outline-variant/15">
                             <div className="flex items-center gap-1.5 text-on-surface-variant min-w-0">
-                                <span className="material-symbols-outlined text-primary text-[17px] shrink-0">
-                                    calendar_month
-                                </span>
+                                <AppIcon name="calendar_month" className="text-primary text-[17px] shrink-0" />
                                 <div className="min-w-0">
                                     <span className="font-bold text-on-surface block text-[11px] leading-tight">
                                         Month-wise Spend History
@@ -419,7 +411,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                                 className="h-8 px-2.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors active:scale-95"
                             >
                                 <span>Spends</span>
-                                <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+                                <AppIcon name="arrow_forward" className="text-[14px]" />
                             </button>
                         </div>
                     )}
@@ -427,9 +419,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                     {onOpenSyncStatus && (
                         <div className="flex items-center justify-between text-xs px-0.5 pb-1 border-b border-outline-variant/15">
                             <div className="flex items-center gap-1.5 text-on-surface-variant min-w-0">
-                                <span className="material-symbols-outlined text-primary text-[17px] shrink-0">
-                                    cloud_sync
-                                </span>
+                                <AppIcon name="cloud_sync" className="text-primary text-[17px] shrink-0" />
                                 <div className="min-w-0">
                                     <span className="font-bold text-on-surface block text-[11px] leading-tight">
                                         Offline Sync & Queues
@@ -448,7 +438,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                                 className="h-8 px-2.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors active:scale-95"
                             >
                                 <span>Status</span>
-                                <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+                                <AppIcon name="arrow_forward" className="text-[14px]" />
                             </button>
                         </div>
                     )}
@@ -461,9 +451,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
                     <div className="flex items-center justify-between text-xs px-0.5">
                         <div className="flex items-center gap-1.5 text-on-surface-variant min-w-0">
-                            <span className="material-symbols-outlined text-primary text-[17px] shrink-0">
-                                cached
-                            </span>
+                            <AppIcon name="cached" className="text-primary text-[17px] shrink-0" />
                             <div className="min-w-0">
                                 <span className="font-bold text-on-surface block text-[11px] leading-tight">
                                     App Version & PWA
@@ -480,9 +468,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                                 className="h-8 px-2.5 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-primary text-xs font-bold border border-outline-variant/30 flex items-center gap-1 cursor-pointer transition-colors active:scale-95 shadow-2xs"
                                 title="Check for SW updates and reload frontend"
                             >
-                                <span className="material-symbols-outlined text-[15px]">
-                                    refresh
-                                </span>
+                                <AppIcon name="refresh" className="text-[15px]" />
                                 <span>Reload</span>
                             </button>
                             <button
@@ -491,9 +477,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                                 className="h-8 px-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-medium border border-outline-variant/20 flex items-center gap-1 cursor-pointer transition-colors active:scale-95"
                                 title="Purge static bundle cache and reload. Your user claim and offline data remain safe in localStorage."
                             >
-                                <span className="material-symbols-outlined text-[15px] text-secondary">
-                                    restart_alt
-                                </span>
+                                <AppIcon name="restart_alt" className="text-[15px] text-secondary" />
                                 <span>Hard Reload</span>
                             </button>
                         </div>

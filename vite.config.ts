@@ -75,8 +75,8 @@ export default defineConfig(({ command, mode }) => {
         name: 'SplitNest',
         short_name: 'SplitNest',
         description: 'Track and split group expenses seamlessly',
-        theme_color: '#006948',
-        background_color: '#f8f9ff',
+        theme_color: '#065f46',
+        background_color: '#f8fafc',
         display: 'standalone',
         orientation: 'portrait',
         icons: [

@@ -1,7 +1,7 @@
 import React, { lazy, Suspense, useState } from 'react';
 import { useExpense } from '../../context';
 import { usePeopleDetails, useUpdateUpiMutation, usePeople } from '../../api';
-import { Avatar, SpendHistoryModal } from '../../components';
+import { AppIcon, Avatar, PeopleSkeleton, SpendHistoryModal } from '../../components';
 import { triggerHaptic } from '../../utils/haptics';
 import type { PersonDetail } from '../../api/types';
 import type { ParsedUpiQr } from '../../utils/qr';
@@ -67,17 +67,13 @@ export function PeoplePage() {
                     className="w-9 h-9 rounded-xl bg-surface-container flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer border border-outline-variant/30"
                     title="Refresh Cache from Server"
                 >
-                    <span className="material-symbols-outlined text-[18px]">
-                        sync
-                    </span>
+                    <AppIcon name="sync" className="text-[18px]" />
                 </button>
             </div>
 
             {/* People List */}
             {isLoading ? (
-                <div className="bg-surface-container-lowest p-8 rounded-2xl text-center text-xs text-on-surface-variant animate-pulse border border-outline-variant/30">
-                    Loading trip members from server...
-                </div>
+                <PeopleSkeleton />
             ) : (
                 <div className="space-y-3">
                     {peopleDetails.map((person) => {
@@ -154,9 +150,7 @@ export function PeoplePage() {
                                                 className="h-8 px-2.5 rounded-lg bg-surface-container text-on-surface hover:text-primary text-xs font-semibold transition-colors cursor-pointer border border-outline-variant/20 flex items-center gap-1 shadow-2xs"
                                                 title="View your month-wise spend history"
                                             >
-                                                <span className="material-symbols-outlined text-[15px] text-primary">
-                                                    calendar_month
-                                                </span>
+                                                <AppIcon name="calendar_month" className="text-[15px] text-primary" />
                                                 <span>My Spends</span>
                                             </button>
 
@@ -169,9 +163,7 @@ export function PeoplePage() {
                                                 }}
                                                 className="h-8 px-2.5 rounded-lg bg-surface-container text-primary hover:bg-primary hover:text-on-primary text-xs font-semibold transition-colors cursor-pointer border border-outline-variant/20 flex items-center gap-1 shadow-2xs"
                                             >
-                                                <span className="material-symbols-outlined text-[15px]">
-                                                    {person.upiId ? 'edit' : 'add'}
-                                                </span>
+                                                <AppIcon name={person.upiId ? 'edit' : 'add'} className="text-[15px]" />
                                                 <span>{person.upiId ? 'Edit' : 'Add UPI'}</span>
                                             </button>
                                         </div>
@@ -202,11 +194,10 @@ export function PeoplePage() {
                                     setShowUpiScanner(false);
                                     setEditingPerson(null);
                                 }}
+                                aria-label="Close UPI modal"
                                 className="w-7 h-7 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-on-surface cursor-pointer"
                             >
-                                <span className="material-symbols-outlined text-[16px]">
-                                    close
-                                </span>
+                                <AppIcon name="close" className="text-[16px]" />
                             </button>
                         </div>
 
@@ -239,9 +230,7 @@ export function PeoplePage() {
                                         className="h-11 px-3 rounded-xl bg-surface-container hover:bg-primary/10 text-primary border border-outline-variant/30 text-xs font-bold flex items-center gap-1 shrink-0 cursor-pointer transition-colors"
                                         title="Scan UPI QR code or screenshot to auto-fill"
                                     >
-                                        <span className="material-symbols-outlined text-[18px]">
-                                            qr_code_scanner
-                                        </span>
+                                        <AppIcon name="qr_code_scanner" className="text-[18px]" />
                                         <span>Scan QR</span>
                                     </button>
                                 </div>

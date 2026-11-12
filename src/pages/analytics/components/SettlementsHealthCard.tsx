@@ -1,6 +1,6 @@
 import React from 'react';
 import type { AnalyticsSettlementsOverview } from '../../../api/types';
-import { Avatar } from '../../../components';
+import { AppIcon, Avatar } from '../../../components';
 import { triggerHaptic } from '../../../utils/haptics';
 
 interface SettlementsHealthCardProps {
@@ -91,7 +91,7 @@ export const SettlementsHealthCard: React.FC<SettlementsHealthCardProps> = ({
             {/* Counterparties List */}
             {settlements.counterparties.length === 0 ? (
                 <div className="p-3 rounded-xl bg-status-settled-bg/50 border border-primary/20 flex items-center gap-2 text-xs text-status-settled-text font-medium">
-                    <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                    <AppIcon name="check_circle" className="text-[18px]" />
                     <span>
                         {(settlements.offsetSplitsCount ?? 0) > 0
                             ? `All balances offset pairwise to ₹0 (${settlements.offsetSplitsCount} mutual splits can be closed on Home).`
@@ -160,7 +160,7 @@ export const SettlementsHealthCard: React.FC<SettlementsHealthCardProps> = ({
                         className="w-full py-2.5 rounded-xl bg-secondary text-on-secondary hover:bg-secondary-dark text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-[background-color,transform] active:scale-[0.98]"
                     >
                         <span>Settle Pending Balances</span>
-                        <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                        <AppIcon name="arrow_forward" className="text-[16px]" />
                     </button>
                 </div>
             )}

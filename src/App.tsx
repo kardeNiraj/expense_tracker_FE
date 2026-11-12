@@ -2,10 +2,24 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { ExpenseProvider, useExpense } from './context';
 import { getTabFromPathname } from './context/expenseStorage';
-import { MobileGate, Header, BottomNav, Toast, InstallPrompt, PullToRefresh, PwaUpdatePrompt } from './components';
+import {
+    MobileGate,
+    Header,
+    BottomNav,
+    Toast,
+    InstallPrompt,
+    PullToRefresh,
+    PwaUpdatePrompt,
+    AppShellSkeleton,
+    SplitsSkeleton,
+    AddPageSkeleton,
+    PeopleSkeleton,
+    ClaimIdentitySkeleton,
+    AnalyticsSkeleton,
+    AdminSkeleton,
+} from './components';
 import { apiFetch, queryKeys } from './api';
-import { Dashboard, SplitsPage, AddPage, PeoplePage, ClaimIdentityScreen } from './pages';
-import { DeviceBlockedScreen } from './pages/claim/DeviceBlockedScreen';
+import Dashboard from './pages/home/index.tsx';
 import { ENV } from './config';
 import { setupQueryCachePersistence } from './utils/idbQueryCache';
 import { processOfflineQueue } from './utils/offlineQueue';
@@ -15,8 +29,15 @@ import {
     syncExistingPushSubscription,
 } from './utils/pushNotifications';
 
+const SplitsPage = lazy(() => import('./pages/splits/index.tsx'));
+const AddPage = lazy(() => import('./pages/add/index.tsx'));
+const PeoplePage = lazy(() => import('./pages/people/index.tsx'));
+const ClaimIdentityScreen = lazy(() => import('./pages/claim/ClaimIdentityScreen.tsx'));
+const DeviceBlockedScreen = lazy(() => import('./pages/claim/DeviceBlockedScreen.tsx'));
 const AnalyticsPage = lazy(() => import('./pages/analytics/index.tsx'));
 const AdminPage = lazy(() => import('./pages/admin/index.tsx'));
+
+const IDB_STARTUP_TIMEOUT_MS = 1200;
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -138,7 +159,9 @@ function MainApp() {
         return (
             <div className="min-h-screen w-full bg-surface-canvas text-on-surface flex flex-col relative font-sans">
                 <PwaUpdatePrompt />
-                <DeviceBlockedScreen />
+                <Suspense fallback={<ClaimIdentitySkeleton />}>
+                    <DeviceBlockedScreen />
+                </Suspense>
                 <Toast />
             </div>
         );
@@ -150,11 +173,7 @@ function MainApp() {
             <div className="min-h-screen w-full bg-surface-canvas text-on-surface flex flex-col relative font-sans">
                 <PwaUpdatePrompt />
                 <main className="flex-1 w-full max-w-md mx-auto px-4 pt-6 pb-10 relative">
-                    <Suspense
-                        fallback={
-                            <div className="h-56 rounded-3xl bg-surface-card-subtle border border-border-subtle animate-pulse" />
-                        }
-                    >
+                    <Suspense fallback={<AdminSkeleton />}>
                         <AdminPage />
                     </Suspense>
                 </main>
@@ -171,7 +190,9 @@ function MainApp() {
                 <div className="max-w-md mx-auto w-full px-4 pt-3">
                     <InstallPrompt />
                 </div>
-                <ClaimIdentityScreen />
+                <Suspense fallback={<ClaimIdentitySkeleton />}>
+                    <ClaimIdentityScreen />
+                </Suspense>
                 <Toast />
             </div>
         );
@@ -188,37 +209,31 @@ function MainApp() {
                 <main className="flex-1 w-full max-w-md mx-auto px-4 pt-20 pb-24 relative">
                     <InstallPrompt />
                     {activeTab === 'dashboard' && <Dashboard />}
-                    {activeTab === 'splits' && <SplitsPage />}
-                    {activeTab === 'add' && <AddPage />}
+                    {activeTab === 'splits' && (
+                        <Suspense fallback={<SplitsSkeleton />}>
+                            <SplitsPage />
+                        </Suspense>
+                    )}
+                    {activeTab === 'add' && (
+                        <Suspense fallback={<AddPageSkeleton />}>
+                            <AddPage />
+                        </Suspense>
+                    )}
                     {activeTab === 'analytics' && (
-                        <Suspense
-                            fallback={
-                                <div className="space-y-3 pt-2">
-                                    <div className="h-36 rounded-3xl bg-surface-card-subtle border border-border-subtle animate-pulse" />
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="h-24 rounded-2xl bg-surface-card-subtle border border-border-subtle animate-pulse" />
-                                        <div className="h-24 rounded-2xl bg-surface-card-subtle border border-border-subtle animate-pulse" />
-                                    </div>
-                                    <div className="h-56 rounded-2xl bg-surface-card-subtle border border-border-subtle animate-pulse" />
-                                </div>
-                            }
-                        >
+                        <Suspense fallback={<AnalyticsSkeleton />}>
                             <AnalyticsPage />
                         </Suspense>
                     )}
                     {activeTab === 'admin' && (
-                        <Suspense
-                            fallback={
-                                <div className="space-y-3 pt-2">
-                                    <div className="h-40 rounded-3xl bg-surface-card-subtle border border-border-subtle animate-pulse" />
-                                    <div className="h-56 rounded-3xl bg-surface-card-subtle border border-border-subtle animate-pulse" />
-                                </div>
-                            }
-                        >
+                        <Suspense fallback={<AdminSkeleton />}>
                             <AdminPage />
                         </Suspense>
                     )}
-                    {activeTab === 'people' && <PeoplePage />}
+                    {activeTab === 'people' && (
+                        <Suspense fallback={<PeopleSkeleton />}>
+                            <PeoplePage />
+                        </Suspense>
+                    )}
                 </main>
             </PullToRefresh>
 
@@ -236,55 +251,76 @@ export function App() {
 
     useEffect(() => {
         let mounted = true;
+        let settled = false;
         const initialTab =
             typeof window !== 'undefined' ? getTabFromPathname(window.location.pathname) : 'dashboard';
+
+        const finishStartup = () => {
+            if (!mounted || settled) return;
+            settled = true;
+            setIsCacheReady(true);
+            // Proactively prefetch people details & member list on startup
+            // so UPI IDs and QR collection are ready offline even before visiting People tab
+            if (typeof navigator !== 'undefined' && navigator.onLine) {
+                queryClient.prefetchQuery({
+                    queryKey: queryKeys.peopleDetails(),
+                    queryFn: () => apiFetch('/people/details?refresh=false'),
+                });
+                queryClient.prefetchQuery({
+                    queryKey: queryKeys.people(false),
+                    queryFn: () => apiFetch('/people?refresh=false'),
+                });
+            }
+        };
+
+        const timeoutId = window.setTimeout(finishStartup, IDB_STARTUP_TIMEOUT_MS);
+
         Promise.allSettled([
             setupQueryCachePersistence(queryClient, {
                 deferAnalytics: initialTab !== 'analytics',
             }),
             syncPersistentDeviceId(),
         ]).finally(() => {
-                if (mounted) {
-                    setIsCacheReady(true);
-                    // Proactively prefetch people details & member list on startup
-                    // so UPI IDs and QR collection are ready offline even before visiting People tab
-                    if (typeof navigator !== 'undefined' && navigator.onLine) {
-                        queryClient.prefetchQuery({
-                            queryKey: queryKeys.peopleDetails(),
-                            queryFn: () => apiFetch('/people/details?refresh=false'),
-                        });
-                        queryClient.prefetchQuery({
-                            queryKey: queryKeys.people(false),
-                            queryFn: () => apiFetch('/people?refresh=false'),
-                        });
-                    }
-                }
-            });
+            window.clearTimeout(timeoutId);
+            finishStartup();
+        });
 
         return () => {
             mounted = false;
+            window.clearTimeout(timeoutId);
         };
     }, []);
 
+    useEffect(() => {
+        if (!isCacheReady) return;
+
+        const prefetchLazyRoutes = () => {
+            void import('./pages/splits/index.tsx');
+            void import('./pages/add/index.tsx');
+            void import('./pages/people/index.tsx');
+            void import('./pages/analytics/index.tsx');
+        };
+
+        const win = window as Window & {
+            requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+            cancelIdleCallback?: (handle: number) => void;
+        };
+
+        if (typeof win.requestIdleCallback === 'function') {
+            const idleId = win.requestIdleCallback(prefetchLazyRoutes, { timeout: 2500 });
+            return () => {
+                win.cancelIdleCallback?.(idleId);
+            };
+        }
+
+        const timerId = window.setTimeout(prefetchLazyRoutes, 400);
+        return () => {
+            window.clearTimeout(timerId);
+        };
+    }, [isCacheReady]);
+
     if (!isCacheReady) {
-        return (
-            <div className="min-h-screen w-full bg-surface text-primary flex items-center justify-center font-sans">
-                <div className="flex flex-col items-center gap-3 animate-pulse">
-                    <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-xs">
-                        <svg
-                            viewBox="0 0 24 24"
-                            className="w-7 h-7 fill-current"
-                            aria-hidden="true"
-                        >
-                            <path d="M14 6l-3.75 5 2.85 3.8-1.6 1.2C9.81 13.75 7 10 7 10l-6 8h22L14 6z" />
-                        </svg>
-                    </div>
-                    <span className="text-xs font-semibold tracking-wider uppercase font-mono text-on-surface-variant">
-                        SplitNest
-                    </span>
-                </div>
-            </div>
-        );
+        return <AppShellSkeleton />;
     }
 
     return (

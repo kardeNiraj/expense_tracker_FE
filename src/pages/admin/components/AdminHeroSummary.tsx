@@ -1,5 +1,6 @@
 import React from 'react';
 import type { AdminDashboardSummary } from '../../../api/types';
+import { AppIcon } from '../../../components';
 
 interface AdminHeroSummaryProps {
     summary: AdminDashboardSummary;
@@ -45,9 +46,7 @@ export const AdminHeroSummary: React.FC<AdminHeroSummaryProps> = ({
                             title="Refresh admin data"
                             aria-label="Refresh admin data"
                         >
-                            <span className="material-symbols-outlined text-[18px]">
-                                refresh
-                            </span>
+                            <AppIcon name="refresh" className="text-[18px]" />
                         </button>
                         <button
                             type="button"
@@ -55,7 +54,7 @@ export const AdminHeroSummary: React.FC<AdminHeroSummaryProps> = ({
                             className="h-9 px-3 rounded-xl bg-on-primary/15 hover:bg-on-primary/25 text-on-primary text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors"
                             title="Lock admin mode and return to app"
                         >
-                            <span className="material-symbols-outlined text-[15px]">lock</span>
+                            <AppIcon name="lock" className="text-[15px]" />
                             <span>Exit</span>
                         </button>
                     </div>

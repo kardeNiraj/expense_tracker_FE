@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import type { AnalyticsCategoryStat } from '../../../api/types';
 import { getCategoryMeta } from '../../../utils/formatters';
 import { triggerHaptic } from '../../../utils/haptics';
+import { AppIcon } from '../../../components';
 
 // Strictly derived from DESIGN.md Section 2.1 & 2.3 Brand & Status Palette
 const CATEGORY_COLORS = [
@@ -238,9 +239,7 @@ export const CategoryDonutCard: React.FC<CategoryDonutCardProps> = ({
                                             <div
                                                 className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${meta.bgClass} ${meta.textClass}`}
                                             >
-                                                <span className="material-symbols-outlined text-[16px]">
-                                                    {meta.icon}
-                                                </span>
+                                                <AppIcon name={meta.icon} className="text-[16px]" />
                                             </div>
                                             <div className="min-w-0">
                                                 <div className="flex items-center gap-1.5">

@@ -17,6 +17,7 @@ import { PendingApprovalsCard } from './components/PendingApprovalsCard';
 import { PersonClaimsOverviewCard } from './components/PersonClaimsOverviewCard';
 import { DeviceRegistryCard } from './components/DeviceRegistryCard';
 import { SecurityAuditCard } from './components/SecurityAuditCard';
+import { AdminSkeleton, AppIcon } from '../../components';
 
 export const AdminPage: React.FC = () => {
     const {
@@ -133,25 +134,14 @@ export const AdminPage: React.FC = () => {
     };
 
     if (isLoading && !dashboard) {
-        return (
-            <div className="space-y-3 pt-2">
-                <div className="h-44 rounded-3xl bg-surface-card-subtle border border-border-subtle animate-pulse" />
-                <div className="grid grid-cols-2 gap-2.5">
-                    <div className="h-24 rounded-2xl bg-surface-card-subtle border border-border-subtle animate-pulse" />
-                    <div className="h-24 rounded-2xl bg-surface-card-subtle border border-border-subtle animate-pulse" />
-                </div>
-                <div className="h-64 rounded-3xl bg-surface-card-subtle border border-border-subtle animate-pulse" />
-            </div>
-        );
+        return <AdminSkeleton />;
     }
 
     if (isError && !dashboard) {
         return (
             <div className="pt-4">
                 <div className="bg-surface-card border border-negative/30 rounded-3xl p-6 text-center space-y-3">
-                    <span className="material-symbols-outlined text-negative text-[36px]">
-                        gpp_maybe
-                    </span>
+                    <AppIcon name="gpp_maybe" className="text-negative text-[36px]" />
                     <h2 className="headline-md text-on-surface">
                         Could not load Admin Console
                     </h2>

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ENV } from '../../config';
+import { AppIcon } from '../Icon/AppIcon';
 
 interface MobileGateProps {
     children: React.ReactNode;
@@ -192,7 +193,7 @@ export const MobileGate: React.FC<MobileGateProps> = ({ children, breakpoint = E
                         type="button"
                         className="w-full mt-4 py-2.5 px-4 rounded-xl bg-primary text-on-primary text-xs font-semibold shadow-md flex items-center justify-center gap-2 hover:bg-primary-container transition-all cursor-pointer"
                     >
-                        <span className="material-symbols-outlined text-[18px]">smartphone</span>
+                        <AppIcon name="smartphone" className="text-[18px]" />
                         <span>Preview in Mobile Frame</span>
                     </button>
                 </div>

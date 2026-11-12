@@ -1,5 +1,6 @@
 import React from 'react';
 import type { AnalyticsInsight } from '../../../api/types';
+import { AppIcon } from '../../../components';
 
 interface InsightsStripProps {
     insights: AnalyticsInsight[];
@@ -38,9 +39,7 @@ export const InsightsStrip: React.FC<InsightsStripProps> = ({ insights }) => {
                             className={`min-w-[245px] max-w-[270px] snap-start p-3.5 rounded-2xl border shadow-[0_1px_3px_rgba(15,23,42,0.05)] shrink-0 space-y-1 ${toneClasses}`}
                         >
                             <div className="flex items-center gap-1.5">
-                                <span className="material-symbols-outlined text-[16px]">
-                                    {iconName}
-                                </span>
+                                <AppIcon name={iconName} className="text-[16px]" />
                                 <span className="text-xs font-bold truncate">{ins.title}</span>
                             </div>
                             <p className="text-xs opacity-90 leading-relaxed">{ins.message}</p>

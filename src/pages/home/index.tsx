@@ -15,7 +15,10 @@ import {
     usePushStatus,
 } from '../../api';
 import {
+    AppIcon,
     Avatar,
+    DashboardPendingSkeleton,
+    RecentExpensesSkeleton,
     PaymentModal,
     type PaymentSettlementData,
     CollectQrModal,
@@ -489,30 +492,42 @@ export function Dashboard() {
 
                 {/* Net Standing Pill */}
                 <div
-                    className={`px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-2xs shrink-0 border ${netBalance > 0
-                            ? 'bg-primary-fixed/60 border-primary/20 text-on-primary-fixed'
-                            : netBalance < 0
+                    className={`px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-2xs shrink-0 border ${
+                        isSplitsLoading
+                            ? 'bg-surface-container border-outline-variant/30 text-on-surface-variant'
+                            : netBalance > 0
+                              ? 'bg-primary-fixed/60 border-primary/20 text-on-primary-fixed'
+                              : netBalance < 0
                                 ? 'bg-error-container/40 border-error/30 text-error'
                                 : 'bg-surface-container border-outline-variant/30 text-on-surface-variant'
-                        }`}
+                    }`}
                     title={
-                        netBalance > 0
-                            ? `You are to receive ₹${netBalance.toLocaleString('en-IN')} net after all settlements`
-                            : netBalance < 0
+                        isSplitsLoading
+                            ? 'Calculating net standing...'
+                            : netBalance > 0
+                              ? `You are to receive ₹${netBalance.toLocaleString('en-IN')} net after all settlements`
+                              : netBalance < 0
                                 ? `You owe ₹${Math.abs(netBalance).toLocaleString('en-IN')} net after all settlements`
                                 : 'All your settlements are cleared'
                     }
                 >
-                    <span className="material-symbols-outlined text-[16px]">
-                        {netBalance > 0 ? 'trending_up' : netBalance < 0 ? 'trending_down' : 'check_circle'}
-                    </span>
-                    <span className="text-xs font-bold font-mono">
-                        {netBalance > 0
-                            ? `+₹${netBalance.toLocaleString('en-IN')} to receive`
-                            : netBalance < 0
-                                ? `-₹${Math.abs(netBalance).toLocaleString('en-IN')} to pay`
-                                : '₹0 all settled'}
-                    </span>
+                    {isSplitsLoading ? (
+                        <span className="inline-block w-24 h-3.5 rounded-full bg-outline-variant/30 animate-pulse" />
+                    ) : (
+                        <>
+                            <AppIcon
+                                name={netBalance > 0 ? 'trending_up' : netBalance < 0 ? 'trending_down' : 'check_circle'}
+                                className="text-[16px]"
+                            />
+                            <span className="text-xs font-bold font-mono">
+                                {netBalance > 0
+                                    ? `+₹${netBalance.toLocaleString('en-IN')} to receive`
+                                    : netBalance < 0
+                                        ? `-₹${Math.abs(netBalance).toLocaleString('en-IN')} to pay`
+                                        : '₹0 all settled'}
+                            </span>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -525,23 +540,28 @@ export function Dashboard() {
                             EXPECT FROM OTHERS
                         </span>
                         <div className="w-6 h-6 rounded-full bg-primary-fixed flex items-center justify-center text-primary">
-                            <span className="material-symbols-outlined text-[15px]">
-                                arrow_downward
-                            </span>
+                            <AppIcon name="arrow_downward" className="text-[15px]" />
                         </div>
                     </div>
-                    <div>
-                        <p className="text-xl font-bold text-primary tracking-tight font-mono">
-                            ₹{totalOwedToYou.toLocaleString('en-IN')}
-                        </p>
-                        <p className="text-[11px] text-on-surface-variant truncate mt-0.5">
-                            {groupedOwedToMeList.length > 0
-                                ? `From ${groupedOwedToMeList.length} ${groupedOwedToMeList.length === 1 ? 'person' : 'people'}`
-                                : totalOffsetAmount > 0
-                                  ? `Nothing due (₹${totalOffsetAmount.toLocaleString('en-IN')} offset)`
-                                  : 'Nothing pending'}
-                        </p>
-                    </div>
+                    {isSplitsLoading ? (
+                        <div className="space-y-1.5 py-0.5">
+                            <div className="h-6 w-20 rounded-md bg-outline-variant/25 animate-pulse" />
+                            <div className="h-3 w-24 rounded bg-outline-variant/20 animate-pulse" />
+                        </div>
+                    ) : (
+                        <div>
+                            <p className="text-xl font-bold text-primary tracking-tight font-mono">
+                                ₹{totalOwedToYou.toLocaleString('en-IN')}
+                            </p>
+                            <p className="text-[11px] text-on-surface-variant truncate mt-0.5">
+                                {groupedOwedToMeList.length > 0
+                                    ? `From ${groupedOwedToMeList.length} ${groupedOwedToMeList.length === 1 ? 'person' : 'people'}`
+                                    : totalOffsetAmount > 0
+                                      ? `Nothing due (₹${totalOffsetAmount.toLocaleString('en-IN')} offset)`
+                                      : 'Nothing pending'}
+                            </p>
+                        </div>
+                    )}
                 </div>
 
                 {/* Money You Owe */}
@@ -551,31 +571,37 @@ export function Dashboard() {
                             YOU OWE
                         </span>
                         <div
-                            className={`w-6 h-6 rounded-full flex items-center justify-center ${totalYouOwe > 0
+                            className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                                !isSplitsLoading && totalYouOwe > 0
                                     ? 'bg-error-container text-error'
                                     : 'bg-surface-container text-on-surface-variant'
-                                }`}
+                            }`}
                         >
-                            <span className="material-symbols-outlined text-[15px]">
-                                arrow_upward
-                            </span>
+                            <AppIcon name="arrow_upward" className="text-[15px]" />
                         </div>
                     </div>
-                    <div>
-                        <p
-                            className={`text-xl font-bold tracking-tight font-mono ${totalYouOwe > 0 ? 'text-error' : 'text-on-surface'
-                                }`}
-                        >
-                            ₹{totalYouOwe.toLocaleString('en-IN')}
-                        </p>
-                        <p className="text-[11px] text-on-surface-variant truncate mt-0.5">
-                            {groupedOwedList.length > 0
-                                ? `To ${groupedOwedList.length} ${groupedOwedList.length === 1 ? 'person' : 'people'}`
-                                : totalOffsetAmount > 0
-                                  ? `All cleared (₹${totalOffsetAmount.toLocaleString('en-IN')} offset)`
-                                  : 'All cleared'}
-                        </p>
-                    </div>
+                    {isSplitsLoading ? (
+                        <div className="space-y-1.5 py-0.5">
+                            <div className="h-6 w-20 rounded-md bg-outline-variant/25 animate-pulse" />
+                            <div className="h-3 w-20 rounded bg-outline-variant/20 animate-pulse" />
+                        </div>
+                    ) : (
+                        <div>
+                            <p
+                                className={`text-xl font-bold tracking-tight font-mono ${totalYouOwe > 0 ? 'text-error' : 'text-on-surface'
+                                    }`}
+                            >
+                                ₹{totalYouOwe.toLocaleString('en-IN')}
+                            </p>
+                            <p className="text-[11px] text-on-surface-variant truncate mt-0.5">
+                                {groupedOwedList.length > 0
+                                    ? `To ${groupedOwedList.length} ${groupedOwedList.length === 1 ? 'person' : 'people'}`
+                                    : totalOffsetAmount > 0
+                                      ? `All cleared (₹${totalOffsetAmount.toLocaleString('en-IN')} offset)`
+                                      : 'All cleared'}
+                            </p>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -597,22 +623,27 @@ export function Dashboard() {
                         <div className="flex items-center justify-between mb-2">
                             <span className="text-[11px] font-bold text-outline tracking-wider font-mono flex items-center gap-1">
                                 <span>YOUR SPEND</span>
-                                <span className="material-symbols-outlined text-[12px] text-primary opacity-0 group-hover:opacity-100 transition-opacity">arrow_forward</span>
+                                <AppIcon name="arrow_forward" className="text-[12px] text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
                             </span>
                             <div className="w-6 h-6 rounded-full bg-primary-fixed flex items-center justify-center text-primary shadow-2xs">
-                                <span className="material-symbols-outlined text-[16px]">
-                                    wallet
-                                </span>
+                                <AppIcon name="wallet" className="text-[16px]" />
                             </div>
                         </div>
-                        <div>
-                            <p className="text-2xl font-bold text-primary tracking-tight font-mono">
-                                {isDataLoading ? '...' : `₹${userTotalSpend.toLocaleString('en-IN')}`}
-                            </p>
-                            <p className="text-[11px] text-on-surface-variant truncate mt-0.5">
-                                {totalUserExpensesCount} {totalUserExpensesCount === 1 ? 'item' : 'items'} • ₹{splitsTotal.toLocaleString('en-IN')} in splits
-                            </p>
-                        </div>
+                        {isDataLoading ? (
+                            <div className="space-y-1.5 py-0.5">
+                                <div className="h-7 w-24 rounded-md bg-outline-variant/25 animate-pulse" />
+                                <div className="h-3 w-28 rounded bg-outline-variant/20 animate-pulse" />
+                            </div>
+                        ) : (
+                            <div>
+                                <p className="text-2xl font-bold text-primary tracking-tight font-mono">
+                                    {`₹${userTotalSpend.toLocaleString('en-IN')}`}
+                                </p>
+                                <p className="text-[11px] text-on-surface-variant truncate mt-0.5">
+                                    {totalUserExpensesCount} {totalUserExpensesCount === 1 ? 'item' : 'items'} • ₹{splitsTotal.toLocaleString('en-IN')} in splits
+                                </p>
+                            </div>
+                        )}
                     </div>
 
                     {/* Today's Spend by Active Person */}
@@ -623,19 +654,24 @@ export function Dashboard() {
                                 TODAY ({activePerson})
                             </span>
                             <div className="w-6 h-6 rounded-full bg-secondary-container flex items-center justify-center text-secondary">
-                                <span className="material-symbols-outlined text-[16px]">
-                                    today
-                                </span>
+                                <AppIcon name="today" className="text-[16px]" />
                             </div>
                         </div>
-                        <div>
-                            <p className="text-2xl font-bold text-on-surface tracking-tight font-mono">
-                                {isDataLoading ? '...' : `₹${userTodaySpend.toLocaleString('en-IN')}`}
-                            </p>
-                            <p className="text-[11px] text-on-surface-variant truncate mt-0.5">
-                                Month: ₹{userMonthSpend.toLocaleString('en-IN')}
-                            </p>
-                        </div>
+                        {isDataLoading ? (
+                            <div className="space-y-1.5 py-0.5">
+                                <div className="h-7 w-20 rounded-md bg-outline-variant/25 animate-pulse" />
+                                <div className="h-3 w-24 rounded bg-outline-variant/20 animate-pulse" />
+                            </div>
+                        ) : (
+                            <div>
+                                <p className="text-2xl font-bold text-on-surface tracking-tight font-mono">
+                                    {`₹${userTodaySpend.toLocaleString('en-IN')}`}
+                                </p>
+                                <p className="text-[11px] text-on-surface-variant truncate mt-0.5">
+                                    Month: ₹{userMonthSpend.toLocaleString('en-IN')}
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -643,9 +679,7 @@ export function Dashboard() {
                 {upfrontPaidByActiveUser > 0 && (
                     <div className="bg-surface-container-low/70 px-3.5 py-2 rounded-xl border border-outline-variant/20 flex items-center justify-between text-xs">
                         <div className="flex items-center gap-1.5 text-on-surface-variant">
-                            <span className="material-symbols-outlined text-primary text-[16px]">
-                                paid
-                            </span>
+                            <AppIcon name="paid" className="text-primary text-[16px]" />
                             <span>Paid upfront on group bills:</span>
                         </div>
                         <span className="font-bold text-on-surface font-mono">
@@ -662,9 +696,7 @@ export function Dashboard() {
                     onClick={() => setActiveTab('add')}
                     className="flex-1 bg-primary text-on-primary h-12 rounded-xl flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] transition-all cursor-pointer font-semibold text-sm hover:bg-primary-container"
                 >
-                    <span className="material-symbols-outlined text-[20px]">
-                        add_circle
-                    </span>
+                    <AppIcon name="add_circle" className="text-[20px]" />
                     <span>Add Expense</span>
                 </button>
 
@@ -673,9 +705,7 @@ export function Dashboard() {
                     onClick={() => setActiveTab('splits')}
                     className="flex-1 bg-surface-container-high text-on-surface h-12 rounded-xl flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] transition-all cursor-pointer font-semibold text-sm hover:bg-surface-container border border-outline-variant/30"
                 >
-                    <span className="material-symbols-outlined text-secondary text-[20px]">
-                        call_split
-                    </span>
+                    <AppIcon name="call_split" className="text-secondary text-[20px]" />
                     <span>View Splits</span>
                 </button>
             </div>
@@ -691,7 +721,7 @@ export function Dashboard() {
             >
                 <div className="flex items-center gap-2.5 min-w-0">
                     <div className="w-8 h-8 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
-                        <span className="material-symbols-outlined text-[18px]">qr_code_scanner</span>
+                        <AppIcon name="qr_code_scanner" className="text-[18px]" />
                     </div>
                     <div className="text-left min-w-0">
                         <span className="text-xs font-bold text-on-surface block truncate">
@@ -702,9 +732,7 @@ export function Dashboard() {
                         </span>
                     </div>
                 </div>
-                <span className="material-symbols-outlined text-[18px] text-primary group-hover:translate-x-0.5 transition-transform shrink-0">
-                    photo_camera
-                </span>
+                <AppIcon name="photo_camera" className="text-[18px] text-primary group-hover:translate-x-0.5 transition-transform shrink-0" />
             </button>
 
             {/* Quick Link to Dedicated /analytics Route */}
@@ -718,7 +746,7 @@ export function Dashboard() {
             >
                 <div className="flex items-center gap-2.5 min-w-0">
                     <div className="w-8 h-8 rounded-xl bg-status-settled-bg text-primary flex items-center justify-center shrink-0">
-                        <span className="material-symbols-outlined text-[18px]">analytics</span>
+                        <AppIcon name="analytics" className="text-[18px]" />
                     </div>
                     <div className="text-left min-w-0">
                         <span className="text-xs font-bold text-on-surface block truncate">
@@ -729,9 +757,7 @@ export function Dashboard() {
                         </span>
                     </div>
                 </div>
-                <span className="material-symbols-outlined text-[18px] text-primary group-hover:translate-x-0.5 transition-transform shrink-0">
-                    arrow_forward
-                </span>
+                <AppIcon name="arrow_forward" className="text-[18px] text-primary group-hover:translate-x-0.5 transition-transform shrink-0" />
             </button>
 
             {/* Compact Web Push Opt-In Banner */}
@@ -740,9 +766,7 @@ export function Dashboard() {
                     <div className="flex items-center justify-between gap-2.5">
                         <div className="flex items-center gap-2.5 min-w-0">
                             <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                                <span className="material-symbols-outlined text-[18px]">
-                                    notifications_active
-                                </span>
+                                <AppIcon name="notifications_active" className="text-[18px]" />
                             </div>
                             <div className="min-w-0">
                                 <span className="text-xs font-bold text-on-surface block truncate">
@@ -781,7 +805,7 @@ export function Dashboard() {
                                 aria-label="Dismiss push notifications prompt"
                                 title="Dismiss"
                             >
-                                <span className="material-symbols-outlined text-[16px]">close</span>
+                                <AppIcon name="close" className="text-[16px]" />
                             </button>
                         </div>
                     </div>
@@ -793,6 +817,9 @@ export function Dashboard() {
                     )}
                 </div>
             )}
+
+            {/* Pending Settlements Skeleton / Content */}
+            {isSplitsLoading && <DashboardPendingSkeleton />}
 
             {/* Pending Settlements for Active Person (Pairwise Netted) */}
             {(groupedOwedList.length > 0 || groupedOwedToMeList.length > 0 || mutualZeroOffsets.length > 0) && (
@@ -871,9 +898,10 @@ export function Dashboard() {
                                                 className="w-7 h-7 rounded-lg text-on-surface-variant hover:bg-surface-container-high flex items-center justify-center transition-colors cursor-pointer"
                                                 title={isExpanded ? 'Collapse breakdown' : 'Expand breakdown'}
                                             >
-                                                <span className="material-symbols-outlined text-[20px]">
-                                                    {isExpanded ? 'expand_less' : 'expand_more'}
-                                                </span>
+                                                <AppIcon
+                                                    name={isExpanded ? 'expand_less' : 'expand_more'}
+                                                    className="text-[20px]"
+                                                />
                                             </button>
                                         )}
                                     </div>
@@ -969,9 +997,10 @@ export function Dashboard() {
                                         }}
                                         className="h-9 px-3.5 rounded-xl bg-primary text-on-primary text-xs font-semibold flex items-center gap-1.5 shadow-xs hover:bg-primary/90 transition-colors cursor-pointer active:scale-[0.99] shrink-0"
                                     >
-                                        <span className="material-symbols-outlined text-[16px]">
-                                            {group.upiIntent || group.toUpiId ? 'qr_code_2' : 'qr_code_scanner'}
-                                        </span>
+                                        <AppIcon
+                                            name={group.upiIntent || group.toUpiId ? 'qr_code_2' : 'qr_code_scanner'}
+                                            className="text-[16px]"
+                                        />
                                         <span>
                                             {group.upiIntent || group.toUpiId
                                                 ? group.hasMutualOffset
@@ -1014,7 +1043,7 @@ export function Dashboard() {
                         >
                             <div className="flex items-center gap-2.5 min-w-0">
                                 <div className="w-8 h-8 rounded-xl bg-[#25D366]/20 text-[#15803d] flex items-center justify-center shrink-0">
-                                    <span className="material-symbols-outlined text-[18px]">qr_code_2</span>
+                                    <AppIcon name="qr_code_2" className="text-[18px]" />
                                 </div>
                                 <div className="text-left min-w-0">
                                     <span className="text-xs font-bold text-on-surface block truncate">
@@ -1026,9 +1055,7 @@ export function Dashboard() {
                                     </span>
                                 </div>
                             </div>
-                            <span className="material-symbols-outlined text-[18px] text-[#15803d] shrink-0">
-                                ios_share
-                            </span>
+                            <AppIcon name="ios_share" className="text-[18px] text-[#15803d] shrink-0" />
                         </button>
                     )}
 
@@ -1094,9 +1121,10 @@ export function Dashboard() {
                                                 className="w-7 h-7 rounded-lg text-on-surface-variant hover:bg-surface-container-high flex items-center justify-center transition-colors cursor-pointer"
                                                 title={isExpanded ? 'Collapse breakdown' : 'Expand breakdown'}
                                             >
-                                                <span className="material-symbols-outlined text-[20px]">
-                                                    {isExpanded ? 'expand_less' : 'expand_more'}
-                                                </span>
+                                                <AppIcon
+                                                    name={isExpanded ? 'expand_less' : 'expand_more'}
+                                                    className="text-[20px]"
+                                                />
                                             </button>
                                         )}
                                     </div>
@@ -1142,11 +1170,14 @@ export function Dashboard() {
                                                                 title={`Send payment reminder to ${group.from} for ${s.description}`}
                                                                 aria-label={`Remind ${group.from} for ${s.description}`}
                                                             >
-                                                                <span className="material-symbols-outlined text-[15px]">
-                                                                    {remindingKey === `${s.splitId}_${group.from}`
-                                                                        ? 'hourglass_top'
-                                                                        : 'notifications_active'}
-                                                                </span>
+                                                                <AppIcon
+                                                                    name={
+                                                                        remindingKey === `${s.splitId}_${group.from}`
+                                                                            ? 'hourglass_top'
+                                                                            : 'notifications_active'
+                                                                    }
+                                                                    className="text-[15px]"
+                                                                />
                                                             </button>
                                                             <button
                                                                 type="button"
@@ -1161,9 +1192,7 @@ export function Dashboard() {
                                                                 className="flex items-center p-1 rounded-md bg-surface-container-high text-primary hover:bg-primary/10 transition-colors cursor-pointer"
                                                                 title="Show QR for this item"
                                                             >
-                                                                <span className="material-symbols-outlined text-[15px]">
-                                                                    qr_code_2
-                                                                </span>
+                                                                <AppIcon name="qr_code_2" className="text-[15px]" />
                                                             </button>
                                                             <button
                                                                 type="button"
@@ -1217,9 +1246,7 @@ export function Dashboard() {
                                         className="flex-1 h-9 px-2.5 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface text-xs font-semibold flex items-center justify-center gap-1 transition-colors border border-outline-variant/30 cursor-pointer active:scale-[0.99] whitespace-nowrap"
                                         title={`Show QR code to collect ₹${group.netAmount} from ${group.from}`}
                                     >
-                                        <span className="material-symbols-outlined text-[17px] text-primary">
-                                            qr_code_2
-                                        </span>
+                                        <AppIcon name="qr_code_2" className="text-[17px] text-primary" />
                                         <span>Show QR</span>
                                     </button>
 
@@ -1240,11 +1267,14 @@ export function Dashboard() {
                                         title={`Send push payment reminder to ${group.from}`}
                                         aria-label={`Remind ${group.from}`}
                                     >
-                                        <span className="material-symbols-outlined text-[16px]">
-                                            {remindingKey === `group_${group.from}`
-                                                ? 'hourglass_top'
-                                                : 'notifications_active'}
-                                        </span>
+                                        <AppIcon
+                                            name={
+                                                remindingKey === `group_${group.from}`
+                                                    ? 'hourglass_top'
+                                                    : 'notifications_active'
+                                            }
+                                            className="text-[16px]"
+                                        />
                                         <span>
                                             {remindingKey === `group_${group.from}` ? 'Sending' : 'Remind'}
                                         </span>
@@ -1274,9 +1304,7 @@ export function Dashboard() {
                                         className="flex-1 h-9 px-2.5 rounded-xl bg-primary-fixed hover:bg-primary text-on-primary-fixed hover:text-on-primary text-xs font-bold transition-colors flex items-center justify-center gap-1 shadow-2xs disabled:opacity-50 cursor-pointer active:scale-[0.99] whitespace-nowrap"
                                         title={`Confirm receipt of ₹${group.netAmount} from ${group.from}`}
                                     >
-                                        <span className="material-symbols-outlined text-[16px]">
-                                            done_all
-                                        </span>
+                                        <AppIcon name="done_all" className="text-[16px]" />
                                         <span>{isMulti ? 'Confirm All' : 'Confirm'}</span>
                                     </button>
                                 </div>
@@ -1298,9 +1326,7 @@ export function Dashboard() {
                                 <div className="flex items-center justify-between gap-2.5">
                                     <div className="flex items-center gap-2.5 min-w-0">
                                         <div className="w-9 h-9 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
-                                            <span className="material-symbols-outlined text-[20px]">
-                                                swap_horiz
-                                            </span>
+                                            <AppIcon name="swap_horiz" className="text-[20px]" />
                                         </div>
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-1.5 flex-wrap">
@@ -1328,9 +1354,10 @@ export function Dashboard() {
                                         className="w-7 h-7 rounded-lg text-on-surface-variant hover:bg-primary/10 flex items-center justify-center transition-colors cursor-pointer shrink-0"
                                         title={isExpanded ? 'Collapse offset details' : 'View offset splits'}
                                     >
-                                        <span className="material-symbols-outlined text-[20px]">
-                                            {isExpanded ? 'expand_less' : 'expand_more'}
-                                        </span>
+                                        <AppIcon
+                                            name={isExpanded ? 'expand_less' : 'expand_more'}
+                                            className="text-[20px]"
+                                        />
                                     </button>
                                 </div>
 
@@ -1382,9 +1409,10 @@ export function Dashboard() {
                                         className="h-8 px-3 rounded-xl bg-primary text-on-primary text-xs font-bold flex items-center gap-1.5 shadow-2xs hover:bg-primary/90 transition-colors disabled:opacity-50 cursor-pointer shrink-0 active:scale-[0.98]"
                                         title={`Mark all ${pair.allSplits.length} cancelled splits as settled`}
                                     >
-                                        <span className="material-symbols-outlined text-[15px]">
-                                            {isClearing ? 'hourglass_top' : 'done_all'}
-                                        </span>
+                                        <AppIcon
+                                            name={isClearing ? 'hourglass_top' : 'done_all'}
+                                            className="text-[15px]"
+                                        />
                                         <span>{isClearing ? 'Clearing...' : 'Clear Offset Splits'}</span>
                                     </button>
                                 </div>
@@ -1410,7 +1438,7 @@ export function Dashboard() {
                     >
                         <div className="flex items-center gap-2.5 min-w-0">
                             <div className="w-8 h-8 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
-                                <span className="material-symbols-outlined text-[18px]">done_all</span>
+                                <AppIcon name="done_all" className="text-[18px]" />
                             </div>
                             <div className="text-left min-w-0">
                                 <span className="text-xs font-bold text-on-surface block truncate">
@@ -1424,9 +1452,10 @@ export function Dashboard() {
                         </div>
                         <div className="flex items-center gap-1 text-[11px] font-bold text-primary shrink-0">
                             <span>View History</span>
-                            <span className="material-symbols-outlined text-[16px] group-hover:translate-x-0.5 transition-transform">
-                                arrow_forward
-                            </span>
+                            <AppIcon
+                                name="arrow_forward"
+                                className="text-[16px] group-hover:translate-x-0.5 transition-transform"
+                            />
                         </div>
                     </button>
                 )}
@@ -1438,10 +1467,14 @@ export function Dashboard() {
                         <h2 className="text-base font-bold text-on-surface font-headline truncate">
                             Recent Spendings
                         </h2>
-                        <span className="text-[11px] text-on-surface-variant font-mono block truncate">
-                            {combinedRecentItems.length} of {allPersonalItems.length}{' '}
-                            {allPersonalItems.length === 1 ? 'item' : 'items'} • {activePerson}
-                        </span>
+                        {isDataLoading ? (
+                            <span className="inline-block h-3 w-28 rounded bg-outline-variant/25 animate-pulse mt-1" />
+                        ) : (
+                            <span className="text-[11px] text-on-surface-variant font-mono block truncate">
+                                {combinedRecentItems.length} of {allPersonalItems.length}{' '}
+                                {allPersonalItems.length === 1 ? 'item' : 'items'} • {activePerson}
+                            </span>
+                        )}
                     </div>
 
                     <button
@@ -1454,16 +1487,12 @@ export function Dashboard() {
                         title="View all transactions month-wise"
                     >
                         <span>View all</span>
-                        <span className="material-symbols-outlined text-[15px] translate-y-[0.5px]">
-                            chevron_right
-                        </span>
+                        <AppIcon name="chevron_right" className="text-[15px] translate-y-[0.5px]" />
                     </button>
                 </div>
 
                 {isDataLoading ? (
-                    <div className="bg-surface-container-lowest p-6 rounded-2xl text-center text-xs text-on-surface-variant animate-pulse border border-outline-variant/30">
-                        Loading expenses from backend...
-                    </div>
+                    <RecentExpensesSkeleton />
                 ) : !combinedRecentItems.length ? (
                     <div className="bg-surface-container-lowest p-6 rounded-2xl text-center text-xs text-on-surface-variant border border-outline-variant/30">
                         No expenses or split shares recorded for {activePerson} yet.
@@ -1487,11 +1516,7 @@ export function Dashboard() {
                                             <div
                                                 className={`w-10 h-10 rounded-xl ${catMeta.bgClass} flex items-center justify-center shrink-0 mt-0.5`}
                                             >
-                                                <span
-                                                    className={`material-symbols-outlined text-[20px] ${catMeta.textClass}`}
-                                                >
-                                                    {catMeta.icon}
-                                                </span>
+                                                <AppIcon name={catMeta.icon} className={`text-[20px] ${catMeta.textClass}`} />
                                             </div>
 
                                             {/* Description & Category / Type Badges */}
@@ -1534,9 +1559,10 @@ export function Dashboard() {
                                     <div className="flex items-center justify-between gap-2 pt-2 border-t border-outline-variant/15 text-xs text-on-surface-variant">
                                         {/* Payer Context */}
                                         <div className="flex items-center gap-1.5 min-w-0 text-[11px]">
-                                            <span className="material-symbols-outlined text-[14px] text-primary/70 shrink-0">
-                                                {item.isSplitShare ? 'group' : 'person'}
-                                            </span>
+                                            <AppIcon
+                                                name={item.isSplitShare ? 'group' : 'person'}
+                                                className="text-[14px] text-primary/70 shrink-0"
+                                            />
                                             <span className="truncate">
                                                 {item.isSplitShare && item.paidBy
                                                     ? isPaidByMe
@@ -1552,9 +1578,7 @@ export function Dashboard() {
                                                 className="flex items-center gap-1 text-[11px] font-mono font-semibold text-on-surface bg-surface-container/70 px-2 py-0.5 rounded-lg border border-outline-variant/25 shrink-0 shadow-2xs"
                                                 title={`Recorded at: ${timeInfo.raw}`}
                                             >
-                                                <span className="material-symbols-outlined text-[13px] text-primary">
-                                                    schedule
-                                                </span>
+                                                <AppIcon name="schedule" className="text-[13px] text-primary" />
                                                 <span>{timeInfo.full}</span>
                                             </div>
                                         )}
@@ -1572,9 +1596,9 @@ export function Dashboard() {
                                 }}
                                 className="w-full py-2.5 px-4 rounded-xl bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-outline-variant/30 active:scale-[0.99] shadow-2xs"
                             >
-                                <span className="material-symbols-outlined text-[17px]">calendar_month</span>
+                                <AppIcon name="calendar_month" className="text-[17px]" />
                                 <span>View all {allPersonalItems.length} transactions across months</span>
-                                <span className="material-symbols-outlined text-[15px]">arrow_forward</span>
+                                <AppIcon name="arrow_forward" className="text-[15px]" />
                             </button>
                         )}
                     </div>

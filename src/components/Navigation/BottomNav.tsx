@@ -2,6 +2,7 @@ import React from 'react';
 import { useExpense } from '../../context';
 import type { AppTab } from '../../context/ExpenseContextDef';
 import { triggerHaptic } from '../../utils/haptics';
+import { AppIcon } from '../Icon/AppIcon';
 
 export const BottomNav: React.FC = () => {
     const { activeTab, setActiveTab } = useExpense();
@@ -43,9 +44,7 @@ export const BottomNav: React.FC = () => {
                                             : 'bg-primary-container text-on-primary-container group-hover:scale-105'
                                     }`}
                                 >
-                                    <span className="material-symbols-outlined text-[22px]">
-                                        add
-                                    </span>
+                                    <AppIcon name="add" className="text-[22px]" />
                                 </div>
                                 <span
                                     className={`text-[11px] font-semibold transition-colors ${
@@ -69,13 +68,12 @@ export const BottomNav: React.FC = () => {
                                     : 'text-on-surface-variant hover:text-on-surface'
                             }`}
                         >
-                            <span
-                                className={`material-symbols-outlined text-[22px] transition-transform ${
+                            <AppIcon
+                                name={tab.icon}
+                                className={`text-[22px] transition-transform ${
                                     isActive ? 'scale-110' : ''
                                 }`}
-                            >
-                                {tab.icon}
-                            </span>
+                            />
                             <span className="text-[11px] font-medium tracking-tight">
                                 {tab.label}
                             </span>

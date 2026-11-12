@@ -1,5 +1,5 @@
 import React from 'react';
-import { Avatar } from '../../../components';
+import { AppIcon, Avatar } from '../../../components';
 import type { AnalyticsRange } from '../../../api/types';
 import { triggerHaptic } from '../../../utils/haptics';
 
@@ -70,13 +70,10 @@ export const AnalyticsHeaderBar: React.FC<AnalyticsHeaderBarProps> = ({
                     title="Refresh analytics from Google Sheets"
                     aria-label="Refresh analytics"
                 >
-                    <span
-                        className={`material-symbols-outlined text-[18px] ${
-                            isRefreshing ? 'animate-spin text-primary' : ''
-                        }`}
-                    >
-                        sync
-                    </span>
+                    <AppIcon
+                        name="sync"
+                        className={`text-[18px] ${isRefreshing ? 'animate-spin text-primary' : ''}`}
+                    />
                 </button>
             </div>
 
@@ -96,7 +93,7 @@ export const AnalyticsHeaderBar: React.FC<AnalyticsHeaderBarProps> = ({
                                     : 'bg-surface-card-subtle text-on-surface-variant border-border-subtle hover:border-border-strong'
                             }`}
                         >
-                            <span className="material-symbols-outlined text-[15px]">groups</span>
+                            <AppIcon name="groups" className="text-[15px]" />
                             <span>Whole Group</span>
                         </button>
 

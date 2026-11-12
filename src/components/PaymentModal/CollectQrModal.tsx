@@ -11,6 +11,7 @@ import {
     shareOrDownloadQrCard,
     type ParsedUpiQr,
 } from '../../utils/qr';
+import { AppIcon } from '../Icon/AppIcon';
 
 const QrScannerModal = lazy(() => import('../QRScanner/QrScannerModal'));
 
@@ -280,7 +281,7 @@ const CollectQrContent: React.FC<CollectQrContentProps> = ({
                             className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer shrink-0"
                             aria-label="Close"
                         >
-                            <span className="material-symbols-outlined text-[20px]">close</span>
+                            <AppIcon name="close" className="text-[20px]" />
                         </button>
                     </div>
 
@@ -336,9 +337,7 @@ const CollectQrContent: React.FC<CollectQrContentProps> = ({
                             <div className="bg-surface-container-low p-4 rounded-2xl border border-outline-variant/30 space-y-3">
                                 <div className="flex items-start justify-between gap-2.5">
                                     <div className="flex items-start gap-2.5">
-                                        <span className="material-symbols-outlined text-secondary text-[22px] mt-0.5 shrink-0">
-                                            account_balance_wallet
-                                        </span>
+                                        <AppIcon name="account_balance_wallet" className="text-secondary text-[22px] mt-0.5 shrink-0" />
                                         <div>
                                             <h4 className="font-bold text-sm text-on-surface">
                                                 {myUpiId ? 'Update your UPI ID' : 'Add your UPI ID to receive payments'}
@@ -372,7 +371,7 @@ const CollectQrContent: React.FC<CollectQrContentProps> = ({
                                             className="h-11 px-3 rounded-xl bg-surface-container border border-outline-variant/40 text-primary hover:bg-primary/10 text-xs font-bold flex items-center gap-1 shrink-0 cursor-pointer"
                                             title="Scan your UPI QR screenshot or card"
                                         >
-                                            <span className="material-symbols-outlined text-[18px]">qr_code_scanner</span>
+                                            <AppIcon name="qr_code_scanner" className="text-[18px]" />
                                             <span>Scan</span>
                                         </button>
                                     </div>
@@ -394,9 +393,7 @@ const CollectQrContent: React.FC<CollectQrContentProps> = ({
                                             disabled={isSavingUpi}
                                             className="flex-1 h-10 rounded-xl bg-primary text-on-primary text-xs font-bold shadow-xs hover:bg-primary/90 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
                                         >
-                                            <span className="material-symbols-outlined text-[16px]">
-                                                qr_code_2
-                                            </span>
+                                            <AppIcon name="qr_code_2" className="text-[16px]" />
                                             <span>{isSavingUpi ? 'Saving...' : 'Save & Show QR Code'}</span>
                                         </button>
                                     </div>
@@ -421,9 +418,7 @@ const CollectQrContent: React.FC<CollectQrContentProps> = ({
                                             onClick={() => void handleShareOrSaveQr()}
                                             className="h-9 px-3 rounded-xl bg-primary/10 hover:bg-primary text-primary hover:text-on-primary text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
                                         >
-                                            <span className="material-symbols-outlined text-[16px]">
-                                                {isSharingQr ? 'hourglass_top' : 'ios_share'}
-                                            </span>
+                                            <AppIcon name={isSharingQr ? 'hourglass_top' : 'ios_share'} className="text-[16px]" />
                                             <span>{isSharingQr ? 'Saving...' : 'Share / Save QR'}</span>
                                         </button>
 
@@ -432,9 +427,7 @@ const CollectQrContent: React.FC<CollectQrContentProps> = ({
                                             onClick={handleShareWhatsApp}
                                             className="h-9 px-3 rounded-xl bg-surface-container-high border border-outline-variant/30 text-on-surface text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-surface-container transition-colors cursor-pointer"
                                         >
-                                            <span className="material-symbols-outlined text-[#25D366] text-[17px]">
-                                                chat
-                                            </span>
+                                            <AppIcon name="chat" className="text-[#25D366] text-[17px]" />
                                             <span>WhatsApp</span>
                                         </button>
                                     </div>
@@ -457,9 +450,7 @@ const CollectQrContent: React.FC<CollectQrContentProps> = ({
                                             className="px-2 py-1 rounded-md text-primary font-semibold hover:bg-primary/10 transition-colors flex items-center gap-1 cursor-pointer"
                                             title="Copy UPI ID"
                                         >
-                                            <span className="material-symbols-outlined text-[14px]">
-                                                {copied ? 'check' : 'content_copy'}
-                                            </span>
+                                            <AppIcon name={copied ? 'check' : 'content_copy'} className="text-[14px]" />
                                             <span>{copied ? 'Copied' : 'Copy'}</span>
                                         </button>
                                         <button
@@ -471,7 +462,7 @@ const CollectQrContent: React.FC<CollectQrContentProps> = ({
                                             className="p-1 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
                                             title="Change UPI ID"
                                         >
-                                            <span className="material-symbols-outlined text-[15px]">edit</span>
+                                            <AppIcon name="edit" className="text-[15px]" />
                                         </button>
                                     </div>
                                 </div>
@@ -487,9 +478,7 @@ const CollectQrContent: React.FC<CollectQrContentProps> = ({
                             onClick={() => void handleConfirmReceived()}
                             className="w-full h-12 rounded-xl bg-primary text-on-primary font-bold text-sm shadow-sm hover:bg-primary/90 active:scale-[0.98] transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                         >
-                            <span className="material-symbols-outlined text-[20px]">
-                                {isSettling ? 'hourglass_top' : 'done_all'}
-                            </span>
+                            <AppIcon name={isSettling ? 'hourglass_top' : 'done_all'} className="text-[20px]" />
                             <span>
                                 {isSettling
                                     ? 'Confirming...'

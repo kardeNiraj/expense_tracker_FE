@@ -10,6 +10,8 @@ import {
     formatMonthYear,
 } from '../../utils/formatters';
 import type { ExpenseRecord } from '../../api/types';
+import { AppIcon } from '../Icon/AppIcon';
+import { SpendHistorySkeleton } from '../Skeleton/AppSkeleton';
 
 interface SpendHistoryModalProps {
     isOpen: boolean;
@@ -309,7 +311,7 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
                         className="w-9 h-9 rounded-xl bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-on-surface transition-colors cursor-pointer"
                         title="Back to Overview"
                     >
-                        <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+                        <AppIcon name="arrow_back" className="text-[20px]" />
                     </button>
 
                     <div className="flex-1 min-w-0 text-center">
@@ -328,13 +330,12 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
                         className="w-9 h-9 rounded-xl bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-on-surface transition-colors cursor-pointer disabled:opacity-50"
                         title="Refresh transactions"
                     >
-                        <span
-                            className={`material-symbols-outlined text-[19px] ${
+                        <AppIcon
+                            name="refresh"
+                            className={`text-[19px] ${
                                 isSpendingsFetching ? 'animate-spin text-primary' : ''
                             }`}
-                        >
-                            refresh
-                        </span>
+                        />
                     </button>
                 </div>
 
@@ -343,7 +344,7 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
                     <div className="max-w-md mx-auto px-4 pb-2.5 space-y-1.5">
                         <div className="flex items-center justify-between text-[10px] text-primary font-bold">
                             <span className="flex items-center gap-1">
-                                <span className="material-symbols-outlined text-[12px]">admin_panel_settings</span>
+                                <AppIcon name="admin_panel_settings" className="text-[12px]" />
                                 <span>Admin Switcher Unlocked</span>
                             </span>
                             <span className="font-mono">Viewing: {selectedPerson}</span>
@@ -388,7 +389,7 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
                             </div>
                         </div>
                         <span className="text-[10px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0">
-                            <span className="material-symbols-outlined text-[13px]">verified_user</span>
+                            <AppIcon name="verified_user" className="text-[13px]" />
                             <span>Claimed</span>
                         </span>
                     </div>
@@ -411,9 +412,13 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
                                     </span>
                                 )}
                             </div>
-                            <div className="text-3xl font-extrabold text-on-surface font-mono tracking-tight">
-                                ₹{grandTotalSpend.toLocaleString('en-IN')}
-                            </div>
+                            {isLoading ? (
+                                <div className="h-9 w-36 rounded-xl bg-outline-variant/25 animate-pulse my-0.5" />
+                            ) : (
+                                <div className="text-3xl font-extrabold text-on-surface font-mono tracking-tight">
+                                    ₹{grandTotalSpend.toLocaleString('en-IN')}
+                                </div>
+                            )}
                             <p className="text-[11px] text-on-surface-variant">
                                 Across all {availableMonths.length} active{' '}
                                 {availableMonths.length === 1 ? 'month' : 'months'}
@@ -421,9 +426,7 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
                         </div>
 
                         <div className="w-12 h-12 rounded-2xl bg-primary/15 text-primary flex items-center justify-center shrink-0 shadow-2xs">
-                            <span className="material-symbols-outlined text-[26px]">
-                                account_balance_wallet
-                            </span>
+                            <AppIcon name="account_balance_wallet" className="text-[26px]" />
                         </div>
                     </div>
 
@@ -431,14 +434,16 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
                     <div className="grid grid-cols-2 gap-2 mt-3.5 pt-3 border-t border-outline-variant/20 relative z-10">
                         <div className="p-2.5 rounded-2xl bg-surface-container-lowest/80 border border-outline-variant/20">
                             <div className="text-[10px] font-bold text-on-surface-variant flex items-center gap-1">
-                                <span className="material-symbols-outlined text-[14px] text-primary">
-                                    receipt_long
-                                </span>
+                                <AppIcon name="receipt_long" className="text-[14px] text-primary" />
                                 <span>Personal Direct</span>
                             </div>
-                            <div className="text-sm font-mono font-bold text-on-surface mt-0.5">
-                                ₹{directTotalSum.toLocaleString('en-IN')}
-                            </div>
+                            {isLoading ? (
+                                <div className="h-5 w-20 rounded-md bg-outline-variant/25 animate-pulse mt-1" />
+                            ) : (
+                                <div className="text-sm font-mono font-bold text-on-surface mt-0.5">
+                                    ₹{directTotalSum.toLocaleString('en-IN')}
+                                </div>
+                            )}
                             <div className="text-[10px] text-on-surface-variant font-mono">
                                 {directExpenses.length} {directExpenses.length === 1 ? 'item' : 'items'}
                             </div>
@@ -446,14 +451,16 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
 
                         <div className="p-2.5 rounded-2xl bg-surface-container-lowest/80 border border-outline-variant/20">
                             <div className="text-[10px] font-bold text-on-surface-variant flex items-center gap-1">
-                                <span className="material-symbols-outlined text-[14px] text-secondary">
-                                    call_split
-                                </span>
+                                <AppIcon name="call_split" className="text-[14px] text-secondary" />
                                 <span>Split Shares</span>
                             </div>
-                            <div className="text-sm font-mono font-bold text-on-surface mt-0.5">
-                                ₹{splitSharesSum.toLocaleString('en-IN')}
-                            </div>
+                            {isLoading ? (
+                                <div className="h-5 w-20 rounded-md bg-outline-variant/25 animate-pulse mt-1" />
+                            ) : (
+                                <div className="text-sm font-mono font-bold text-on-surface mt-0.5">
+                                    ₹{splitSharesSum.toLocaleString('en-IN')}
+                                </div>
+                            )}
                             <div className="text-[10px] text-on-surface-variant font-mono">
                                 {splitShareExpenses.length} {splitShareExpenses.length === 1 ? 'split' : 'splits'}
                             </div>
@@ -463,9 +470,7 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
                     {upfrontPaidBySelected > 0 && (
                         <div className="mt-2 p-2 rounded-xl bg-primary/5 border border-primary/15 flex items-center justify-between text-[11px] relative z-10">
                             <span className="text-on-surface-variant flex items-center gap-1">
-                                <span className="material-symbols-outlined text-[14px] text-primary">
-                                    payments
-                                </span>
+                                <AppIcon name="payments" className="text-[14px] text-primary" />
                                 <span>Total Bills Covered Upfront:</span>
                             </span>
                             <span className="font-mono font-bold text-primary">
@@ -481,9 +486,7 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
                     <div className="flex items-center gap-2">
                         {/* Search Input */}
                         <div className="flex-1 flex items-center h-10 px-3 rounded-xl bg-surface-container-lowest border border-outline-variant/30 focus-within:border-primary">
-                            <span className="material-symbols-outlined text-[18px] text-on-surface-variant mr-1.5">
-                                search
-                            </span>
+                            <AppIcon name="search" className="text-[18px] text-on-surface-variant mr-1.5" />
                             <input
                                 type="text"
                                 value={searchQuery}
@@ -495,9 +498,10 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
                                 <button
                                     type="button"
                                     onClick={() => setSearchQuery('')}
+                                    aria-label="Clear search"
                                     className="text-on-surface-variant hover:text-on-surface"
                                 >
-                                    <span className="material-symbols-outlined text-[16px]">close</span>
+                                    <AppIcon name="close" className="text-[16px]" />
                                 </button>
                             )}
                         </div>
@@ -577,14 +581,11 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
 
                 {/* Main Transaction Body */}
                 {isLoading ? (
-                    <div className="bg-surface-container-lowest p-8 rounded-3xl text-center text-xs text-on-surface-variant animate-pulse border border-outline-variant/30 space-y-2">
-                        <div className="w-8 h-8 rounded-full bg-primary/20 mx-auto animate-spin" />
-                        <div>Loading transactions for {selectedPerson}...</div>
-                    </div>
+                    <SpendHistorySkeleton />
                 ) : monthGroups.length === 0 ? (
                     <div className="bg-surface-container-lowest p-8 rounded-3xl text-center border border-outline-variant/30 space-y-2">
                         <div className="w-12 h-12 rounded-2xl bg-surface-container text-on-surface-variant flex items-center justify-center mx-auto">
-                            <span className="material-symbols-outlined text-[24px]">receipt_long</span>
+                            <AppIcon name="receipt_long" className="text-[24px]" />
                         </div>
                         <h3 className="font-bold text-sm text-on-surface">No Transactions Found</h3>
                         <p className="text-xs text-on-surface-variant max-w-xs mx-auto">
@@ -604,9 +605,7 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
                                 <div className="p-3.5 rounded-2xl bg-surface-container-low border border-outline-variant/30 flex items-center justify-between gap-3 shadow-2xs">
                                     <div className="min-w-0">
                                         <div className="flex items-center gap-1.5">
-                                            <span className="material-symbols-outlined text-primary text-[18px]">
-                                                calendar_month
-                                            </span>
+                                            <AppIcon name="calendar_month" className="text-primary text-[18px]" />
                                             <h2 className="font-bold text-sm text-on-surface truncate font-headline">
                                                 {group.month}
                                             </h2>
@@ -653,11 +652,7 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
                                                         <div
                                                             className={`w-10 h-10 rounded-xl ${catMeta.bgClass} flex items-center justify-center shrink-0 mt-0.5 shadow-2xs`}
                                                         >
-                                                            <span
-                                                                className={`material-symbols-outlined text-[20px] ${catMeta.textClass}`}
-                                                            >
-                                                                {catMeta.icon}
-                                                            </span>
+                                                            <AppIcon name={catMeta.icon} className={`text-[20px] ${catMeta.textClass}`} />
                                                         </div>
 
                                                         <div className="min-w-0">
@@ -702,9 +697,7 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
                                                 {/* Bottom Row: Timestamp & Payer info */}
                                                 <div className="flex items-center justify-between text-[11px] text-on-surface-variant pt-1 border-t border-outline-variant/15">
                                                     <span className="flex items-center gap-1 font-mono text-[10px]">
-                                                        <span className="material-symbols-outlined text-[13px]">
-                                                            schedule
-                                                        </span>
+                                                        <AppIcon name="schedule" className="text-[13px]" />
                                                         <span>{timeInfo.full || item.timestamp || 'Recorded'}</span>
                                                     </span>
 

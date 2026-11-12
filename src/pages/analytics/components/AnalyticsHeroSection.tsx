@@ -1,4 +1,5 @@
 import React from 'react';
+import { AppIcon } from '../../../components';
 import type { AnalyticsSummary } from '../../../api/types';
 
 interface AnalyticsHeroSectionProps {
@@ -34,9 +35,10 @@ export const AnalyticsHeroSection: React.FC<AnalyticsHeroSectionProps> = ({
                                         : 'bg-status-pending-bg text-status-pending-text'
                                 }`}
                             >
-                                <span className="material-symbols-outlined text-[12px]">
-                                    {isMomDown ? 'trending_down' : 'trending_up'}
-                                </span>
+                                <AppIcon
+                                    name={isMomDown ? 'trending_down' : 'trending_up'}
+                                    className="text-[12px]"
+                                />
                                 {Math.abs(momDelta)}% MoM
                             </span>
                         )}

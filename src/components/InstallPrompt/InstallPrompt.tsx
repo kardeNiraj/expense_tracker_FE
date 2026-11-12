@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { AppIcon } from '../Icon/AppIcon';
 
 interface BeforeInstallPromptEvent extends Event {
     prompt: () => Promise<void>;
@@ -101,7 +102,7 @@ export const InstallPrompt: React.FC = () => {
                             onClick={handleInstallClick}
                             className="px-3 py-1.5 rounded-lg bg-primary text-on-primary text-xs font-semibold hover:bg-primary-container shadow-xs transition-colors cursor-pointer flex items-center gap-1"
                         >
-                            <span className="material-symbols-outlined text-[15px]">download</span>
+                            <AppIcon name="download" className="text-[15px]" />
                             <span>Install</span>
                         </button>
                     )}
@@ -112,7 +113,7 @@ export const InstallPrompt: React.FC = () => {
                             onClick={() => setShowIosGuide(!showIosGuide)}
                             className="px-3 py-1.5 rounded-lg bg-primary text-on-primary text-xs font-semibold hover:bg-primary-container shadow-xs transition-colors cursor-pointer flex items-center gap-1"
                         >
-                            <span className="material-symbols-outlined text-[15px]">ios_share</span>
+                            <AppIcon name="ios_share" className="text-[15px]" />
                             <span>Install</span>
                         </button>
                     )}
@@ -123,7 +124,7 @@ export const InstallPrompt: React.FC = () => {
                         className="w-7 h-7 rounded-lg hover:bg-surface-container-high flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
                         aria-label="Dismiss install banner"
                     >
-                        <span className="material-symbols-outlined text-[16px]">close</span>
+                        <AppIcon name="close" className="text-[16px]" />
                     </button>
                 </div>
             </div>
@@ -136,10 +137,10 @@ export const InstallPrompt: React.FC = () => {
                     </p>
                     <ol className="list-decimal list-inside space-y-1 text-[11px] text-on-surface">
                         <li>
-                            Tap the <span className="font-semibold inline-flex items-center gap-0.5"><span className="material-symbols-outlined text-[13px] text-primary">ios_share</span> Share</span> button at the bottom of Safari.
+                            Tap the <span className="font-semibold inline-flex items-center gap-0.5"><AppIcon name="ios_share" className="text-[13px] text-primary" /> Share</span> button at the bottom of Safari.
                         </li>
                         <li>
-                            Scroll down in the share sheet and tap <span className="font-semibold inline-flex items-center gap-0.5"><span className="material-symbols-outlined text-[13px] text-primary">add_box</span> Add to Home Screen</span>.
+                            Scroll down in the share sheet and tap <span className="font-semibold inline-flex items-center gap-0.5"><AppIcon name="add_box" className="text-[13px] text-primary" /> Add to Home Screen</span>.
                         </li>
                         <li>
                             Tap <span className="font-semibold text-primary">Add</span> in the top right corner.

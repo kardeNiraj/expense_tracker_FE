@@ -1,5 +1,5 @@
 import React, { useId } from 'react';
-import { Avatar } from '../../components/Avatar';
+import { AppIcon, Avatar } from '../../components';
 
 interface ClaimConfirmModalProps {
     person: string;
@@ -39,9 +39,10 @@ export const ClaimConfirmModal: React.FC<ClaimConfirmModalProps> = ({
                                 : 'bg-primary text-on-primary'
                         }`}
                     >
-                        <span className="material-symbols-outlined text-[12px] leading-none">
-                            {showApprovalFlow ? 'verified_user' : 'lock'}
-                        </span>
+                        <AppIcon
+                            name={showApprovalFlow ? 'verified_user' : 'lock'}
+                            className="text-[12px] leading-none"
+                        />
                     </span>
                 </div>
 
@@ -66,7 +67,7 @@ export const ClaimConfirmModal: React.FC<ClaimConfirmModalProps> = ({
 
                 {isPendingForPerson && (
                     <div className="p-2.5 rounded-xl bg-status-awaiting-bg text-status-awaiting-text text-[11px] font-semibold flex items-center justify-center gap-1.5">
-                        <span className="material-symbols-outlined text-[15px]">hourglass_top</span>
+                        <AppIcon name="hourglass_top" className="text-[15px]" />
                         <span>Approval request is pending admin review</span>
                     </div>
                 )}
@@ -79,9 +80,7 @@ export const ClaimConfirmModal: React.FC<ClaimConfirmModalProps> = ({
                             onClick={() => onConfirmClaim(person)}
                             className="w-full h-11 rounded-xl bg-primary text-on-primary font-bold text-sm shadow-xs hover:bg-primary-dark transition-colors cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5"
                         >
-                            <span className="material-symbols-outlined text-[18px]">
-                                check_circle
-                            </span>
+                            <AppIcon name="check_circle" className="text-[18px]" />
                             <span>{isSubmitting ? 'Verifying...' : `Yes, I am ${person}`}</span>
                         </button>
                     )}
@@ -94,9 +93,7 @@ export const ClaimConfirmModal: React.FC<ClaimConfirmModalProps> = ({
                                 onClick={() => onRequestApproval(person)}
                                 className="w-full h-11 rounded-xl bg-primary text-on-primary font-bold text-xs shadow-xs hover:bg-primary-dark transition-colors cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5"
                             >
-                                <span className="material-symbols-outlined text-[17px]">
-                                    approval_delegation
-                                </span>
+                                <AppIcon name="approval_delegation" className="text-[17px]" />
                                 <span>
                                     {isSubmitting
                                         ? 'Submitting request...'
@@ -157,9 +154,7 @@ export const ClaimAdminModal: React.FC<ClaimAdminModalProps> = ({
             >
                 <div className="flex items-center justify-between pb-2 border-b border-border-subtle">
                     <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-primary text-[22px]">
-                            admin_panel_settings
-                        </span>
+                        <AppIcon name="admin_panel_settings" className="text-primary text-[22px]" />
                         <h3 className="font-bold text-base text-on-surface font-headline">
                             Admin Unlock
                         </h3>
@@ -170,7 +165,7 @@ export const ClaimAdminModal: React.FC<ClaimAdminModalProps> = ({
                         className="w-7 h-7 rounded-full bg-surface-card-subtle flex items-center justify-center text-on-surface-variant hover:text-on-surface cursor-pointer"
                         aria-label="Close modal"
                     >
-                        <span className="material-symbols-outlined text-[16px]">close</span>
+                        <AppIcon name="close" className="text-[16px]" />
                     </button>
                 </div>
 

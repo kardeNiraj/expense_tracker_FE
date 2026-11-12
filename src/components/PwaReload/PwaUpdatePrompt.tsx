@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { triggerHaptic } from '../../utils/haptics';
+import { AppIcon } from '../Icon/AppIcon';
 
 export const PwaUpdatePrompt: React.FC = () => {
     const {
@@ -46,9 +47,7 @@ export const PwaUpdatePrompt: React.FC = () => {
             <div className="bg-primary text-on-primary px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-primary-container max-w-sm w-full justify-between">
                 <div className="flex items-center gap-2.5 min-w-0">
                     <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                        <span className="material-symbols-outlined text-[18px] text-white">
-                            rocket_launch
-                        </span>
+                        <AppIcon name="rocket_launch" className="text-[18px] text-white" />
                     </div>
                     <div className="min-w-0 text-left">
                         <div className="font-bold text-xs truncate">New Version Available!</div>
@@ -69,7 +68,7 @@ export const PwaUpdatePrompt: React.FC = () => {
                         className="w-8 h-8 rounded-xl text-on-primary hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer"
                         title="Dismiss"
                     >
-                        <span className="material-symbols-outlined text-[16px]">close</span>
+                        <AppIcon name="close" className="text-[16px]" />
                     </button>
                 </div>
             </div>

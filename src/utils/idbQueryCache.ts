@@ -434,7 +434,11 @@ function applyRecordsToQueryClient(
         try {
             const parsedKey = JSON.parse(record.key);
             if (record.data !== undefined) {
-                if (skipIfDefined && queryClient.getQueryData(parsedKey) !== undefined) {
+                const state = queryClient.getQueryState(parsedKey);
+                if (
+                    state?.data !== undefined &&
+                    (skipIfDefined || state.dataUpdatedAt >= (record.updatedAt || 0))
+                ) {
                     continue;
                 }
                 // Preserve genuine persistence age so offline data renders immediately

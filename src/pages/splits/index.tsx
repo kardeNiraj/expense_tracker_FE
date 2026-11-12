@@ -12,7 +12,9 @@ import {
     usePeopleDetails,
 } from '../../api';
 import {
+    AppIcon,
     Avatar,
+    SplitsSkeleton,
     PaymentModal,
     type PaymentSettlementData,
     CollectQrModal,
@@ -517,9 +519,7 @@ export function SplitsPage() {
                             onClick={handleShareGroupTripSummary}
                             className="h-11 px-3 rounded-xl bg-surface-container-low border border-outline-variant/30 text-xs font-semibold text-on-surface flex items-center justify-center gap-1.5 hover:bg-surface-container transition-colors active:scale-[0.99] cursor-pointer shadow-xs"
                         >
-                            <span className="material-symbols-outlined text-[#25D366] text-[17px] shrink-0">
-                                chat
-                            </span>
+                            <AppIcon name="chat" className="text-[#25D366] text-[17px] shrink-0" />
                             <span className="truncate">Debt Summary</span>
                         </button>
                         <button
@@ -536,9 +536,7 @@ export function SplitsPage() {
                             }}
                             className="h-11 px-3 rounded-xl bg-[#25D366]/12 border border-[#25D366]/35 hover:border-[#25D366]/60 text-xs font-bold text-[#15803d] flex items-center justify-center gap-1.5 transition-colors active:scale-[0.99] cursor-pointer shadow-xs"
                         >
-                            <span className="material-symbols-outlined text-[17px] shrink-0">
-                                qr_code_2
-                            </span>
+                            <AppIcon name="qr_code_2" className="text-[17px] shrink-0" />
                             <span className="truncate">
                                 Share {activeReceivableDebtors.length}{' '}
                                 {activeReceivableDebtors.length === 1 ? 'Collect QR' : 'Collect QRs'}
@@ -553,15 +551,13 @@ export function SplitsPage() {
                     >
                         <div className="flex items-center gap-2 min-w-0">
                             <span className="w-6 h-6 rounded-full bg-[#25D366]/15 flex items-center justify-center shrink-0">
-                                <span className="material-symbols-outlined text-[#25D366] text-[16px]">
-                                    chat
-                                </span>
+                                <AppIcon name="chat" className="text-[#25D366] text-[16px]" />
                             </span>
                             <span className="truncate">Share Group Debt Summary to WhatsApp</span>
                         </div>
                         <div className="flex items-center gap-1 text-[11px] font-bold text-primary shrink-0">
                             <span>Send</span>
-                            <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                            <AppIcon name="arrow_forward" className="text-[16px]" />
                         </div>
                     </button>
                 )
@@ -579,9 +575,7 @@ export function SplitsPage() {
                             >
                                 <div className="flex items-center gap-2.5 min-w-0">
                                     <div className="w-8 h-8 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
-                                        <span className="material-symbols-outlined text-[18px]">
-                                            swap_horiz
-                                        </span>
+                                        <AppIcon name="swap_horiz" className="text-[18px]" />
                                     </div>
                                     <div className="min-w-0">
                                         <span className="text-xs font-bold text-on-surface block truncate">
@@ -599,9 +593,10 @@ export function SplitsPage() {
                                     className="h-8 px-2.5 rounded-xl bg-primary text-on-primary text-[11px] font-bold flex items-center gap-1 shadow-2xs hover:bg-primary/90 transition-colors cursor-pointer disabled:opacity-50 shrink-0"
                                     title={`Mark both directions (${pair.allSplits.length} splits) as settled`}
                                 >
-                                    <span className="material-symbols-outlined text-[14px]">
-                                        {isClearing ? 'hourglass_top' : 'done_all'}
-                                    </span>
+                                    <AppIcon
+                                        name={isClearing ? 'hourglass_top' : 'done_all'}
+                                        className="text-[14px]"
+                                    />
                                     <span>{isClearing ? 'Clearing...' : 'Clear Splits'}</span>
                                 </button>
                             </div>
@@ -612,22 +607,21 @@ export function SplitsPage() {
 
             {/* Splits List */}
             {isLoading ? (
-                <div className="bg-surface-container-lowest p-8 rounded-2xl text-center text-xs text-on-surface-variant animate-pulse border border-outline-variant/30">
-                    Loading splits from server...
-                </div>
+                <SplitsSkeleton />
             ) : splits.length === 0 ? (
                 <div className="bg-surface-container-lowest p-8 rounded-2xl text-center text-xs text-on-surface-variant border border-outline-variant/30 space-y-2.5">
-                    <span
-                        className={`material-symbols-outlined text-4xl ${
+                    <AppIcon
+                        name={
+                            effectiveStatusFilter === 'ACTIVE' && settledSplits.length > 0
+                                ? 'task_alt'
+                                : 'receipt_long'
+                        }
+                        className={`text-4xl ${
                             effectiveStatusFilter === 'ACTIVE' && settledSplits.length > 0
                                 ? 'text-primary'
                                 : 'text-outline-variant'
                         }`}
-                    >
-                        {effectiveStatusFilter === 'ACTIVE' && settledSplits.length > 0
-                            ? 'task_alt'
-                            : 'receipt_long'}
-                    </span>
+                    />
                     <p className="font-semibold text-sm text-on-surface">
                         {effectiveStatusFilter === 'ACTIVE' && settledSplits.length > 0
                             ? 'All splits are settled!'
@@ -656,9 +650,7 @@ export function SplitsPage() {
                                 View {settledSplits.length} Settled{' '}
                                 {settledSplits.length === 1 ? 'Split' : 'Splits'}
                             </span>
-                            <span className="material-symbols-outlined text-[15px]">
-                                arrow_forward
-                            </span>
+                            <AppIcon name="arrow_forward" className="text-[15px]" />
                         </button>
                     )}
                     {effectiveStatusFilter === 'SETTLED' && activeSplits.length > 0 && (
@@ -672,9 +664,7 @@ export function SplitsPage() {
                             className="inline-flex items-center gap-1.5 h-9 px-4 rounded-xl bg-primary/10 hover:bg-primary/15 text-primary text-xs font-bold transition-colors cursor-pointer"
                         >
                             <span>View {activeSplits.length} Active Splits</span>
-                            <span className="material-symbols-outlined text-[15px]">
-                                arrow_forward
-                            </span>
+                            <AppIcon name="arrow_forward" className="text-[15px]" />
                         </button>
                     )}
                 </div>
@@ -690,9 +680,10 @@ export function SplitsPage() {
                             onClick={() => toggleAll(!areAllExpanded)}
                             className="text-xs font-semibold text-primary hover:underline flex items-center gap-1 cursor-pointer"
                         >
-                            <span className="material-symbols-outlined text-[16px]">
-                                {areAllExpanded ? 'unfold_less' : 'unfold_more'}
-                            </span>
+                            <AppIcon
+                                name={areAllExpanded ? 'unfold_less' : 'unfold_more'}
+                                className="text-[16px]"
+                            />
                             <span>{areAllExpanded ? 'Collapse All' : 'Expand All'}</span>
                         </button>
                     </div>
@@ -748,21 +739,19 @@ export function SplitsPage() {
                                     <div className="flex items-center justify-between gap-2">
                                         <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                                             <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${catMeta.bgClass} ${catMeta.textClass}`}>
-                                                <span className="material-symbols-outlined text-[13px]">
-                                                    {catMeta.icon}
-                                                </span>
+                                                <AppIcon name={catMeta.icon} className="text-[13px]" />
                                                 <span className="truncate max-w-[120px]">{split.category}</span>
                                             </span>
 
                                             {/* Overall Split Status Badge (DESIGN.md Section 2.3 & 3) */}
                                             {split.status === 'SETTLED' ? (
                                                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold font-mono tracking-wide px-2.5 py-0.5 rounded-full bg-status-settled-bg text-status-settled-text uppercase">
-                                                    <span className="material-symbols-outlined text-[13px]">done_all</span>
+                                                    <AppIcon name="done_all" className="text-[13px]" />
                                                     <span>Settled</span>
                                                 </span>
                                             ) : pendingSettlements === 0 ? (
                                                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold font-mono tracking-wide px-2.5 py-0.5 rounded-full bg-status-settled-bg text-status-settled-text uppercase">
-                                                    <span className="material-symbols-outlined text-[13px]">check</span>
+                                                    <AppIcon name="check" className="text-[13px]" />
                                                     <span>All Paid</span>
                                                 </span>
                                             ) : pendingSettlements < totalSettlements ? (
@@ -794,16 +783,14 @@ export function SplitsPage() {
                                                     title="Edit split details"
                                                     aria-label="Edit split"
                                                 >
-                                                    <span className="material-symbols-outlined text-[15px]">edit</span>
+                                                    <AppIcon name="edit" className="text-[15px]" />
                                                 </button>
                                             )}
                                             <div className="w-7 h-7 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors shrink-0">
-                                                <span
-                                                    className={`material-symbols-outlined text-[18px] transition-transform duration-200 ${expanded ? 'rotate-180 text-primary' : ''
-                                                        }`}
-                                                >
-                                                    keyboard_arrow_down
-                                                </span>
+                                                <AppIcon
+                                                    name="keyboard_arrow_down"
+                                                    className={`text-[18px] transition-transform duration-200 ${expanded ? 'rotate-180 text-primary' : ''}`}
+                                                />
                                             </div>
                                         </div>
                                     </div>
@@ -836,7 +823,7 @@ export function SplitsPage() {
                                         {/* User Stake at-a-glance */}
                                         {userStake && (
                                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold ${userStake.badgeClass}`}>
-                                                <span className="material-symbols-outlined text-[13px]">{userStake.icon}</span>
+                                                <AppIcon name={userStake.icon} className="text-[13px]" />
                                                 <span>{userStake.text}</span>
                                                 {userStake.subtext && <span className="opacity-75 font-normal ml-0.5">{userStake.subtext}</span>}
                                             </span>
@@ -850,9 +837,7 @@ export function SplitsPage() {
                                         {/* Split ID & Reference Bar (Only displayed in expanded view) */}
                                         <div className="flex items-center justify-between p-2.5 rounded-xl bg-surface-container-low border border-outline-variant/20 text-xs gap-2">
                                             <div className="flex items-center gap-2 min-w-0">
-                                                <span className="material-symbols-outlined text-primary text-[16px] shrink-0">
-                                                    tag
-                                                </span>
+                                                <AppIcon name="tag" className="text-primary text-[16px] shrink-0" />
                                                 <div className="min-w-0">
                                                     <span className="text-[10px] text-on-surface-variant uppercase font-semibold block leading-none mb-0.5">
                                                         Split Reference ID
@@ -871,7 +856,7 @@ export function SplitsPage() {
                                                 className="px-2.5 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-primary hover:text-primary-container text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors shrink-0 border border-outline-variant/20"
                                                 title="Copy Split ID"
                                             >
-                                                <span className="material-symbols-outlined text-[14px]">content_copy</span>
+                                                <AppIcon name="content_copy" className="text-[14px]" />
                                                 <span>Copy ID</span>
                                             </button>
                                         </div>
@@ -933,9 +918,7 @@ export function SplitsPage() {
                                                         }}
                                                         className="text-xs font-semibold text-primary hover:underline flex items-center gap-1 cursor-pointer"
                                                     >
-                                                        <span className="material-symbols-outlined text-[15px]">
-                                                            add
-                                                        </span>
+                                                        <AppIcon name="add" className="text-[15px]" />
                                                         <span>Add Contribution</span>
                                                     </button>
                                                 )}
@@ -999,9 +982,7 @@ export function SplitsPage() {
                                                                               : `Overall pairwise net: You owe ${netMeta.counterparty} ₹${Math.abs(netMeta.netSigned).toLocaleString('en-IN')} (after ₹${netMeta.offsetAmount.toLocaleString('en-IN')} offset)`;
                                                                     return (
                                                                         <div className="px-2 py-1 rounded-lg bg-primary/8 border border-primary/20 text-[11px] font-medium text-primary flex items-center gap-1.5">
-                                                                            <span className="material-symbols-outlined text-[14px] shrink-0">
-                                                                                swap_horiz
-                                                                            </span>
+                                                                            <AppIcon name="swap_horiz" className="text-[14px] shrink-0" />
                                                                             <span className="truncate">{hintText}</span>
                                                                         </div>
                                                                     );
@@ -1026,9 +1007,7 @@ export function SplitsPage() {
                                                                                 className="flex-1 h-8.5 px-2.5 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface text-xs font-semibold flex items-center justify-center gap-1 transition-colors border border-outline-variant/30 cursor-pointer active:scale-[0.99] whitespace-nowrap"
                                                                                 title={`Show QR code to collect ₹${s.amount} from ${s.from}`}
                                                                             >
-                                                                                <span className="material-symbols-outlined text-[16px] text-primary">
-                                                                                    qr_code_2
-                                                                                </span>
+                                                                                <AppIcon name="qr_code_2" className="text-[16px] text-primary" />
                                                                                 <span>Show QR</span>
                                                                             </button>
                                                                             <button
@@ -1044,11 +1023,14 @@ export function SplitsPage() {
                                                                                 title={`Send push payment reminder to ${s.from}`}
                                                                                 aria-label={`Remind ${s.from}`}
                                                                             >
-                                                                                <span className="material-symbols-outlined text-[15px]">
-                                                                                    {remindingKey === `${split.splitId}_${s.from}`
-                                                                                        ? 'hourglass_top'
-                                                                                        : 'notifications_active'}
-                                                                                </span>
+                                                                                <AppIcon
+                                                                                    name={
+                                                                                        remindingKey === `${split.splitId}_${s.from}`
+                                                                                            ? 'hourglass_top'
+                                                                                            : 'notifications_active'
+                                                                                    }
+                                                                                    className="text-[15px]"
+                                                                                />
                                                                                 <span>
                                                                                     {remindingKey === `${split.splitId}_${s.from}`
                                                                                         ? 'Sending'
@@ -1067,9 +1049,7 @@ export function SplitsPage() {
                                                                                 title={`Confirm you have received ₹${s.amount} from ${s.from}`}
                                                                                 aria-label={`Confirm receipt of ₹${s.amount} from ${s.from}`}
                                                                             >
-                                                                                <span className="material-symbols-outlined text-[15px]">
-                                                                                    done_all
-                                                                                </span>
+                                                                                <AppIcon name="done_all" className="text-[15px]" />
                                                                                 <span>Confirm</span>
                                                                             </button>
                                                                         </div>
@@ -1096,9 +1076,10 @@ export function SplitsPage() {
                                                                                     }
                                                                                     className="w-full h-8.5 px-3 rounded-xl bg-primary text-on-primary text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs hover:bg-primary/90 transition-all cursor-pointer active:scale-[0.99]"
                                                                                 >
-                                                                                    <span className="material-symbols-outlined text-[16px]">
-                                                                                        {hasUpi ? 'qr_code_2' : 'qr_code_scanner'}
-                                                                                    </span>
+                                                                                    <AppIcon
+                                                                                        name={hasUpi ? 'qr_code_2' : 'qr_code_scanner'}
+                                                                                        className="text-[16px]"
+                                                                                    />
                                                                                     <span>
                                                                                         {hasUpi
                                                                                             ? `Pay ₹${s.amount.toLocaleString('en-IN')} via QR`
@@ -1139,9 +1120,7 @@ export function SplitsPage() {
                                                         }}
                                                         className="w-full h-9 px-3 rounded-xl bg-[#25D366]/12 border border-[#25D366]/35 hover:border-[#25D366]/60 text-[#15803d] text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                                                     >
-                                                        <span className="material-symbols-outlined text-[16px]">
-                                                            qr_code_2
-                                                        </span>
+                                                        <AppIcon name="qr_code_2" className="text-[16px]" />
                                                         <span>
                                                             Share {splitCreditorDebtors.length} Named{' '}
                                                             {splitCreditorDebtors.length === 1 ? 'QR' : 'QRs'} to WhatsApp
@@ -1158,9 +1137,7 @@ export function SplitsPage() {
                                                             }
                                                             className="flex-1 h-9 rounded-xl bg-surface-container text-on-surface text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-surface-container-high transition-colors cursor-pointer border border-outline-variant/20"
                                                         >
-                                                            <span className="material-symbols-outlined text-[#25D366] text-[18px]">
-                                                                chat
-                                                            </span>
+                                                            <AppIcon name="chat" className="text-[#25D366] text-[18px]" />
                                                             <span>Share on WhatsApp</span>
                                                         </button>
                                                         <button
@@ -1171,9 +1148,7 @@ export function SplitsPage() {
                                                             className="h-9 px-3 rounded-xl bg-surface-container-low text-on-surface-variant hover:text-on-surface text-xs font-semibold flex items-center gap-1 cursor-pointer border border-outline-variant/20"
                                                             title="Copy Summary"
                                                         >
-                                                            <span className="material-symbols-outlined text-[16px]">
-                                                                content_copy
-                                                            </span>
+                                                            <AppIcon name="content_copy" className="text-[16px]" />
                                                             <span>Copy</span>
                                                         </button>
                                                     </div>
@@ -1199,7 +1174,7 @@ export function SplitsPage() {
                                                             }}
                                                             className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 font-semibold p-1 rounded-lg hover:bg-primary/10 transition-colors cursor-pointer"
                                                         >
-                                                            <span className="material-symbols-outlined text-[16px]">edit</span>
+                                                            <AppIcon name="edit" className="text-[16px]" />
                                                             <span>Edit Split</span>
                                                         </button>
                                                         {canDelete ? (
@@ -1211,12 +1186,12 @@ export function SplitsPage() {
                                                                 }}
                                                                 className="text-xs text-error hover:text-error/80 flex items-center gap-1 font-semibold p-1 rounded-lg hover:bg-error/10 transition-colors cursor-pointer"
                                                             >
-                                                                <span className="material-symbols-outlined text-[16px]">delete</span>
+                                                                <AppIcon name="delete" className="text-[16px]" />
                                                                 <span>Delete Split</span>
                                                             </button>
                                                         ) : (
                                                             <span className="text-[11px] text-on-surface-variant/70 italic flex items-center gap-1">
-                                                                <span className="material-symbols-outlined text-[13px]">lock</span>
+                                                                <AppIcon name="lock" className="text-[13px]" />
                                                                 <span>Cannot delete (dues settled)</span>
                                                             </span>
                                                         )}
@@ -1234,9 +1209,7 @@ export function SplitsPage() {
                                             onClick={() => toggleSplit(split.splitId, index)}
                                             className="w-full py-1 text-[11px] font-semibold text-on-surface-variant hover:text-primary flex items-center justify-center gap-1 cursor-pointer transition-colors border-t border-outline-variant/15 pt-1.5"
                                         >
-                                            <span className="material-symbols-outlined text-[15px]">
-                                                keyboard_arrow_up
-                                            </span>
+                                            <AppIcon name="keyboard_arrow_up" className="text-[15px]" />
                                             <span>Collapse card</span>
                                         </button>
                                     </div>
@@ -1263,11 +1236,10 @@ export function SplitsPage() {
                             <button
                                 type="button"
                                 onClick={() => setSelectedSplitForContribution(null)}
+                                aria-label="Close contribution modal"
                                 className="w-7 h-7 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-on-surface cursor-pointer"
                             >
-                                <span className="material-symbols-outlined text-[16px]">
-                                    close
-                                </span>
+                                <AppIcon name="close" className="text-[16px]" />
                             </button>
                         </div>
 
@@ -1371,7 +1343,7 @@ export function SplitsPage() {
                     >
                         <div className="flex items-center gap-3 text-error">
                             <div className="w-10 h-10 rounded-full bg-error/10 flex items-center justify-center shrink-0">
-                                <span className="material-symbols-outlined text-[22px]">delete_forever</span>
+                                <AppIcon name="delete_forever" className="text-[22px]" />
                             </div>
                             <div>
                                 <h3 className="font-bold text-base text-on-surface">Delete Split?</h3>
@@ -1413,9 +1385,10 @@ export function SplitsPage() {
                                 }}
                                 className="flex-1 h-11 rounded-xl bg-error text-on-error text-xs font-bold shadow-xs hover:bg-error/90 transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                             >
-                                <span className="material-symbols-outlined text-[16px]">
-                                    {deleteMutation.isPending ? 'hourglass_top' : 'delete'}
-                                </span>
+                                <AppIcon
+                                    name={deleteMutation.isPending ? 'hourglass_top' : 'delete'}
+                                    className="text-[16px]"
+                                />
                                 <span>{deleteMutation.isPending ? 'Deleting...' : 'Delete'}</span>
                             </button>
                         </div>

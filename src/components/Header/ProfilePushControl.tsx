@@ -11,6 +11,7 @@ import {
     isPushSupported,
     sendTestPushNotification,
 } from '../../utils/pushNotifications';
+import { AppIcon } from '../Icon/AppIcon';
 
 interface ProfilePushControlProps {
     claimedPerson: string | null;
@@ -221,7 +222,7 @@ const PushActionButtons: React.FC<PushActionButtonsProps> = ({
             onClick={onEnablePush}
             className="h-8 px-2.5 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary-dark cursor-pointer transition-colors disabled:opacity-50 flex items-center gap-1"
         >
-            <span className="material-symbols-outlined text-[14px]">notifications_active</span>
+            <AppIcon name="notifications_active" className="text-[14px]" />
             <span>{enableLabel}</span>
         </button>
     );
@@ -238,13 +239,12 @@ export const ProfilePushControl: React.FC<ProfilePushControlProps> = ({
         <div className="px-0.5 pb-1.5 border-b border-outline-variant/15 space-y-1.5 text-xs">
             <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5 text-on-surface-variant min-w-0">
-                    <span
-                        className={`material-symbols-outlined text-[17px] shrink-0 ${
+                    <AppIcon
+                        name={push.isPushActive ? 'notifications_active' : 'notifications'}
+                        className={`text-[17px] shrink-0 ${
                             push.isPushActive ? 'text-primary' : 'text-on-surface-variant'
                         }`}
-                    >
-                        {push.isPushActive ? 'notifications_active' : 'notifications'}
-                    </span>
+                    />
                     <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-bold text-on-surface text-[11px] leading-tight">

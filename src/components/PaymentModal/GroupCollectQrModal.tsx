@@ -13,6 +13,7 @@ import {
     type ParsedUpiQr,
     type QrCardShareItem,
 } from '../../utils/qr';
+import { AppIcon } from '../Icon/AppIcon';
 
 const QrScannerModal = lazy(() => import('../QRScanner/QrScannerModal'));
 
@@ -599,9 +600,7 @@ const GroupCollectQrContent: React.FC<GroupCollectQrContentProps> = ({
                     <div className="p-4 border-b border-outline-variant/20 flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2.5 min-w-0">
                             <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                                <span className="material-symbols-outlined text-[22px]">
-                                    qr_code_2
-                                </span>
+                                <AppIcon name="qr_code_2" className="text-[22px]" />
                             </div>
                             <div className="min-w-0">
                                 <h3 className="font-bold text-base text-on-surface truncate">
@@ -620,7 +619,7 @@ const GroupCollectQrContent: React.FC<GroupCollectQrContentProps> = ({
                             className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer shrink-0"
                             aria-label="Close"
                         >
-                            <span className="material-symbols-outlined text-[20px]">close</span>
+                            <AppIcon name="close" className="text-[20px]" />
                         </button>
                     </div>
 
@@ -629,9 +628,7 @@ const GroupCollectQrContent: React.FC<GroupCollectQrContentProps> = ({
                         {!myUpiId || isEditingUpi ? (
                             <div className="bg-surface-container-low p-4 rounded-2xl border border-outline-variant/30 space-y-3">
                                 <div className="flex items-start gap-2.5">
-                                    <span className="material-symbols-outlined text-secondary text-[22px] mt-0.5 shrink-0">
-                                        account_balance_wallet
-                                    </span>
+                                    <AppIcon name="account_balance_wallet" className="text-secondary text-[22px] mt-0.5 shrink-0" />
                                     <div>
                                         <h4 className="font-bold text-sm text-on-surface">
                                             {myUpiId ? 'Update your UPI ID' : 'Add your UPI ID to generate group QR cards'}
@@ -663,9 +660,7 @@ const GroupCollectQrContent: React.FC<GroupCollectQrContentProps> = ({
                                             }}
                                             className="h-11 px-3 rounded-xl bg-surface-container border border-outline-variant/40 text-primary hover:bg-primary/10 text-xs font-bold flex items-center gap-1 shrink-0 cursor-pointer transition-colors"
                                         >
-                                            <span className="material-symbols-outlined text-[18px]">
-                                                qr_code_scanner
-                                            </span>
+                                            <AppIcon name="qr_code_scanner" className="text-[18px]" />
                                             <span>Scan</span>
                                         </button>
                                     </div>
@@ -687,9 +682,7 @@ const GroupCollectQrContent: React.FC<GroupCollectQrContentProps> = ({
                                             disabled={isSavingUpi}
                                             className="flex-1 h-10 rounded-xl bg-primary text-on-primary text-xs font-bold shadow-xs hover:bg-primary/90 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer transition-colors"
                                         >
-                                            <span className="material-symbols-outlined text-[16px]">
-                                                qr_code_2
-                                            </span>
+                                            <AppIcon name="qr_code_2" className="text-[16px]" />
                                             <span>
                                                 {isSavingUpi ? 'Saving...' : 'Save & Generate QR Cards'}
                                             </span>
@@ -716,9 +709,7 @@ const GroupCollectQrContent: React.FC<GroupCollectQrContentProps> = ({
                                                 onClick={() => void handleCopyUpi()}
                                                 className="px-2 py-1 rounded-md text-primary font-semibold hover:bg-primary/10 transition-colors flex items-center gap-1 cursor-pointer"
                                             >
-                                                <span className="material-symbols-outlined text-[13px]">
-                                                    {copiedUpi ? 'check' : 'content_copy'}
-                                                </span>
+                                                <AppIcon name={copiedUpi ? 'check' : 'content_copy'} className="text-[13px]" />
                                                 <span>{copiedUpi ? 'Copied' : 'Copy'}</span>
                                             </button>
                                             <button
@@ -731,9 +722,7 @@ const GroupCollectQrContent: React.FC<GroupCollectQrContentProps> = ({
                                                 title="Change UPI ID"
                                                 aria-label="Change UPI ID"
                                             >
-                                                <span className="material-symbols-outlined text-[15px]">
-                                                    edit
-                                                </span>
+                                                <AppIcon name="edit" className="text-[15px]" />
                                             </button>
                                         </div>
                                     </div>
@@ -823,17 +812,16 @@ const GroupCollectQrContent: React.FC<GroupCollectQrContentProps> = ({
                                                                     {debtor.debtorName}
                                                                 </span>
                                                             </div>
-                                                            <span
-                                                                className={`material-symbols-outlined text-[18px] shrink-0 ${
+                                                            <AppIcon
+                                                                name={isSelected
+                                                                    ? 'check_circle'
+                                                                    : 'radio_button_unchecked'}
+                                                                className={`text-[18px] shrink-0 ${
                                                                     isSelected
                                                                         ? 'text-primary'
                                                                         : 'text-outline-variant'
                                                                 }`}
-                                                            >
-                                                                {isSelected
-                                                                    ? 'check_circle'
-                                                                    : 'radio_button_unchecked'}
-                                                            </span>
+                                                            />
                                                         </button>
 
                                                         {/* QR Preview */}
@@ -861,9 +849,7 @@ const GroupCollectQrContent: React.FC<GroupCollectQrContentProps> = ({
                                                                 onClick={() => void handleShareSingleDebtor(debtor)}
                                                                 className="w-full h-7 rounded-lg bg-surface-container hover:bg-primary/10 text-primary text-[11px] font-bold flex items-center justify-center gap-1 border border-outline-variant/25 transition-colors cursor-pointer disabled:opacity-50"
                                                             >
-                                                                <span className="material-symbols-outlined text-[13px]">
-                                                                    {isSingleSharing ? 'hourglass_top' : 'ios_share'}
-                                                                </span>
+                                                                <AppIcon name={isSingleSharing ? 'hourglass_top' : 'ios_share'} className="text-[13px]" />
                                                                 <span>
                                                                     {isSingleSharing ? 'Sharing...' : 'Share 1'}
                                                                 </span>
@@ -931,9 +917,7 @@ const GroupCollectQrContent: React.FC<GroupCollectQrContentProps> = ({
                                                                     : 'bg-surface-container-low border-outline-variant/30 text-on-surface-variant opacity-70'
                                                             }`}
                                                         >
-                                                            <span className="material-symbols-outlined text-[13px]">
-                                                                {isSelected ? 'check' : 'add'}
-                                                            </span>
+                                                            <AppIcon name={isSelected ? 'check' : 'add'} className="text-[13px]" />
                                                             <span>
                                                                 {debtor.debtorName} · ₹{debtor.amount.toLocaleString('en-IN')}
                                                             </span>
@@ -950,9 +934,7 @@ const GroupCollectQrContent: React.FC<GroupCollectQrContentProps> = ({
                                     <div className="bg-surface-container-low/80 border border-outline-variant/25 rounded-2xl p-3 space-y-2">
                                         <div className="flex items-center justify-between gap-2">
                                             <span className="text-[11px] font-bold text-on-surface flex items-center gap-1">
-                                                <span className="material-symbols-outlined text-[#25D366] text-[15px]">
-                                                    chat
-                                                </span>
+                                                <AppIcon name="chat" className="text-[#25D366] text-[15px]" />
                                                 <span>Accompanying WhatsApp Message</span>
                                             </span>
                                             <button
@@ -960,9 +942,7 @@ const GroupCollectQrContent: React.FC<GroupCollectQrContentProps> = ({
                                                 onClick={() => void handleCopyMessage()}
                                                 className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
                                             >
-                                                <span className="material-symbols-outlined text-[13px]">
-                                                    {copiedMsg ? 'check' : 'content_copy'}
-                                                </span>
+                                                <AppIcon name={copiedMsg ? 'check' : 'content_copy'} className="text-[13px]" />
                                                 <span>{copiedMsg ? 'Copied' : 'Copy Msg'}</span>
                                             </button>
                                         </div>
@@ -984,9 +964,7 @@ const GroupCollectQrContent: React.FC<GroupCollectQrContentProps> = ({
                                 onClick={() => void handleSharePrimary()}
                                 className="w-full h-12 px-4 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-sm shadow-sm flex items-center justify-center gap-2 transition-colors active:scale-[0.98] cursor-pointer disabled:opacity-50"
                             >
-                                <span className="material-symbols-outlined text-[20px]">
-                                    {isSharingBatch ? 'hourglass_top' : 'ios_share'}
-                                </span>
+                                <AppIcon name={isSharingBatch ? 'hourglass_top' : 'ios_share'} className="text-[20px]" />
                                 <span>
                                     {isSharingBatch
                                         ? 'Preparing QR...'
@@ -1007,9 +985,7 @@ const GroupCollectQrContent: React.FC<GroupCollectQrContentProps> = ({
                                     onClick={() => void handleDownloadPngs()}
                                     className="h-9 px-3 rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant/30 text-on-surface text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
                                 >
-                                    <span className="material-symbols-outlined text-[16px] text-primary">
-                                        download
-                                    </span>
+                                    <AppIcon name="download" className="text-[16px] text-primary" />
                                     <span>
                                         {isDownloadingAll
                                             ? 'Saving...'
@@ -1025,9 +1001,7 @@ const GroupCollectQrContent: React.FC<GroupCollectQrContentProps> = ({
                                     onClick={handleOpenWhatsAppText}
                                     className="h-9 px-3 rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant/30 text-on-surface text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
                                 >
-                                    <span className="material-symbols-outlined text-[16px] text-[#25D366]">
-                                        chat
-                                    </span>
+                                    <AppIcon name="chat" className="text-[16px] text-[#25D366]" />
                                     <span>Text Only (wa.me)</span>
                                 </button>
                             </div>

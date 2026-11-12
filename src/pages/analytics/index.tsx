@@ -5,6 +5,7 @@ import { apiFetch, queryKeys, useAnalytics, usePeople } from '../../api';
 import type { AnalyticsData, AnalyticsRange } from '../../api/types';
 import { triggerHaptic } from '../../utils/haptics';
 import { AnalyticsHeaderBar } from './components/AnalyticsHeaderBar';
+import { AppIcon, AnalyticsSkeleton } from '../../components';
 import { AnalyticsHeroSection } from './components/AnalyticsHeroSection';
 import { InsightsStrip } from './components/InsightsStrip';
 import { CategoryDonutCard } from './components/CategoryDonutCard';
@@ -123,19 +124,10 @@ export function AnalyticsPage() {
             />
 
             {isLoading && !data ? (
-                <div className="space-y-3">
-                    <div className="h-36 rounded-3xl bg-surface-card-subtle border border-border-subtle animate-pulse" />
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="h-24 rounded-2xl bg-surface-card-subtle border border-border-subtle animate-pulse" />
-                        <div className="h-24 rounded-2xl bg-surface-card-subtle border border-border-subtle animate-pulse" />
-                    </div>
-                    <div className="h-56 rounded-2xl bg-surface-card-subtle border border-border-subtle animate-pulse" />
-                </div>
+                <AnalyticsSkeleton />
             ) : isError && !data ? (
                 <div className="p-6 rounded-2xl bg-surface-card border border-negative/30 shadow-[0_1px_3px_rgba(15,23,42,0.05)] text-center space-y-3">
-                    <span className="material-symbols-outlined text-3xl text-negative">
-                        cloud_off
-                    </span>
+                    <AppIcon name="cloud_off" className="text-3xl text-negative" />
                     <div>
                         <p className="text-sm font-bold text-on-surface">
                             Unable to load analytics

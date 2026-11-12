@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { AppIcon } from '../Icon/AppIcon';
 
 export interface PullToRefreshProps {
     onRefresh: () => Promise<unknown> | void;
@@ -120,17 +121,16 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
                 }}
             >
                 <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-surface-container-highest/95 backdrop-blur-md border border-outline-variant/40 shadow-xl text-xs font-semibold text-on-surface">
-                    <span
-                        className={`material-symbols-outlined text-[18px] text-primary ${
+                    <AppIcon
+                        name={isRefreshing ? 'progress_activity' : progress >= 1 ? 'autorenew' : 'arrow_downward'}
+                        className={`text-[18px] text-primary ${
                             isRefreshing ? 'animate-spin' : ''
                         }`}
                         style={{
                             transform: isRefreshing ? undefined : `rotate(${progress * 360}deg)`,
                             transition: isPulling ? 'none' : 'transform 0.15s',
                         }}
-                    >
-                        {isRefreshing ? 'progress_activity' : progress >= 1 ? 'autorenew' : 'arrow_downward'}
-                    </span>
+                    />
                     <span className="font-sans">
                         {isRefreshing
                             ? 'Reloading from Sheet...'

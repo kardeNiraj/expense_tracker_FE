@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { QRCode } from '../QRCode';
 import { triggerHaptic } from '../../utils/haptics';
 import { useExpense } from '../../context';
+import { AppIcon } from '../Icon/AppIcon';
 
 interface JoinTripModalProps {
     isOpen: boolean;
@@ -58,9 +59,7 @@ export const JoinTripModal: React.FC<JoinTripModalProps> = ({
                 <div className="flex items-center justify-between pb-3 border-b border-outline-variant/20">
                     <div className="flex items-center gap-2.5 min-w-0">
                         <div className="w-10 h-10 rounded-2xl bg-primary text-on-primary flex items-center justify-center shadow-xs shrink-0">
-                            <span className="material-symbols-outlined text-[22px]">
-                                {tripIcon}
-                            </span>
+                            <AppIcon name={tripIcon} className="text-[22px]" />
                         </div>
                         <div className="min-w-0">
                             <h3 className="font-bold text-base text-on-surface truncate font-headline">
@@ -77,9 +76,7 @@ export const JoinTripModal: React.FC<JoinTripModalProps> = ({
                         className="w-8 h-8 rounded-full hover:bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
                         aria-label="Close"
                     >
-                        <span className="material-symbols-outlined text-[20px]">
-                            close
-                        </span>
+                        <AppIcon name="close" className="text-[20px]" />
                     </button>
                 </div>
 
@@ -90,9 +87,7 @@ export const JoinTripModal: React.FC<JoinTripModalProps> = ({
                     </div>
                     <div className="space-y-0.5">
                         <p className="text-xs font-bold text-on-surface flex items-center justify-center gap-1">
-                            <span className="material-symbols-outlined text-[15px] text-primary">
-                                qr_code_scanner
-                            </span>
+                            <AppIcon name="qr_code_scanner" className="text-[15px] text-primary" />
                             <span>Scan with Phone Camera</span>
                         </p>
                         <p className="text-[11px] text-on-surface-variant max-w-[240px]">
@@ -108,9 +103,7 @@ export const JoinTripModal: React.FC<JoinTripModalProps> = ({
                         onClick={handleWhatsAppShare}
                         className="w-full h-11 px-3.5 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-xs transition-transform active:scale-[0.98] cursor-pointer"
                     >
-                        <span className="material-symbols-outlined text-[18px]">
-                            chat
-                        </span>
+                        <AppIcon name="chat" className="text-[18px]" />
                         <span>Share Invite via WhatsApp</span>
                     </button>
 
@@ -119,9 +112,7 @@ export const JoinTripModal: React.FC<JoinTripModalProps> = ({
                         onClick={handleCopy}
                         className="w-full h-10 px-3.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-semibold text-xs flex items-center justify-center gap-2 border border-outline-variant/30 transition-all active:scale-[0.98] cursor-pointer"
                     >
-                        <span className="material-symbols-outlined text-[16px] text-primary">
-                            {copied ? 'check' : 'content_copy'}
-                        </span>
+                        <AppIcon name={copied ? 'check' : 'content_copy'} className="text-[16px] text-primary" />
                         <span>{copied ? 'Link Copied!' : 'Copy App Link'}</span>
                     </button>
                 </div>

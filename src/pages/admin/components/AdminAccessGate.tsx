@@ -1,5 +1,6 @@
 import React, { useId, useState } from 'react';
 import { useExpense } from '../../../context';
+import { AppIcon } from '../../../components';
 
 export const AdminAccessGate: React.FC = () => {
     const { unlockProfileSwitch, setActiveTab, showToast } = useExpense();
@@ -30,9 +31,7 @@ export const AdminAccessGate: React.FC = () => {
             <div className="w-full bg-surface-card border border-border-subtle rounded-3xl p-6 shadow-xs space-y-5">
                 <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                        <span className="material-symbols-outlined text-[26px]">
-                            admin_panel_settings
-                        </span>
+                        <AppIcon name="admin_panel_settings" className="text-[26px]" />
                     </div>
                     <div>
                         <span className="label-pill text-primary uppercase block">
@@ -92,9 +91,7 @@ export const AdminAccessGate: React.FC = () => {
                             disabled={isSubmitting}
                             className="flex-1 h-11 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary-dark cursor-pointer transition-colors disabled:opacity-60 flex items-center justify-center gap-1.5"
                         >
-                            <span className="material-symbols-outlined text-[16px]">
-                                lock_open
-                            </span>
+                            <AppIcon name="lock_open" className="text-[16px]" />
                             <span>{isSubmitting ? 'Verifying...' : 'Authenticate Admin'}</span>
                         </button>
                     </div>

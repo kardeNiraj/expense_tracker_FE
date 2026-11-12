@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Avatar } from '../../../components/Avatar';
+import { AppIcon } from '../../../components';
 import { ENV } from '../../../config';
 import type { AdminPersonStat, AdminUpdateDevicePayload } from '../../../api/types';
 
@@ -107,9 +108,7 @@ export const PersonClaimsOverviewCard: React.FC<PersonClaimsOverviewCardProps> =
                                                 : 'Lock new claims for this person'
                                         }
                                     >
-                                        <span className="material-symbols-outlined text-[14px]">
-                                            {stat.isLocked ? 'lock' : 'lock_open'}
-                                        </span>
+                                        <AppIcon name={stat.isLocked ? 'lock' : 'lock_open'} className="text-[14px]" />
                                         <span>{stat.isLocked ? 'Locked' : 'Unlocked'}</span>
                                     </button>
 
@@ -121,9 +120,7 @@ export const PersonClaimsOverviewCard: React.FC<PersonClaimsOverviewCardProps> =
                                         className="w-8 h-8 rounded-xl bg-surface-card border border-border-subtle flex items-center justify-center text-on-surface-variant cursor-pointer"
                                         aria-label={`Inspect devices for ${stat.person}`}
                                     >
-                                        <span className="material-symbols-outlined text-[18px]">
-                                            {isExpanded ? 'expand_less' : 'expand_more'}
-                                        </span>
+                                        <AppIcon name={isExpanded ? 'expand_less' : 'expand_more'} className="text-[18px]" />
                                     </button>
                                 </div>
                             </div>

@@ -5,6 +5,7 @@ import type {
     AdminUpdateDevicePayload,
 } from '../../../api/types';
 import { DeviceRegistryItem } from './DeviceRegistryItem';
+import { AppIcon } from '../../../components';
 
 type DeviceFilter = 'all' | 'multi' | 'blocked' | 'unclaimed' | 'pending';
 
@@ -87,9 +88,7 @@ export const DeviceRegistryCard: React.FC<DeviceRegistryCardProps> = ({
                     Search devices by name, label, platform, or ID
                 </label>
                 <div className="relative">
-                    <span className="material-symbols-outlined text-[18px] text-on-surface-variant absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                        search
-                    </span>
+                    <AppIcon name="search" className="text-[18px] text-on-surface-variant absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                         id={searchId}
                         type="search"

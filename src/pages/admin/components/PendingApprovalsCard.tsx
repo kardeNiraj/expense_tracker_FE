@@ -1,5 +1,6 @@
 import React from 'react';
 import type { AdminDeviceRecord, AdminUpdateDevicePayload } from '../../../api/types';
+import { AppIcon } from '../../../components';
 
 interface PendingApprovalsCardProps {
     pendingApprovals: AdminDeviceRecord[];
@@ -18,9 +19,7 @@ export const PendingApprovalsCard: React.FC<PendingApprovalsCardProps> = ({
         <section className="bg-surface-card border border-status-awaiting-text/30 rounded-3xl p-4 space-y-3">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-status-awaiting-text text-[20px]">
-                        approval_delegation
-                    </span>
+                    <AppIcon name="approval_delegation" className="text-status-awaiting-text text-[20px]" />
                     <h2 className="headline-md text-on-surface text-base">
                         Pending Claim Approvals ({pendingApprovals.length})
                     </h2>

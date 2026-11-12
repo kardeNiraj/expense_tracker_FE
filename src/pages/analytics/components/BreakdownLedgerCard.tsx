@@ -1,4 +1,5 @@
 import React, { useId, useMemo, useState } from 'react';
+import { AppIcon } from '../../../components';
 import type { AnalyticsTransaction } from '../../../api/types';
 import { formatPurchaseTime, getCategoryMeta } from '../../../utils/formatters';
 import { triggerHaptic } from '../../../utils/haptics';
@@ -73,7 +74,7 @@ export const BreakdownLedgerCard: React.FC<BreakdownLedgerCardProps> = ({
                         className="px-2.5 py-1 rounded-full bg-status-settled-bg text-status-settled-text label-pill uppercase flex items-center gap-1 cursor-pointer shrink-0"
                     >
                         <span>{selectedCategory}</span>
-                        <span className="material-symbols-outlined text-[14px]">close</span>
+                        <AppIcon name="close" className="text-[14px]" />
                     </button>
                 )}
             </div>
@@ -83,9 +84,10 @@ export const BreakdownLedgerCard: React.FC<BreakdownLedgerCardProps> = ({
                 <label htmlFor={searchInputId} className="sr-only">
                     Search transactions by description, category, or payer
                 </label>
-                <span className="material-symbols-outlined text-[18px] text-on-surface-variant absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                    search
-                </span>
+                <AppIcon
+                    name="search"
+                    className="text-[18px] text-on-surface-variant absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                />
                 <input
                     id={searchInputId}
                     type="text"
@@ -101,7 +103,7 @@ export const BreakdownLedgerCard: React.FC<BreakdownLedgerCardProps> = ({
                         className="absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface cursor-pointer"
                         aria-label="Clear search"
                     >
-                        <span className="material-symbols-outlined text-[16px]">close</span>
+                        <AppIcon name="close" className="text-[16px]" />
                     </button>
                 )}
             </div>
@@ -126,9 +128,7 @@ export const BreakdownLedgerCard: React.FC<BreakdownLedgerCardProps> = ({
                                         <div
                                             className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${meta.bgClass} ${meta.textClass}`}
                                         >
-                                            <span className="material-symbols-outlined text-[17px]">
-                                                {meta.icon}
-                                            </span>
+                                            <AppIcon name={meta.icon} className="text-[17px]" />
                                         </div>
                                         <div className="min-w-0">
                                             <p className="text-sm font-semibold text-on-surface truncate">

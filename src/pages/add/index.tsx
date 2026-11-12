@@ -7,7 +7,7 @@ import {
     useAddExpenseMutation,
     useAddSplitMutation,
 } from '../../api';
-import { Avatar } from '../../components';
+import { AppIcon, Avatar } from '../../components';
 import { triggerHaptic } from '../../utils/haptics';
 import { DEFAULT_CATEGORIES } from '../../config';
 
@@ -293,9 +293,7 @@ export function AddPage() {
                             : 'text-on-surface-variant hover:text-on-surface'
                     }`}
                 >
-                    <span className="material-symbols-outlined text-[18px]">
-                        call_split
-                    </span>
+                    <AppIcon name="call_split" className="text-[18px]" />
                     <span>Group Split</span>
                 </button>
                 <button
@@ -307,9 +305,7 @@ export function AddPage() {
                             : 'text-on-surface-variant hover:text-on-surface'
                     }`}
                 >
-                    <span className="material-symbols-outlined text-[18px]">
-                        receipt
-                    </span>
+                    <AppIcon name="receipt" className="text-[18px]" />
                     <span>Single Expense</span>
                 </button>
             </div>
@@ -369,9 +365,7 @@ export function AddPage() {
                             </label>
                             {detectCategory(splitDesc, categories) && !isSplitCategoryManual && (
                                 <span className="text-[10px] text-primary font-semibold flex items-center gap-0.5 animate-in fade-in">
-                                    <span className="material-symbols-outlined text-[13px]">
-                                        auto_awesome
-                                    </span>
+                                    <AppIcon name="auto_awesome" className="text-[13px]" />
                                     <span>Category: {activeSplitCategory}</span>
                                 </span>
                             )}
@@ -419,23 +413,31 @@ export function AddPage() {
                             Paid By
                         </label>
                         <div className="flex flex-wrap gap-2">
-                            {people.map((person) => (
-                                <button
-                                    key={person}
-                                    type="button"
-                                    onClick={() => {
-                                        triggerHaptic('light');
-                                        setSplitPaidBy(person);
-                                    }}
-                                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer border ${
-                                        activeSplitPaidBy === person
-                                            ? 'bg-primary text-on-primary border-primary shadow-2xs'
-                                            : 'bg-surface-container-low text-on-surface border-outline-variant/20 hover:bg-surface-container'
-                                    }`}
-                                >
-                                    {person === activePerson ? `${person} (You)` : person}
-                                </button>
-                            ))}
+                            {people.length === 0 && isPeopleFetching ? (
+                                <>
+                                    <span className="h-8 w-20 rounded-full bg-outline-variant/25 animate-pulse" />
+                                    <span className="h-8 w-24 rounded-full bg-outline-variant/25 animate-pulse" />
+                                    <span className="h-8 w-16 rounded-full bg-outline-variant/25 animate-pulse" />
+                                </>
+                            ) : (
+                                people.map((person) => (
+                                    <button
+                                        key={person}
+                                        type="button"
+                                        onClick={() => {
+                                            triggerHaptic('light');
+                                            setSplitPaidBy(person);
+                                        }}
+                                        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer border ${
+                                            activeSplitPaidBy === person
+                                                ? 'bg-primary text-on-primary border-primary shadow-2xs'
+                                                : 'bg-surface-container-low text-on-surface border-outline-variant/20 hover:bg-surface-container'
+                                        }`}
+                                    >
+                                        {person === activePerson ? `${person} (You)` : person}
+                                    </button>
+                                ))
+                            )}
                         </div>
                     </div>
 
@@ -462,13 +464,10 @@ export function AddPage() {
                                     title="Reload members from Google Sheet"
                                     aria-label="Reload members"
                                 >
-                                    <span
-                                        className={`material-symbols-outlined text-[15px] ${
-                                            isPeopleFetching ? 'animate-spin text-primary' : ''
-                                        }`}
-                                    >
-                                        sync
-                                    </span>
+                                    <AppIcon
+                                        name="sync"
+                                        className={`text-[15px] ${isPeopleFetching ? 'animate-spin text-primary' : ''}`}
+                                    />
                                     <span className="hidden sm:inline">Reload</span>
                                 </button>
                                 {splitDistributionMode === 'EQUAL' && (
@@ -479,9 +478,7 @@ export function AddPage() {
                                         title="Select all members"
                                         aria-label="Select all members"
                                     >
-                                        <span className="material-symbols-outlined text-[15px]">
-                                            select_all
-                                        </span>
+                                        <AppIcon name="select_all" className="text-[15px]" />
                                         <span>Select All</span>
                                     </button>
                                 )}
@@ -502,7 +499,7 @@ export function AddPage() {
                                         : 'text-on-surface-variant hover:text-on-surface'
                                 }`}
                             >
-                                <span className="material-symbols-outlined text-[16px]">equal</span>
+                                <AppIcon name="equal" className="text-[16px]" />
                                 <span>Equal Split</span>
                             </button>
                             <button
@@ -517,7 +514,7 @@ export function AddPage() {
                                         : 'text-on-surface-variant hover:text-on-surface'
                                 }`}
                             >
-                                <span className="material-symbols-outlined text-[16px]">pie_chart</span>
+                                <AppIcon name="pie_chart" className="text-[16px]" />
                                 <span>Shares / Weights</span>
                             </button>
                         </div>
@@ -525,28 +522,35 @@ export function AddPage() {
                         {splitDistributionMode === 'EQUAL' ? (
                             /* Equal Split: 2-column checklist */
                             <div className="grid grid-cols-2 gap-2">
-                                {people.map((person) => {
-                                    const isChecked = activeParticipants.includes(person);
-                                    return (
-                                        <button
-                                            key={person}
-                                            type="button"
-                                            onClick={() => toggleParticipant(person)}
-                                            className={`p-2.5 rounded-xl flex items-center justify-between text-xs font-semibold transition-colors cursor-pointer border ${
-                                                isChecked
-                                                    ? 'bg-primary-fixed/30 border-primary/40 text-on-surface'
-                                                    : 'bg-surface-container-low border-outline-variant/20 text-on-surface-variant'
-                                            }`}
-                                        >
-                                            <span>{person}</span>
-                                            {isChecked && (
-                                                <span className="material-symbols-outlined text-primary text-[18px]">
-                                                    check
-                                                </span>
-                                            )}
-                                        </button>
-                                    );
-                                })}
+                                {people.length === 0 && isPeopleFetching ? (
+                                    <>
+                                        <div className="h-10 rounded-xl bg-outline-variant/20 animate-pulse" />
+                                        <div className="h-10 rounded-xl bg-outline-variant/20 animate-pulse" />
+                                        <div className="h-10 rounded-xl bg-outline-variant/20 animate-pulse" />
+                                        <div className="h-10 rounded-xl bg-outline-variant/20 animate-pulse" />
+                                    </>
+                                ) : (
+                                    people.map((person) => {
+                                        const isChecked = activeParticipants.includes(person);
+                                        return (
+                                            <button
+                                                key={person}
+                                                type="button"
+                                                onClick={() => toggleParticipant(person)}
+                                                className={`p-2.5 rounded-xl flex items-center justify-between text-xs font-semibold transition-colors cursor-pointer border ${
+                                                    isChecked
+                                                        ? 'bg-primary-fixed/30 border-primary/40 text-on-surface'
+                                                        : 'bg-surface-container-low border-outline-variant/20 text-on-surface-variant'
+                                                }`}
+                                            >
+                                                <span>{person}</span>
+                                                {isChecked && (
+                                                    <AppIcon name="check" className="text-primary text-[18px]" />
+                                                )}
+                                            </button>
+                                        );
+                                    })
+                                )}
                             </div>
                         ) : (
                             /* Shares / Weights: Stepper for couples, kids, unequal */
@@ -592,9 +596,10 @@ export function AddPage() {
                                                     type="button"
                                                     disabled={weight <= 0}
                                                     onClick={() => adjustShare(person, -1)}
+                                                    aria-label={`Decrease share for ${person}`}
                                                     className="w-8 h-8 rounded-lg bg-surface-container-highest text-on-surface hover:bg-surface-container flex items-center justify-center transition-colors disabled:opacity-30 cursor-pointer"
                                                 >
-                                                    <span className="material-symbols-outlined text-[16px]">remove</span>
+                                                    <AppIcon name="remove" className="text-[16px]" />
                                                 </button>
                                                 <span className="w-8 text-center font-mono font-bold text-xs text-on-surface">
                                                     {weight}x
@@ -603,9 +608,10 @@ export function AddPage() {
                                                     type="button"
                                                     disabled={weight >= 10}
                                                     onClick={() => adjustShare(person, 1)}
+                                                    aria-label={`Increase share for ${person}`}
                                                     className="w-8 h-8 rounded-lg bg-primary-fixed text-on-primary-fixed hover:bg-primary hover:text-on-primary flex items-center justify-center transition-colors disabled:opacity-30 cursor-pointer"
                                                 >
-                                                    <span className="material-symbols-outlined text-[16px]">add</span>
+                                                    <AppIcon name="add" className="text-[16px]" />
                                                 </button>
                                             </div>
                                         </div>
@@ -673,9 +679,7 @@ export function AddPage() {
                         disabled={addSplitMutation.isPending}
                         className="w-full h-12 rounded-xl bg-primary text-on-primary font-semibold text-sm shadow-md hover:bg-primary-container active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer"
                     >
-                        <span className="material-symbols-outlined text-[20px]">
-                            call_split
-                        </span>
+                        <AppIcon name="call_split" className="text-[20px]" />
                         <span>
                             {addSplitMutation.isPending ? 'Splitting bill...' : 'Create Group Split'}
                         </span>
@@ -738,9 +742,7 @@ export function AddPage() {
                             </label>
                             {detectCategory(expenseDesc, categories) && !isExpenseCategoryManual && (
                                 <span className="text-[10px] text-primary font-semibold flex items-center gap-0.5 animate-in fade-in">
-                                    <span className="material-symbols-outlined text-[13px]">
-                                        auto_awesome
-                                    </span>
+                                    <AppIcon name="auto_awesome" className="text-[13px]" />
                                     <span>Category: {activeExpenseCategory}</span>
                                 </span>
                             )}
@@ -788,23 +790,31 @@ export function AddPage() {
                             Paid By
                         </label>
                         <div className="flex flex-wrap gap-2">
-                            {people.map((person) => (
-                                <button
-                                    key={person}
-                                    type="button"
-                                    onClick={() => {
-                                        triggerHaptic('light');
-                                        setExpensePayee(person);
-                                    }}
-                                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer border ${
-                                        (expensePayee || activePerson) === person
-                                            ? 'bg-primary text-on-primary border-primary shadow-2xs'
-                                            : 'bg-surface-container-low text-on-surface border-outline-variant/20 hover:bg-surface-container'
-                                    }`}
-                                >
-                                    {person === activePerson ? `${person} (You)` : person}
-                                </button>
-                            ))}
+                            {people.length === 0 && isPeopleFetching ? (
+                                <>
+                                    <span className="h-8 w-20 rounded-full bg-outline-variant/25 animate-pulse" />
+                                    <span className="h-8 w-24 rounded-full bg-outline-variant/25 animate-pulse" />
+                                    <span className="h-8 w-16 rounded-full bg-outline-variant/25 animate-pulse" />
+                                </>
+                            ) : (
+                                people.map((person) => (
+                                    <button
+                                        key={person}
+                                        type="button"
+                                        onClick={() => {
+                                            triggerHaptic('light');
+                                            setExpensePayee(person);
+                                        }}
+                                        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer border ${
+                                            (expensePayee || activePerson) === person
+                                                ? 'bg-primary text-on-primary border-primary shadow-2xs'
+                                                : 'bg-surface-container-low text-on-surface border-outline-variant/20 hover:bg-surface-container'
+                                        }`}
+                                    >
+                                        {person === activePerson ? `${person} (You)` : person}
+                                    </button>
+                                ))
+                            )}
                         </div>
                     </div>
 
@@ -814,9 +824,7 @@ export function AddPage() {
                         disabled={addExpenseMutation.isPending}
                         className="w-full h-12 rounded-xl bg-primary text-on-primary font-semibold text-sm shadow-md hover:bg-primary-container active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer"
                     >
-                        <span className="material-symbols-outlined text-[20px]">
-                            add_circle
-                        </span>
+                        <AppIcon name="add_circle" className="text-[20px]" />
                         <span>
                             {addExpenseMutation.isPending ? 'Recording...' : 'Record Expense'}
                         </span>

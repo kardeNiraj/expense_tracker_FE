@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { AdminDeviceRecord, AdminUpdateDevicePayload } from '../../../api/types';
 import { DeviceLabelEditor } from './DeviceLabelEditor';
 import { DeviceActionsFooter } from './DeviceActionsFooter';
+import { AppIcon } from '../../../components';
 
 interface DeviceRegistryItemProps {
     device: AdminDeviceRecord;
@@ -111,7 +112,7 @@ export const DeviceRegistryItem: React.FC<DeviceRegistryItemProps> = ({
                         title={`Click to unblock ${blockedPerson} on this device`}
                     >
                         <span>Blocked: {blockedPerson}</span>
-                        <span className="material-symbols-outlined text-[13px]">close</span>
+                        <AppIcon name="close" className="text-[13px]" />
                     </button>
                 ))}
             </div>

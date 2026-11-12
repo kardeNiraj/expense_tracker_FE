@@ -10,6 +10,7 @@ import type {
     UpdateSplitPayload,
 } from '../../api/types';
 import type { QueuedItem, QueuedGroup } from '../../utils/offlineQueue';
+import { AppIcon } from '../Icon/AppIcon';
 
 export interface SyncStatusModalProps {
     isOpen: boolean;
@@ -106,7 +107,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
         if (group.status === 'SYNCING') {
             return (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary border border-primary/20">
-                    <span className="material-symbols-outlined text-[13px] animate-spin">sync</span>
+                    <AppIcon name="sync" className="text-[13px] animate-spin" />
                     <span>Syncing...</span>
                 </span>
             );
@@ -115,7 +116,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
         if (group.status === 'BACKOFF') {
             return (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30">
-                    <span className="material-symbols-outlined text-[13px] animate-pulse">timer</span>
+                    <AppIcon name="timer" className="text-[13px] animate-pulse" />
                     <span>Retrying in {group.backoffSecondsRemaining}s</span>
                 </span>
             );
@@ -124,7 +125,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
         if (group.status === 'FAILED') {
             return (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-error/10 text-error border border-error/20">
-                    <span className="material-symbols-outlined text-[13px]">error</span>
+                    <AppIcon name="error" className="text-[13px]" />
                     <span>Failed (Backoff)</span>
                 </span>
             );
@@ -132,7 +133,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
 
         return (
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/25">
-                <span className="material-symbols-outlined text-[13px]">schedule</span>
+                <AppIcon name="schedule" className="text-[13px]" />
                 <span>Queued</span>
             </span>
         );
@@ -154,9 +155,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
                 <div className="flex items-center justify-between px-5 pt-3 pb-3 border-b border-outline-variant/20 shrink-0">
                     <div className="flex items-center gap-2.5">
                         <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-                            <span className="material-symbols-outlined text-[20px]">
-                                {!isOnline ? 'cloud_off' : isSyncing ? 'sync' : 'cloud_sync'}
-                            </span>
+                            <AppIcon name={!isOnline ? 'cloud_off' : isSyncing ? 'sync' : 'cloud_sync'} className="text-[20px]" />
                         </div>
                         <div>
                             <h2 className="text-base font-bold text-on-surface flex items-center gap-2">
@@ -182,7 +181,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
                         className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer"
                         aria-label="Close"
                     >
-                        <span className="material-symbols-outlined text-[20px]">close</span>
+                        <AppIcon name="close" className="text-[20px]" />
                     </button>
                 </div>
 
@@ -190,9 +189,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
                 <div className="px-4 pt-3 pb-2 shrink-0">
                     {!isOnline ? (
                         <div className="p-3 rounded-xl bg-tertiary/10 border border-tertiary/25 flex items-start gap-2.5">
-                            <span className="material-symbols-outlined text-[20px] text-tertiary shrink-0 mt-0.5">
-                                cloud_off
-                            </span>
+                            <AppIcon name="cloud_off" className="text-[20px] text-tertiary shrink-0 mt-0.5" />
                             <div className="text-xs">
                                 <span className="font-bold text-tertiary">
                                     You are currently offline
@@ -204,9 +201,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
                         </div>
                     ) : isSyncing ? (
                         <div className="p-3 rounded-xl bg-primary/10 border border-primary/20 flex items-center gap-2.5">
-                            <span className="material-symbols-outlined text-[20px] text-primary shrink-0 animate-spin">
-                                sync
-                            </span>
+                            <AppIcon name="sync" className="text-[20px] text-primary shrink-0 animate-spin" />
                             <div className="text-xs">
                                 <span className="font-bold text-primary">
                                     Synchronizing with Google Sheets...
@@ -219,9 +214,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
                     ) : pendingCount > 0 ? (
                         <div className="p-3 rounded-xl bg-surface-container-high border border-outline-variant/30 flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 text-xs">
-                                <span className="material-symbols-outlined text-[18px] text-primary">
-                                    cloud_queue
-                                </span>
+                                <AppIcon name="cloud_queue" className="text-[18px] text-primary" />
                                 <div>
                                     <span className="font-bold text-on-surface">
                                         {pendingCount} {pendingCount === 1 ? 'operation' : 'operations'} pending
@@ -243,9 +236,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
                         </div>
                     ) : (
                         <div className="p-3 rounded-xl bg-primary-fixed/20 border border-primary/20 flex items-center gap-2.5">
-                            <span className="material-symbols-outlined text-[20px] text-primary shrink-0">
-                                check_circle
-                            </span>
+                            <AppIcon name="check_circle" className="text-[20px] text-primary shrink-0" />
                             <div className="text-xs">
                                 <span className="font-bold text-primary">
                                     All transactions synchronized!
@@ -263,7 +254,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
                     {groups.length === 0 ? (
                         <div className="py-12 px-4 text-center flex flex-col items-center justify-center">
                             <div className="w-14 h-14 rounded-2xl bg-surface-container-high flex items-center justify-center text-primary/70 mb-3">
-                                <span className="material-symbols-outlined text-[32px]">cloud_done</span>
+                                <AppIcon name="cloud_done" className="text-[32px]" />
                             </div>
                             <h3 className="text-sm font-bold text-on-surface">Zero Pending Sync Operations</h3>
                             <p className="text-xs text-on-surface-variant max-w-xs mt-1 leading-relaxed">
@@ -280,13 +271,14 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
                                 <div className="flex items-start justify-between gap-2">
                                     <div className="flex items-start gap-2.5 min-w-0">
                                         <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0 mt-0.5">
-                                            <span className="material-symbols-outlined text-[18px]">
-                                                {group.type === 'SPLIT'
+                                            <AppIcon
+                                                name={group.type === 'SPLIT'
                                                     ? 'call_split'
                                                     : group.type === 'EXPENSE'
                                                     ? 'receipt_long'
                                                     : 'account_balance_wallet'}
-                                            </span>
+                                                className="text-[18px]"
+                                            />
                                         </div>
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-2 flex-wrap">
@@ -313,9 +305,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
                                 {/* Last Error Message (if any) */}
                                 {group.lastError && (
                                     <div className="p-2.5 rounded-xl bg-error/10 border border-error/20 text-[11px] text-error flex items-start gap-1.5">
-                                        <span className="material-symbols-outlined text-[15px] shrink-0 mt-0.5">
-                                            warning
-                                        </span>
+                                        <AppIcon name="warning" className="text-[15px] shrink-0 mt-0.5" />
                                         <span className="break-all leading-tight font-mono">
                                             {group.lastError}
                                         </span>
@@ -338,9 +328,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
                                                     <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center shrink-0">
                                                         {idx + 1}
                                                     </span>
-                                                    <span className="material-symbols-outlined text-[15px] text-primary/70 shrink-0">
-                                                        {details.icon}
-                                                    </span>
+                                                    <AppIcon name={details.icon} className="text-[15px] text-primary/70 shrink-0" />
                                                     <div className="min-w-0">
                                                         <div className="font-semibold text-on-surface truncate text-[11px]">
                                                             {details.title}
@@ -376,7 +364,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
                                                             title="Cancel operation and remove from view"
                                                             aria-label="Cancel operation"
                                                         >
-                                                            <span className="material-symbols-outlined text-[13px]">close</span>
+                                                            <AppIcon name="close" className="text-[13px]" />
                                                         </button>
                                                     )}
                                                 </div>
@@ -415,7 +403,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
                                                 onClick={() => setDiscardConfirmGroup(group.groupId)}
                                                 className="text-[11px] text-error/80 hover:text-error flex items-center gap-1 cursor-pointer transition-colors"
                                             >
-                                                <span className="material-symbols-outlined text-[14px]">delete</span>
+                                                <AppIcon name="delete" className="text-[14px]" />
                                                 <span>Discard</span>
                                             </button>
 
@@ -425,7 +413,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
                                                 disabled={isSyncing || !isOnline}
                                                 className="px-3 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
                                             >
-                                                <span className="material-symbols-outlined text-[14px]">refresh</span>
+                                                <AppIcon name="refresh" className="text-[14px]" />
                                                 <span>Retry Now</span>
                                             </button>
                                         </>
@@ -477,9 +465,10 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
                             disabled={!isOnline || isSyncing || pendingCount === 0}
                             className="h-10 flex-1 rounded-xl bg-primary hover:bg-primary-hover text-on-primary text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
                         >
-                            <span className={`material-symbols-outlined text-[16px] ${isSyncing ? 'animate-spin' : ''}`}>
-                                {!isOnline ? 'cloud_off' : isSyncing ? 'sync' : 'cloud_upload'}
-                            </span>
+                            <AppIcon
+                                name={!isOnline ? 'cloud_off' : isSyncing ? 'sync' : 'cloud_upload'}
+                                className={`text-[16px] ${isSyncing ? 'animate-spin' : ''}`}
+                            />
                             <span>{isSyncing ? 'Syncing...' : 'Sync All Transactions'}</span>
                         </button>
                     </div>
