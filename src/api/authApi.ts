@@ -142,6 +142,8 @@ export function useUpdateProfileMutation() {
         mutationFn: updateAuthMeApi,
         onSuccess: () => {
             void queryClient.invalidateQueries({ queryKey: authQueryKeys.me() });
+            void queryClient.invalidateQueries({ queryKey: ['groups'] });
+            void queryClient.invalidateQueries({ queryKey: ['people'] });
         },
     });
 }

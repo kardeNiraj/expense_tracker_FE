@@ -12,6 +12,7 @@ import {
     useCreateGroupMutation,
     useGroupInvitePreview,
     useJoinGroupMutation,
+    useUpdateProfileMutation,
 } from '../../api';
 import { AppIcon } from '../../components';
 import { triggerHaptic } from '../../utils/haptics';
@@ -91,6 +92,12 @@ export const OnboardingScreen: React.FC = () => {
     const invitePreviewQuery = useGroupInvitePreview(pendingInviteCode);
     const createGroupMutation = useCreateGroupMutation();
     const joinGroupMutation = useJoinGroupMutation();
+    const updateProfileMutation = useUpdateProfileMutation();
+
+    const [isVerifyingGoogle, setIsVerifyingGoogle] = useState(false);
+    const [isEditingDisplayName, setIsEditingDisplayName] = useState(false);
+    const [displayNameDraft, setDisplayNameDraft] = useState('');
+    const [displayNameError, setDisplayNameError] = useState<string | null>(null);
 
     const effectiveGoogleClientId = ENV.GOOGLE_CLIENT_ID || authConfig?.googleClientId || '';
     const googleEnabled = Boolean(
@@ -243,6 +250,7 @@ export const OnboardingScreen: React.FC = () => {
     const handleGoogleCredential = async (credential: string) => {
         setAuthError(null);
         setIsAuthBusy(true);
+        setIsVerifyingGoogle(true);
         try {
             const res = await authenticateWithGoogleApi({ credential });
             completeAuthSession(res);
@@ -257,6 +265,32 @@ export const OnboardingScreen: React.FC = () => {
             );
         } finally {
             setIsAuthBusy(false);
+            setIsVerifyingGoogle(false);
+        }
+    };
+
+    const handleStartEditName = () => {
+        setDisplayNameDraft(user?.name || '');
+        setDisplayNameError(null);
+        setIsEditingDisplayName(true);
+    };
+
+    const handleSaveDisplayName = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const clean = displayNameDraft.trim();
+        if (clean.length < 2) {
+            setDisplayNameError('Name must be at least 2 characters.');
+            return;
+        }
+        setDisplayNameError(null);
+        try {
+            const res = await updateProfileMutation.mutateAsync({ name: clean });
+            triggerHaptic('success');
+            setIsEditingDisplayName(false);
+            showToast(`Display name updated to ${res.user.name}!`, 'badge');
+        } catch (err) {
+            triggerHaptic('warning');
+            setDisplayNameError(err instanceof Error ? err.message : 'Failed to update name');
         }
     };
 
@@ -758,10 +792,23 @@ export const OnboardingScreen: React.FC = () => {
                             <div className="flex-1 border-t border-outline-variant/25" />
                         </div>
 
+                        {isVerifyingGoogle && (
+                            <div className="p-3.5 rounded-2xl bg-primary/8 border border-primary/25 flex items-center gap-3 animate-in fade-in duration-200">
+                                <div className="w-8 h-8 rounded-xl bg-primary/15 flex items-center justify-center text-primary shrink-0">
+                                    <AppIcon name="progress_activity" className="text-[18px] animate-spin" />
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="text-xs font-bold text-on-surface">Verifying with Google...</p>
+                                    <p className="text-[11px] text-on-surface-variant">Connecting your Google profile to SplitNest</p>
+                                </div>
+                            </div>
+                        )}
+
                         <GoogleSignInButton
                             clientId={effectiveGoogleClientId}
                             enabled={googleEnabled}
                             disabled={isAuthBusy}
+                            isVerifying={isVerifyingGoogle}
                             onCredential={handleGoogleCredential}
                         />
 
@@ -786,12 +833,21 @@ export const OnboardingScreen: React.FC = () => {
                     <div className="space-y-4">
                         {/* Signed-in Account Pill */}
                         <div className="rounded-2xl bg-surface-container-low border border-outline-variant/30 px-3.5 py-2.5 flex items-center justify-between gap-2">
-                            <div className="min-w-0">
-                                <div className="flex items-center gap-1.5">
+                            <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
                                     <AppIcon name="verified_user" className="text-[15px] text-primary shrink-0" />
                                     <span className="text-xs font-bold text-on-surface truncate">
                                         {user?.name}
                                     </span>
+                                    <button
+                                        type="button"
+                                        onClick={handleStartEditName}
+                                        className="text-[11px] text-primary hover:underline font-semibold flex items-center gap-0.5 ml-1 cursor-pointer"
+                                        title="Change display name"
+                                    >
+                                        <AppIcon name="edit" className="text-[12px]" />
+                                        <span>Edit Name</span>
+                                    </button>
                                     <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary text-[9px] font-mono uppercase font-bold">
                                         {user?.authProvider}
                                     </span>
@@ -810,6 +866,61 @@ export const OnboardingScreen: React.FC = () => {
                                 Sign Out
                             </button>
                         </div>
+
+                        {/* Inline Display Name Edit Form */}
+                        {isEditingDisplayName && (
+                            <form
+                                onSubmit={handleSaveDisplayName}
+                                className="rounded-2xl bg-surface-container border border-outline-variant/35 p-3 space-y-2.5 animate-in fade-in duration-150"
+                            >
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-on-surface flex items-center gap-1.5">
+                                        <AppIcon name="badge" className="text-[15px] text-primary" />
+                                        <span>Update Your Display Name</span>
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsEditingDisplayName(false)}
+                                        className="text-[11px] text-on-surface-variant hover:text-on-surface cursor-pointer"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                                <div>
+                                    <input
+                                        type="text"
+                                        value={displayNameDraft}
+                                        onChange={(e) => setDisplayNameDraft(e.target.value)}
+                                        placeholder="Enter your name (e.g. Niraj)"
+                                        maxLength={60}
+                                        className="w-full h-9 px-3 rounded-xl bg-surface-container-low border border-outline-variant/35 text-xs text-on-surface focus:outline-none focus:border-primary"
+                                        autoFocus
+                                    />
+                                    {displayNameError && (
+                                        <p className="text-[11px] text-error mt-1">{displayNameError}</p>
+                                    )}
+                                </div>
+                                <div className="flex items-center justify-end gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsEditingDisplayName(false)}
+                                        className="px-3 h-8 rounded-xl border border-outline-variant/30 text-xs font-medium text-on-surface-variant hover:bg-surface-container-low cursor-pointer"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={updateProfileMutation.isPending}
+                                        className="px-3.5 h-8 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 cursor-pointer flex items-center gap-1.5 disabled:opacity-60 shadow-xs"
+                                    >
+                                        {updateProfileMutation.isPending && (
+                                            <AppIcon name="progress_activity" className="text-[13px] animate-spin" />
+                                        )}
+                                        <span>{updateProfileMutation.isPending ? 'Saving...' : 'Save Name'}</span>
+                                    </button>
+                                </div>
+                            </form>
+                        )}
 
                         {roomError && (
                             <div className="p-3 rounded-xl bg-error/10 border border-error/25 text-xs text-error flex items-start gap-2">

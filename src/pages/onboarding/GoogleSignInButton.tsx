@@ -70,6 +70,7 @@ interface GoogleSignInButtonProps {
     clientId?: string | null;
     enabled?: boolean;
     disabled?: boolean;
+    isVerifying?: boolean;
     onCredential: (credential: string) => void | Promise<void>;
 }
 
@@ -77,6 +78,7 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
     clientId,
     enabled,
     disabled = false,
+    isVerifying = false,
     onCredential,
 }) => {
     const buttonContainerRef = useRef<HTMLDivElement | null>(null);
@@ -148,13 +150,23 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
         );
     }
 
+    if (isVerifying) {
+        return (
+            <div className="w-full py-3 px-4 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center gap-2.5 text-primary text-xs font-bold shadow-xs animate-pulse">
+                <AppIcon name="progress_activity" className="text-[18px] animate-spin shrink-0" />
+                <span>Verifying Google account...</span>
+            </div>
+        );
+    }
+
     return (
         <div className={`space-y-2 ${disabled ? 'opacity-60 pointer-events-none' : ''}`}>
             <div className="flex justify-center min-h-[44px]" ref={buttonContainerRef} />
             {sdkState === 'loading' && (
-                <p className="text-[11px] text-center text-on-surface-variant">
-                    Loading Google Sign-In...
-                </p>
+                <div className="flex items-center justify-center gap-2 text-[11px] text-on-surface-variant py-1">
+                    <AppIcon name="progress_activity" className="text-[14px] animate-spin text-primary" />
+                    <span>Loading Google Sign-In...</span>
+                </div>
             )}
             {sdkState === 'unavailable' && (
                 <p className="text-[11px] text-center text-tertiary">

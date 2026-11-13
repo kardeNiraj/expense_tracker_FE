@@ -5,6 +5,7 @@ import { reloadApp } from '../../utils/pwaReload';
 import { ProfilePushControl } from './ProfilePushControl';
 import type { ClaimActionResult } from '../../context/ExpenseContextDef';
 import type { AuthUser, GroupSummary } from '../../api/types';
+import { useUpdateProfileMutation } from '../../api';
 import { AppIcon } from '../Icon/AppIcon';
 
 interface ProfileModalProps {
@@ -61,7 +62,46 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showAdminUnlockForm, setShowAdminUnlockForm] = useState(false);
 
+    const updateProfileMutation = useUpdateProfileMutation();
+    const [isEditingProfile, setIsEditingProfile] = useState(false);
+    const [nameDraft, setNameDraft] = useState('');
+    const [upiDraft, setUpiDraft] = useState('');
+    const [profileEditError, setProfileEditError] = useState<string | null>(null);
+
     if (!isOpen) return null;
+
+    const handleStartEditProfile = () => {
+        setNameDraft(user?.name || activePerson || '');
+        setUpiDraft(user?.upiId || '');
+        setProfileEditError(null);
+        setIsEditingProfile(true);
+    };
+
+    const handleSaveProfile = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const cleanName = nameDraft.trim();
+        if (cleanName.length < 2) {
+            setProfileEditError('Display name must be at least 2 characters');
+            return;
+        }
+        setProfileEditError(null);
+        try {
+            const result = await updateProfileMutation.mutateAsync({
+                name: cleanName,
+                upiId: upiDraft.trim() || null,
+            });
+            triggerHaptic('success');
+            setIsEditingProfile(false);
+            showToast(`Display name updated to ${result.user.name}`, 'badge');
+            if (claimedPerson && user?.name && claimedPerson.toLowerCase() === user.name.toLowerCase()) {
+                setActivePerson(result.user.name);
+                void claimProfile(result.user.name);
+            }
+        } catch (err) {
+            triggerHaptic('warning');
+            setProfileEditError(err instanceof Error ? err.message : 'Failed to update profile');
+        }
+    };
 
     const handleUnlock = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -110,6 +150,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         setUnlockError(false);
         setPasscodeInput('');
         setShowAdminUnlockForm(false);
+        setIsEditingProfile(false);
+        setProfileEditError(null);
         onClose();
     };
 
@@ -185,11 +227,21 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                         <div className="space-y-3">
                             <div className="p-3.5 rounded-2xl bg-surface-container-low border border-outline-variant/30 space-y-2.5">
                                 <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
                                         <Avatar name={activePerson || user.name || 'Member'} size="md" />
-                                        <div className="min-w-0">
+                                        <div className="min-w-0 flex-1">
                                             <div className="font-bold text-sm text-on-surface flex items-center gap-1.5 flex-wrap">
                                                 <span className="truncate">{user.name || activePerson || 'Account'}</span>
+                                                {!isEditingProfile && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleStartEditProfile}
+                                                        className="w-5 h-5 rounded-md bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-primary flex items-center justify-center transition-colors cursor-pointer"
+                                                        title="Edit display name and UPI ID"
+                                                    >
+                                                        <AppIcon name="edit" className="text-[12px]" />
+                                                    </button>
+                                                )}
                                                 <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary text-[9px] font-bold uppercase">
                                                     {user.authProvider || 'pin'}
                                                 </span>
@@ -199,6 +251,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                                                     ? `In "${activeGroup.name}" as ${activeGroup.myMemberName || activePerson}${activeGroup.isOwner ? ' (Owner)' : activeGroup.isReadOnly ? ' (Archived • Read-Only)' : ''}`
                                                     : 'Join or create a room to track splits'}
                                             </p>
+                                            {user.upiId && !isEditingProfile && (
+                                                <p className="text-[10px] text-on-surface-variant flex items-center gap-1 mt-0.5">
+                                                    <AppIcon name="account_balance_wallet" className="text-[12px] text-primary" />
+                                                    <span className="font-mono">{user.upiId}</span>
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                     {onLogoutUser && (
@@ -211,6 +269,83 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                                         </button>
                                     )}
                                 </div>
+
+                                {/* Inline Profile Edit Form */}
+                                {isEditingProfile && (
+                                    <form
+                                        onSubmit={handleSaveProfile}
+                                        className="pt-2.5 border-t border-outline-variant/20 space-y-2.5 animate-in fade-in duration-150"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-bold text-on-surface flex items-center gap-1.5">
+                                                <AppIcon name="badge" className="text-[14px] text-primary" />
+                                                <span>Update Profile Info</span>
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsEditingProfile(false)}
+                                                className="text-[11px] text-on-surface-variant hover:text-on-surface cursor-pointer"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+
+                                        <div>
+                                            <label className="text-[10px] font-semibold text-on-surface-variant block mb-1">
+                                                Display Name (how friends see you in rooms)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={nameDraft}
+                                                onChange={(e) => setNameDraft(e.target.value)}
+                                                placeholder="e.g. Niraj"
+                                                maxLength={60}
+                                                className="w-full h-8 px-2.5 rounded-lg bg-surface-container border border-outline-variant/35 text-xs text-on-surface focus:outline-none focus:border-primary"
+                                                autoFocus
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="text-[10px] font-semibold text-on-surface-variant block mb-1">
+                                                UPI ID (for receiving settlements & quick payment QR)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={upiDraft}
+                                                onChange={(e) => setUpiDraft(e.target.value)}
+                                                placeholder="e.g. niraj@okaxis (optional)"
+                                                className="w-full h-8 px-2.5 rounded-lg bg-surface-container border border-outline-variant/35 text-xs text-on-surface focus:outline-none focus:border-primary font-mono text-[11px]"
+                                            />
+                                        </div>
+
+                                        {profileEditError && (
+                                            <p className="text-[11px] text-error flex items-center gap-1">
+                                                <AppIcon name="error" className="text-[13px]" />
+                                                <span>{profileEditError}</span>
+                                            </p>
+                                        )}
+
+                                        <div className="flex items-center justify-end gap-2 pt-0.5">
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsEditingProfile(false)}
+                                                className="px-2.5 h-7 rounded-lg border border-outline-variant/30 text-[11px] font-medium text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                type="submit"
+                                                disabled={updateProfileMutation.isPending}
+                                                className="px-3 h-7 rounded-lg bg-primary text-on-primary text-[11px] font-bold hover:bg-primary/90 cursor-pointer transition-colors flex items-center gap-1.5 disabled:opacity-60 shadow-xs"
+                                            >
+                                                {updateProfileMutation.isPending && (
+                                                    <AppIcon name="progress_activity" className="text-[12px] animate-spin" />
+                                                )}
+                                                <span>{updateProfileMutation.isPending ? 'Saving...' : 'Save Changes'}</span>
+                                            </button>
+                                        </div>
+                                    </form>
+                                )}
 
                                 {onOpenGroups && (
                                     <button
