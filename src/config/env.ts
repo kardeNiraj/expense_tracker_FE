@@ -34,6 +34,7 @@ export const ENV = {
 
     // User Defaults
     DEFAULT_ACTIVE_PERSON: import.meta.env.VITE_DEFAULT_ACTIVE_PERSON?.trim() || 'Niraj',
+    GOOGLE_CLIENT_ID: import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() || '',
 
     // UI & Behavior Configuration
     CURRENCY_SYMBOL: import.meta.env.VITE_CURRENCY_SYMBOL?.trim() || '₹',

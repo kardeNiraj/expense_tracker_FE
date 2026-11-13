@@ -1,9 +1,13 @@
-import React from 'react';
-import type { AdminDashboardSummary } from '../../../api/types';
+import React, { useId } from 'react';
+import type { AdminDashboardSummary, AdminRoomSummary } from '../../../api/types';
 import { AppIcon } from '../../../components';
+import { formatCurrency } from '../../../utils/formatters';
 
 interface AdminHeroSummaryProps {
     summary: AdminDashboardSummary;
+    rooms?: AdminRoomSummary[];
+    selectedScope: string;
+    onSelectScope: (scope: string) => void;
     isBusy: boolean;
     onRefresh: () => void;
     onBulkLock: (locked: boolean) => void;
@@ -12,19 +16,25 @@ interface AdminHeroSummaryProps {
 
 export const AdminHeroSummary: React.FC<AdminHeroSummaryProps> = ({
     summary,
+    rooms = [],
+    selectedScope,
+    onSelectScope,
     isBusy,
     onRefresh,
     onBulkLock,
     onExitAdmin,
 }) => {
+    const scopeSelectId = useId();
     const allLocked =
         summary.totalPeople > 0 && summary.lockedPeopleCount >= summary.totalPeople;
+
+    const isGlobal = summary.scope?.isGlobal ?? (selectedScope === 'ALL');
 
     return (
         <section className="space-y-3">
             {/* Hero Command Banner */}
             <div className="bg-primary text-on-primary rounded-3xl p-5 shadow-xs space-y-4">
-                <div className="flex items-start justify-between gap-2">
+                <div className="flex items-start justify-between gap-2 flex-wrap">
                     <div className="min-w-0">
                         <span className="label-pill text-primary-light uppercase block">
                             Strict Security Level
@@ -33,7 +43,7 @@ export const AdminHeroSummary: React.FC<AdminHeroSummaryProps> = ({
                             Admin Control Center
                         </h1>
                         <p className="text-xs text-primary-light/90 pt-0.5">
-                            Manage device claims, block rogue IDs, and enforce claim locks
+                            Manage room fleets, device claims, and system-wide security
                         </p>
                     </div>
 
@@ -58,6 +68,38 @@ export const AdminHeroSummary: React.FC<AdminHeroSummaryProps> = ({
                             <span>Exit</span>
                         </button>
                     </div>
+                </div>
+
+                {/* Scope Switcher & Attention Strip */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
+                    <div className="w-full sm:w-auto min-w-0 max-w-full flex items-center gap-2 bg-black/30 px-3 py-2 rounded-2xl border border-on-primary/15">
+                        <AppIcon name="public" className="text-primary-light text-[18px] shrink-0" />
+                        <label htmlFor={scopeSelectId} className="text-[11px] font-bold text-primary-light uppercase tracking-wider shrink-0">
+                            Scope:
+                        </label>
+                        <select
+                            id={scopeSelectId}
+                            value={selectedScope}
+                            onChange={(e) => onSelectScope(e.target.value)}
+                            className="bg-transparent text-xs font-bold text-on-primary focus:outline-none cursor-pointer w-full min-w-0 truncate"
+                        >
+                            <option value="ALL" className="bg-dark-slate text-white">
+                                🌐 All Rooms (Platform View)
+                            </option>
+                            {rooms.map((r) => (
+                                <option key={r.groupId} value={r.groupId} className="bg-dark-slate text-white">
+                                    🏠 {r.name} ({r.status})
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {summary.pendingApprovalsCount > 0 && (
+                        <div className="self-start sm:self-auto px-3 py-1.5 rounded-2xl bg-status-pending-bg text-status-pending-text flex items-center gap-1.5 text-xs font-bold animate-pulse shrink-0">
+                            <AppIcon name="priority_high" className="text-[15px]" />
+                            <span>{summary.pendingApprovalsCount} Approval{summary.pendingApprovalsCount === 1 ? '' : 's'} Pending</span>
+                        </div>
+                    )}
                 </div>
 
                 {/* Global Claim Lock Action Strip */}
@@ -89,86 +131,86 @@ export const AdminHeroSummary: React.FC<AdminHeroSummaryProps> = ({
 
             {/* 2x2 Admin KPI Bento Grid */}
             <div className="grid grid-cols-2 gap-2.5">
+                {/* 1. Platform / Room Spend & Debt */}
                 <div className="bg-surface-card border border-border-subtle rounded-2xl p-3.5 space-y-1">
                     <span className="label-pill text-on-surface-variant uppercase block">
-                        Devices
+                        {isGlobal ? 'Platform Spend' : `${summary.scope?.groupName || 'Room'} Spend`}
+                    </span>
+                    <div className="text-2xl font-bold font-mono tabular-nums text-on-surface">
+                        {formatCurrency(summary.totalPlatformSpend ?? 0)}
+                    </div>
+                    <span className="text-[11px] text-on-surface-variant block">
+                        {formatCurrency(summary.totalInFlightDebt ?? 0)} in-flight unsettled
+                    </span>
+                </div>
+
+                {/* 2. Room Fleet Overview */}
+                <div className="bg-surface-card border border-border-subtle rounded-2xl p-3.5 space-y-1">
+                    <span className="label-pill text-on-surface-variant uppercase block">
+                        {isGlobal ? 'Rooms Fleet' : 'Room Status'}
+                    </span>
+                    <div className="text-2xl font-bold font-mono tabular-nums text-on-surface">
+                        {isGlobal ? (
+                            <>
+                                {summary.activeRooms ?? (rooms.length > 0 ? rooms.filter((r) => r.status === 'ACTIVE').length : 0)}
+                                <span className="text-xs font-normal text-on-surface-variant ml-1">
+                                    active / {summary.totalRooms ?? rooms.length} total
+                                </span>
+                            </>
+                        ) : (
+                            <span className="text-xl">
+                                {summary.scope?.roomStatus || 'ACTIVE'}
+                            </span>
+                        )}
+                    </div>
+                    <span className="text-[11px] text-on-surface-variant block truncate">
+                        {isGlobal
+                            ? `${summary.archivedRooms ?? 0} archived · ${summary.closedRooms ?? 0} closed`
+                            : `${summary.scope?.claimedMemberCount ?? 0}/${summary.scope?.memberCount ?? 0} claimed · Owner: ${summary.scope?.ownerName || 'Unknown'}`
+                        }
+                    </span>
+                </div>
+
+                {/* 3. Device Fleet Health */}
+                <div className="bg-surface-card border border-border-subtle rounded-2xl p-3.5 space-y-1">
+                    <span className="label-pill text-on-surface-variant uppercase block">
+                        {isGlobal ? 'Device Fleet' : 'Room Devices'}
                     </span>
                     <div className="text-2xl font-bold font-mono tabular-nums text-on-surface">
                         {summary.activeDevices}
                         <span className="text-xs font-normal text-on-surface-variant ml-1">
-                            / {summary.totalDevices}
+                            active / {summary.totalDevices}
                         </span>
                     </div>
                     <span className="text-[11px] text-on-surface-variant block">
-                        {summary.claimedDevices} claimed · {summary.unclaimedDevices} unclaimed
+                        {summary.idleDevices ?? 0} idle · {summary.dormantDevices ?? 0} dormant · {summary.blockedDevices} blocked
                     </span>
                 </div>
 
-                <div
-                    className={`border rounded-2xl p-3.5 space-y-1 ${
-                        summary.multiDevicePeopleCount > 0
-                            ? 'bg-status-pending-bg/45 border-tertiary/40'
-                            : 'bg-surface-card border-border-subtle'
-                    }`}
-                >
-                    <span className="label-pill text-on-surface-variant uppercase block">
-                        Multi-Device IDs
-                    </span>
-                    <div
-                        className={`text-2xl font-bold font-mono tabular-nums ${
-                            summary.multiDevicePeopleCount > 0
-                                ? 'text-status-pending-text'
-                                : 'text-on-surface'
-                        }`}
-                    >
-                        {summary.multiDevicePeopleCount}
-                    </div>
-                    <span className="text-[11px] text-on-surface-variant block">
-                        {summary.multiDevicePeopleCount > 0
-                            ? 'People claimed on 2+ devices'
-                            : 'Single-device integrity intact'}
-                    </span>
-                </div>
-
+                {/* 4. Users & Members */}
                 <div className="bg-surface-card border border-border-subtle rounded-2xl p-3.5 space-y-1">
                     <span className="label-pill text-on-surface-variant uppercase block">
-                        Blocked Devices
+                        {isGlobal ? 'Users & Members' : 'Room Members'}
                     </span>
-                    <div
-                        className={`text-2xl font-bold font-mono tabular-nums ${
-                            summary.blockedDevices > 0 ? 'text-negative' : 'text-on-surface'
-                        }`}
-                    >
-                        {summary.blockedDevices}
+                    <div className="text-2xl font-bold font-mono tabular-nums text-on-surface">
+                        {isGlobal ? (
+                            <>
+                                {summary.totalUsers ?? 0}
+                                <span className="text-xs font-normal text-on-surface-variant ml-1">
+                                    users
+                                </span>
+                            </>
+                        ) : (
+                            <>
+                                {summary.totalPeople}
+                                <span className="text-xs font-normal text-on-surface-variant ml-1">
+                                    members
+                                </span>
+                            </>
+                        )}
                     </div>
                     <span className="text-[11px] text-on-surface-variant block">
-                        {summary.lockedPeopleCount} identities protected
-                    </span>
-                </div>
-
-                <div
-                    className={`border rounded-2xl p-3.5 space-y-1 ${
-                        summary.pendingApprovalsCount > 0
-                            ? 'bg-status-awaiting-bg/60 border-status-awaiting-text/30'
-                            : 'bg-surface-card border-border-subtle'
-                    }`}
-                >
-                    <span className="label-pill text-on-surface-variant uppercase block">
-                        Pending Approvals
-                    </span>
-                    <div
-                        className={`text-2xl font-bold font-mono tabular-nums ${
-                            summary.pendingApprovalsCount > 0
-                                ? 'text-status-awaiting-text'
-                                : 'text-on-surface'
-                        }`}
-                    >
-                        {summary.pendingApprovalsCount}
-                    </div>
-                    <span className="text-[11px] text-on-surface-variant block">
-                        {summary.pendingApprovalsCount > 0
-                            ? 'Waiting for admin confirmation'
-                            : 'No pending requests'}
+                        {summary.claimedDevices} active devices · {summary.lockedPeopleCount} locked
                     </span>
                 </div>
             </div>

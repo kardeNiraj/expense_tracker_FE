@@ -14,6 +14,7 @@ import { AdminAccessGate } from './components/AdminAccessGate';
 import { AdminHeroSummary } from './components/AdminHeroSummary';
 import { AdminPushCard } from './components/AdminPushCard';
 import { PendingApprovalsCard } from './components/PendingApprovalsCard';
+import { RoomRegistryCard } from './components/RoomRegistryCard';
 import { PersonClaimsOverviewCard } from './components/PersonClaimsOverviewCard';
 import { DeviceRegistryCard } from './components/DeviceRegistryCard';
 import { SecurityAuditCard } from './components/SecurityAuditCard';
@@ -29,7 +30,12 @@ export const AdminPage: React.FC = () => {
     } = useExpense();
     const queryClient = useQueryClient();
 
-    const { data: people = [] } = usePeople();
+    const [selectedScope, setSelectedScope] = useState<string>('ALL');
+
+    const { data: people = [] } = usePeople(
+        false,
+        selectedScope === 'ALL' ? undefined : selectedScope
+    );
     const {
         data: dashboard,
         isLoading,
@@ -37,7 +43,7 @@ export const AdminPage: React.FC = () => {
         isError,
         error,
         refetch,
-    } = useAdminDashboard(isSwitcherUnlocked);
+    } = useAdminDashboard(isSwitcherUnlocked, false, selectedScope);
 
     const [busyDeviceId, setBusyDeviceId] = useState<string | null>(null);
     const [busyPerson, setBusyPerson] = useState<string | null>(null);
@@ -179,19 +185,38 @@ export const AdminPage: React.FC = () => {
         <div className="space-y-4 pb-6">
             <AdminHeroSummary
                 summary={dashboard.summary}
+                rooms={dashboard.rooms}
+                selectedScope={selectedScope}
+                onSelectScope={(scope) => {
+                    triggerHaptic('selection');
+                    setSelectedScope(scope);
+                }}
                 isBusy={isFetching || isBulkBusy}
                 onRefresh={() => void handleRefresh()}
                 onBulkLock={(locked) => void handleBulkLock(locked)}
                 onExitAdmin={handleExitAdmin}
             />
 
-            <AdminPushCard />
-
+            {/* High Priority: Pending Claim Approvals requiring admin attention */}
             <PendingApprovalsCard
                 pendingApprovals={dashboard.pendingApprovals}
                 busyDeviceId={busyDeviceId}
                 onUpdateDevice={(id, updates) => void handleUpdateDevice(id, updates)}
             />
+
+            {/* Room & Group Fleet Oversight */}
+            {dashboard.rooms && dashboard.rooms.length > 0 && (
+                <RoomRegistryCard
+                    rooms={dashboard.rooms}
+                    selectedGroupId={selectedScope}
+                    onSelectRoom={(groupId) => {
+                        triggerHaptic('selection');
+                        setSelectedScope(groupId);
+                    }}
+                />
+            )}
+
+            <AdminPushCard />
 
             <PersonClaimsOverviewCard
                 stats={dashboard.personDeviceStats}

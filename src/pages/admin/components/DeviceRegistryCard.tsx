@@ -7,7 +7,15 @@ import type {
 import { DeviceRegistryItem } from './DeviceRegistryItem';
 import { AppIcon } from '../../../components';
 
-type DeviceFilter = 'all' | 'multi' | 'blocked' | 'unclaimed' | 'pending';
+type DeviceFilter =
+    | 'all'
+    | 'active'
+    | 'idle'
+    | 'dormant'
+    | 'blocked'
+    | 'multi'
+    | 'pending'
+    | 'unclaimed';
 
 interface DeviceRegistryCardProps {
     devices: AdminDeviceRecord[];
@@ -43,6 +51,9 @@ export const DeviceRegistryCard: React.FC<DeviceRegistryCardProps> = ({
     const filteredDevices = useMemo(() => {
         const q = searchQuery.trim().toLowerCase();
         return devices.filter((dev) => {
+            if (filter === 'active' && dev.status !== 'ACTIVE') return false;
+            if (filter === 'idle' && dev.status !== 'IDLE') return false;
+            if (filter === 'dormant' && dev.status !== 'DORMANT') return false;
             if (filter === 'blocked' && dev.status !== 'BLOCKED') return false;
             if (filter === 'unclaimed' && dev.claimedPerson) return false;
             if (filter === 'pending' && !dev.pendingPerson) return false;
@@ -65,9 +76,12 @@ export const DeviceRegistryCard: React.FC<DeviceRegistryCardProps> = ({
 
     const filterChips: { id: DeviceFilter; label: string }[] = [
         { id: 'all', label: `All (${devices.length})` },
+        { id: 'active', label: 'Active' },
+        { id: 'idle', label: 'Idle' },
+        { id: 'dormant', label: 'Dormant (>7d)' },
+        { id: 'blocked', label: 'Blocked' },
         { id: 'multi', label: 'Multi-Device' },
         { id: 'pending', label: 'Pending' },
-        { id: 'blocked', label: 'Blocked' },
         { id: 'unclaimed', label: 'Unclaimed' },
     ];
 

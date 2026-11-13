@@ -47,7 +47,17 @@ import {
 } from '../../utils/pushNotifications';
 
 export function Dashboard() {
-    const { activePerson, claimedPerson, isDeviceClaimed, setActiveTab, showToast } = useExpense();
+    const {
+        activeGroup,
+        isFormerActiveGroup,
+        isRoomArchived,
+        isRoomClosed,
+        activePerson,
+        claimedPerson,
+        isDeviceClaimed,
+        setActiveTab,
+        showToast,
+    } = useExpense();
     const queryClient = useQueryClient();
     const { data: spendings, isLoading: isSpendingsLoading } = useSpendings(activePerson);
     const { data: allSplits = [], isLoading: isSplitsLoading } = useSplits();
@@ -70,6 +80,9 @@ export function Dashboard() {
             }
         }
     }, [people.length, peopleDetails.length, refetchPeople, refetchPeopleDetails]);
+
+    const canAddExpense = !isFormerActiveGroup && !isRoomArchived && !isRoomClosed;
+    const canSettle = !isFormerActiveGroup && !isRoomClosed;
 
     const settleMutation = useSettleParticipantMutation();
     const [paymentSettlement, setPaymentSettlement] = useState<PaymentSettlementData | null>(null);
@@ -485,7 +498,7 @@ export function Dashboard() {
                     <div className="flex items-center gap-1.5 mt-0.5">
                         <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
                         <p className="text-xs text-on-surface-variant truncate font-medium">
-                            {tripInfo?.title || 'Trip'} • Shared Tracker
+                            {activeGroup?.name || tripInfo?.title || 'Trip'} • Shared Tracker
                         </p>
                     </div>
                 </div>
@@ -530,6 +543,33 @@ export function Dashboard() {
                     )}
                 </div>
             </div>
+
+            {/* Room Status Banner (if archived or closed) */}
+            {isRoomClosed ? (
+                <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-low p-3.5 text-xs text-on-surface flex items-start gap-3 shadow-xs">
+                    <div className="w-8 h-8 rounded-lg bg-surface-container-high flex items-center justify-center shrink-0 text-on-surface-variant">
+                        <AppIcon name="lock" className="text-base" />
+                    </div>
+                    <div className="space-y-0.5">
+                        <div className="font-semibold text-on-surface font-headline">Room Finalized &amp; Closed</div>
+                        <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                            This room is permanently closed. All historical financial records are preserved as read-only.
+                        </p>
+                    </div>
+                </div>
+            ) : isRoomArchived ? (
+                <div className="rounded-2xl border border-tertiary/25 bg-tertiary/10 p-3.5 text-xs flex items-start gap-3 shadow-xs">
+                    <div className="w-8 h-8 rounded-lg bg-tertiary/15 text-tertiary flex items-center justify-center shrink-0">
+                        <AppIcon name="inventory_2" className="text-base" />
+                    </div>
+                    <div className="space-y-0.5">
+                        <div className="font-bold text-tertiary font-headline">Room is Archived</div>
+                        <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                            Adding new expenses is disabled. You can still settle remaining debts below or under the Splits tab.
+                        </p>
+                    </div>
+                </div>
+            ) : null}
 
             {/* Settlement Balance Cards: Expect from others vs You owe */}
             <div className="grid grid-cols-2 gap-3">
@@ -691,14 +731,16 @@ export function Dashboard() {
 
             {/* Quick Action Buttons */}
             <div className="flex items-center gap-2.5">
-                <button
-                    type="button"
-                    onClick={() => setActiveTab('add')}
-                    className="flex-1 bg-primary text-on-primary h-12 rounded-xl flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] transition-all cursor-pointer font-semibold text-sm hover:bg-primary-container"
-                >
-                    <AppIcon name="add_circle" className="text-[20px]" />
-                    <span>Add Expense</span>
-                </button>
+                {canAddExpense && (
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('add')}
+                        className="flex-1 bg-primary text-on-primary h-12 rounded-xl flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] transition-all cursor-pointer font-semibold text-sm hover:bg-primary-container"
+                    >
+                        <AppIcon name="add_circle" className="text-[20px]" />
+                        <span>Add Expense</span>
+                    </button>
+                )}
 
                 <button
                     type="button"
@@ -711,29 +753,31 @@ export function Dashboard() {
             </div>
 
             {/* Camera QR Scanner Quick Action */}
-            <button
-                type="button"
-                onClick={() => {
-                    triggerHaptic('light');
-                    setShowQrScanner(true);
-                }}
-                className="w-full px-3.5 py-2.5 rounded-2xl bg-primary/5 border border-primary/25 hover:border-primary/45 shadow-[0_1px_3px_rgba(15,23,42,0.04)] flex items-center justify-between gap-2.5 active:scale-[0.99] transition-[border-color,transform] cursor-pointer group"
-            >
-                <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-8 h-8 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
-                        <AppIcon name="qr_code_scanner" className="text-[18px]" />
+            {canAddExpense && (
+                <button
+                    type="button"
+                    onClick={() => {
+                        triggerHaptic('light');
+                        setShowQrScanner(true);
+                    }}
+                    className="w-full px-3.5 py-2.5 rounded-2xl bg-primary/5 border border-primary/25 hover:border-primary/45 shadow-[0_1px_3px_rgba(15,23,42,0.04)] flex items-center justify-between gap-2.5 active:scale-[0.99] transition-[border-color,transform] cursor-pointer group"
+                >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
+                            <AppIcon name="qr_code_scanner" className="text-[18px]" />
+                        </div>
+                        <div className="text-left min-w-0">
+                            <span className="text-xs font-bold text-on-surface block truncate">
+                                Scan Creditor&apos;s UPI QR
+                            </span>
+                            <span className="text-[11px] text-on-surface-variant block truncate">
+                                Read friend&apos;s QR code via camera or gallery &amp; settle dues
+                            </span>
+                        </div>
                     </div>
-                    <div className="text-left min-w-0">
-                        <span className="text-xs font-bold text-on-surface block truncate">
-                            Scan Creditor&apos;s UPI QR
-                        </span>
-                        <span className="text-[11px] text-on-surface-variant block truncate">
-                            Read friend&apos;s QR code via camera or gallery &amp; settle dues
-                        </span>
-                    </div>
-                </div>
-                <AppIcon name="photo_camera" className="text-[18px] text-primary group-hover:translate-x-0.5 transition-transform shrink-0" />
-            </button>
+                    <AppIcon name="photo_camera" className="text-[18px] text-primary group-hover:translate-x-0.5 transition-transform shrink-0" />
+                </button>
+            )}
 
             {/* Quick Link to Dedicated /analytics Route */}
             <button
@@ -927,7 +971,7 @@ export function Dashboard() {
                                                     <span className="font-mono text-error font-bold">
                                                         {group.hasMutualOffset ? '+' : ''}₹{s.amount.toLocaleString('en-IN')}
                                                     </span>
-                                                    {!group.hasMutualOffset && (
+                                                    {!group.hasMutualOffset && canSettle && (
                                                         <button
                                                             type="button"
                                                             onClick={() => {
@@ -977,40 +1021,46 @@ export function Dashboard() {
                                         </span>
                                     )}
 
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setPaymentSettlement({
-                                                to: group.to,
-                                                from: activePerson,
-                                                splitId: isMulti ? undefined : group.youOweSplits[0]?.splitId,
-                                                splitIds: isMulti ? group.allSplits.map((s) => s.splitId) : undefined,
-                                                amount: group.netAmount,
-                                                toUpiId: group.toUpiId,
-                                                upiIntent: group.upiIntent,
-                                                description: group.hasMutualOffset
-                                                    ? `Net after ₹${group.offsetAmount.toLocaleString('en-IN')} offset (${group.allSplits.length} splits)`
-                                                    : isMulti
-                                                      ? `Consolidated payoff (${group.allSplits.length} splits)`
-                                                      : group.youOweSplits[0]?.description || 'Split due',
-                                            });
-                                        }}
-                                        className="h-9 px-3.5 rounded-xl bg-primary text-on-primary text-xs font-semibold flex items-center gap-1.5 shadow-xs hover:bg-primary/90 transition-colors cursor-pointer active:scale-[0.99] shrink-0"
-                                    >
-                                        <AppIcon
-                                            name={group.upiIntent || group.toUpiId ? 'qr_code_2' : 'qr_code_scanner'}
-                                            className="text-[16px]"
-                                        />
-                                        <span>
-                                            {group.upiIntent || group.toUpiId
-                                                ? group.hasMutualOffset
-                                                    ? 'Pay Net QR'
-                                                    : isMulti
-                                                      ? 'Pay All QR'
-                                                      : 'Pay via QR'
-                                                : 'Scan & Pay'}
+                                    {canSettle ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setPaymentSettlement({
+                                                    to: group.to,
+                                                    from: activePerson,
+                                                    splitId: isMulti ? undefined : group.youOweSplits[0]?.splitId,
+                                                    splitIds: isMulti ? group.allSplits.map((s) => s.splitId) : undefined,
+                                                    amount: group.netAmount,
+                                                    toUpiId: group.toUpiId,
+                                                    upiIntent: group.upiIntent,
+                                                    description: group.hasMutualOffset
+                                                        ? `Net after ₹${group.offsetAmount.toLocaleString('en-IN')} offset (${group.allSplits.length} splits)`
+                                                        : isMulti
+                                                          ? `Consolidated payoff (${group.allSplits.length} splits)`
+                                                          : group.youOweSplits[0]?.description || 'Split due',
+                                                });
+                                            }}
+                                            className="h-9 px-3.5 rounded-xl bg-primary text-on-primary text-xs font-semibold flex items-center gap-1.5 shadow-xs hover:bg-primary/90 transition-colors cursor-pointer active:scale-[0.99] shrink-0"
+                                        >
+                                            <AppIcon
+                                                name={group.upiIntent || group.toUpiId ? 'qr_code_2' : 'qr_code_scanner'}
+                                                className="text-[16px]"
+                                            />
+                                            <span>
+                                                {group.upiIntent || group.toUpiId
+                                                    ? group.hasMutualOffset
+                                                        ? 'Pay Net QR'
+                                                        : isMulti
+                                                          ? 'Pay All QR'
+                                                          : 'Pay via QR'
+                                                    : 'Scan & Pay'}
+                                            </span>
+                                        </button>
+                                    ) : (
+                                        <span className="text-[10px] font-mono font-semibold text-on-surface-variant shrink-0">
+                                            Archived (Read-Only)
                                         </span>
-                                    </button>
+                                    )}
                                 </div>
                             </div>
                         );
@@ -1150,7 +1200,7 @@ export function Dashboard() {
                                                     <span className="font-mono text-primary font-bold">
                                                         {group.hasMutualOffset ? '+' : ''}₹{s.amount.toLocaleString('en-IN')}
                                                     </span>
-                                                    {!group.hasMutualOffset && (
+                                                    {!group.hasMutualOffset && canSettle && (
                                                         <>
                                                             <button
                                                                 type="button"
@@ -1226,88 +1276,95 @@ export function Dashboard() {
                                 )}
 
                                 {/* Actions Row: Show QR, Remind & Confirm */}
-                                <div className="pt-2 border-t border-outline-variant/15 flex items-center gap-1.5">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setCollectSettlement({
-                                                debtorName: group.from,
-                                                amount: group.netAmount,
-                                                splitId: isMulti ? undefined : resolvedRefs[0]?.splitId,
-                                                splitIds: isMulti ? resolvedRefs.map((r) => r.splitId) : undefined,
-                                                settlementRefs: resolvedRefs,
-                                                description: group.hasMutualOffset
-                                                    ? `Net after ₹${group.offsetAmount.toLocaleString('en-IN')} offset (${group.allSplits.length} splits)`
-                                                    : isMulti
-                                                      ? `${group.allSplits.length} splits combined`
-                                                      : group.owedToMeSplits[0]?.description || 'Split due',
-                                            });
-                                        }}
-                                        className="flex-1 h-9 px-2.5 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface text-xs font-semibold flex items-center justify-center gap-1 transition-colors border border-outline-variant/30 cursor-pointer active:scale-[0.99] whitespace-nowrap"
-                                        title={`Show QR code to collect ₹${group.netAmount} from ${group.from}`}
-                                    >
-                                        <AppIcon name="qr_code_2" className="text-[17px] text-primary" />
-                                        <span>Show QR</span>
-                                    </button>
+                                {canSettle ? (
+                                    <div className="pt-2 border-t border-outline-variant/15 flex items-center gap-1.5">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setCollectSettlement({
+                                                    debtorName: group.from,
+                                                    amount: group.netAmount,
+                                                    splitId: isMulti ? undefined : resolvedRefs[0]?.splitId,
+                                                    splitIds: isMulti ? resolvedRefs.map((r) => r.splitId) : undefined,
+                                                    settlementRefs: resolvedRefs,
+                                                    description: group.hasMutualOffset
+                                                        ? `Net after ₹${group.offsetAmount.toLocaleString('en-IN')} offset (${group.allSplits.length} splits)`
+                                                        : isMulti
+                                                          ? `${group.allSplits.length} splits combined`
+                                                          : group.owedToMeSplits[0]?.description || 'Split due',
+                                                });
+                                            }}
+                                            className="flex-1 h-9 px-2.5 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface text-xs font-semibold flex items-center justify-center gap-1 transition-colors border border-outline-variant/30 cursor-pointer active:scale-[0.99] whitespace-nowrap"
+                                            title={`Show QR code to collect ₹${group.netAmount} from ${group.from}`}
+                                        >
+                                            <AppIcon name="qr_code_2" className="text-[17px] text-primary" />
+                                            <span>Show QR</span>
+                                        </button>
 
-                                    <button
-                                        type="button"
-                                        disabled={remindingKey === `group_${group.from}`}
-                                        onClick={() =>
-                                            void handleRemindDebtor({
-                                                key: `group_${group.from}`,
-                                                splitIds: group.owedToMeSplits.map((s) => s.splitId),
-                                                fromPerson: group.from,
-                                                toPerson: activePerson,
-                                                consolidatedAmount: isMulti ? group.netAmount : undefined,
-                                                consolidatedCount: isMulti ? group.allSplits.length : undefined,
-                                            })
-                                        }
-                                        className="h-9 px-2.5 rounded-xl bg-status-awaiting-bg/85 hover:bg-status-awaiting-bg text-status-awaiting-text text-xs font-bold flex items-center justify-center gap-1 transition-colors border border-status-awaiting-text/25 cursor-pointer disabled:opacity-50 active:scale-[0.99] shrink-0 whitespace-nowrap"
-                                        title={`Send push payment reminder to ${group.from}`}
-                                        aria-label={`Remind ${group.from}`}
-                                    >
-                                        <AppIcon
-                                            name={
-                                                remindingKey === `group_${group.from}`
-                                                    ? 'hourglass_top'
-                                                    : 'notifications_active'
+                                        <button
+                                            type="button"
+                                            disabled={remindingKey === `group_${group.from}`}
+                                            onClick={() =>
+                                                void handleRemindDebtor({
+                                                    key: `group_${group.from}`,
+                                                    splitIds: group.owedToMeSplits.map((s) => s.splitId),
+                                                    fromPerson: group.from,
+                                                    toPerson: activePerson,
+                                                    consolidatedAmount: isMulti ? group.netAmount : undefined,
+                                                    consolidatedCount: isMulti ? group.allSplits.length : undefined,
+                                                })
                                             }
-                                            className="text-[16px]"
-                                        />
-                                        <span>
-                                            {remindingKey === `group_${group.from}` ? 'Sending' : 'Remind'}
-                                        </span>
-                                    </button>
+                                            className="h-9 px-2.5 rounded-xl bg-status-awaiting-bg/85 hover:bg-status-awaiting-bg text-status-awaiting-text text-xs font-bold flex items-center justify-center gap-1 transition-colors border border-status-awaiting-text/25 cursor-pointer disabled:opacity-50 active:scale-[0.99] shrink-0 whitespace-nowrap"
+                                            title={`Send push payment reminder to ${group.from}`}
+                                            aria-label={`Remind ${group.from}`}
+                                        >
+                                            <AppIcon
+                                                name={
+                                                    remindingKey === `group_${group.from}`
+                                                        ? 'hourglass_top'
+                                                        : 'notifications_active'
+                                                }
+                                                className="text-[16px]"
+                                            />
+                                            <span>
+                                                {remindingKey === `group_${group.from}` ? 'Sending' : 'Remind'}
+                                            </span>
+                                        </button>
 
-                                    <button
-                                        type="button"
-                                        disabled={
-                                            settlingKey === `multi_${group.from}` ||
-                                            settlingKey === `offset_${group.from}` ||
-                                            (group.allSplits.length === 1 &&
-                                                settlingKey === `${group.allSplits[0].splitId}_${group.from}`)
-                                        }
-                                        onClick={() =>
-                                            group.allSplits.length > 1
-                                                ? void handleSettleSettlementRefs(
-                                                      group.allSplits,
-                                                      `multi_${group.from}`,
-                                                      `Confirmed net ₹${group.netAmount.toLocaleString('en-IN')} settlement with ${group.from}!`
-                                                  )
-                                                : void handleSettle(
-                                                      group.allSplits[0].splitId,
-                                                      group.from,
-                                                      activePerson
-                                                  )
-                                        }
-                                        className="flex-1 h-9 px-2.5 rounded-xl bg-primary-fixed hover:bg-primary text-on-primary-fixed hover:text-on-primary text-xs font-bold transition-colors flex items-center justify-center gap-1 shadow-2xs disabled:opacity-50 cursor-pointer active:scale-[0.99] whitespace-nowrap"
-                                        title={`Confirm receipt of ₹${group.netAmount} from ${group.from}`}
-                                    >
-                                        <AppIcon name="done_all" className="text-[16px]" />
-                                        <span>{isMulti ? 'Confirm All' : 'Confirm'}</span>
-                                    </button>
-                                </div>
+                                        <button
+                                            type="button"
+                                            disabled={
+                                                settlingKey === `multi_${group.from}` ||
+                                                settlingKey === `offset_${group.from}` ||
+                                                (group.allSplits.length === 1 &&
+                                                    settlingKey === `${group.allSplits[0].splitId}_${group.from}`)
+                                            }
+                                            onClick={() =>
+                                                group.allSplits.length > 1
+                                                    ? void handleSettleSettlementRefs(
+                                                          group.allSplits,
+                                                          `multi_${group.from}`,
+                                                          `Confirmed net ₹${group.netAmount.toLocaleString('en-IN')} settlement with ${group.from}!`
+                                                      )
+                                                    : void handleSettle(
+                                                          group.allSplits[0].splitId,
+                                                          group.from,
+                                                          activePerson
+                                                      )
+                                            }
+                                            className="flex-1 h-9 px-2.5 rounded-xl bg-primary-fixed hover:bg-primary text-on-primary-fixed hover:text-on-primary text-xs font-bold transition-colors flex items-center justify-center gap-1 shadow-2xs disabled:opacity-50 cursor-pointer active:scale-[0.99] whitespace-nowrap"
+                                            title={`Confirm receipt of ₹${group.netAmount} from ${group.from}`}
+                                        >
+                                            <AppIcon name="done_all" className="text-[16px]" />
+                                            <span>{isMulti ? 'Confirm All' : 'Confirm'}</span>
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="pt-2 border-t border-outline-variant/15 flex items-center justify-between text-[11px] text-on-surface-variant">
+                                        <span>Historical balance snapshot prior to departure</span>
+                                        <span className="font-mono font-semibold">Read-Only</span>
+                                    </div>
+                                )}
                             </div>
                         );
                     })}
@@ -1396,25 +1453,27 @@ export function Dashboard() {
                                     <span className="text-[11px] text-status-settled-text font-medium truncate">
                                         Both sides cancel out — no payment needed
                                     </span>
-                                    <button
-                                        type="button"
-                                        disabled={isClearing}
-                                        onClick={() =>
-                                            void handleSettleSettlementRefs(
-                                                pair.allSplits,
-                                                lockKey,
-                                                `Cleared ${pair.allSplits.length} mutual offset splits with ${pair.counterparty}!`
-                                            )
-                                        }
-                                        className="h-8 px-3 rounded-xl bg-primary text-on-primary text-xs font-bold flex items-center gap-1.5 shadow-2xs hover:bg-primary/90 transition-colors disabled:opacity-50 cursor-pointer shrink-0 active:scale-[0.98]"
-                                        title={`Mark all ${pair.allSplits.length} cancelled splits as settled`}
-                                    >
-                                        <AppIcon
-                                            name={isClearing ? 'hourglass_top' : 'done_all'}
-                                            className="text-[15px]"
-                                        />
-                                        <span>{isClearing ? 'Clearing...' : 'Clear Offset Splits'}</span>
-                                    </button>
+                                    {canSettle && (
+                                        <button
+                                            type="button"
+                                            disabled={isClearing}
+                                            onClick={() =>
+                                                void handleSettleSettlementRefs(
+                                                    pair.allSplits,
+                                                    lockKey,
+                                                    `Cleared ${pair.allSplits.length} mutual offset splits with ${pair.counterparty}!`
+                                                )
+                                            }
+                                            className="h-8 px-3 rounded-xl bg-primary text-on-primary text-xs font-bold flex items-center gap-1.5 shadow-2xs hover:bg-primary/90 transition-colors disabled:opacity-50 cursor-pointer shrink-0 active:scale-[0.98]"
+                                            title={`Mark all ${pair.allSplits.length} cancelled splits as settled`}
+                                        >
+                                            <AppIcon
+                                                name={isClearing ? 'hourglass_top' : 'done_all'}
+                                                className="text-[15px]"
+                                            />
+                                            <span>{isClearing ? 'Clearing...' : 'Clear Offset Splits'}</span>
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         );

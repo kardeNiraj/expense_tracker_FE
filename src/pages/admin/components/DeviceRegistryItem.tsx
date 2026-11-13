@@ -29,12 +29,58 @@ export const DeviceRegistryItem: React.FC<DeviceRegistryItemProps> = ({
         setIsEditingLabel(false);
     };
 
+    const renderStatusBadge = () => {
+        switch (device.status) {
+            case 'ACTIVE':
+                return (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-status-settled-bg text-status-settled-text border border-status-settled-text/20">
+                        <span className="w-1.5 h-1.5 rounded-full bg-status-settled-text animate-pulse" />
+                        ACTIVE
+                    </span>
+                );
+            case 'IDLE':
+                return (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-status-pending-bg text-status-pending-text border border-status-pending-text/25">
+                        <span className="w-1.5 h-1.5 rounded-full bg-status-pending-text" />
+                        IDLE
+                    </span>
+                );
+            case 'DORMANT':
+                return (
+                    <span
+                        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-surface-card-subtle text-on-surface-variant border border-border-subtle"
+                        title="Device inactive for over 7 days (no longer in use)"
+                    >
+                        <span className="w-1.5 h-1.5 rounded-full bg-on-surface-variant/40" />
+                        DORMANT
+                    </span>
+                );
+            case 'BLOCKED':
+                return (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-error-container text-negative border border-negative/30">
+                        <span className="w-1.5 h-1.5 rounded-full bg-negative" />
+                        BLOCKED
+                    </span>
+                );
+            default:
+                return (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-surface-card text-on-surface-variant border border-border-subtle">
+                        {device.status}
+                    </span>
+                );
+        }
+    };
+
     return (
         <div
             className={`rounded-2xl border p-3.5 space-y-3 transition-colors ${
                 isBlocked
                     ? 'bg-error-container/25 border-negative/30'
-                    : 'bg-surface-card-subtle/60 border-border-subtle'
+                    : device.status === 'ACTIVE'
+                    ? 'bg-surface-card border-border-subtle hover:border-primary/30'
+                    : device.status === 'IDLE'
+                    ? 'bg-surface-card-subtle/70 border-border-subtle'
+                    : 'bg-surface-card-subtle/40 border-border-subtle/80 opacity-90'
             }`}
         >
             <div className="flex items-start justify-between gap-2">
@@ -48,15 +94,7 @@ export const DeviceRegistryItem: React.FC<DeviceRegistryItemProps> = ({
                                 THIS DEVICE
                             </span>
                         )}
-                        <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                isBlocked
-                                    ? 'bg-error-container text-negative'
-                                    : 'bg-surface-card text-on-surface-variant border border-border-subtle'
-                            }`}
-                        >
-                            {device.status}
-                        </span>
+                        {renderStatusBadge()}
                     </div>
 
                     <div className="text-[11px] text-on-surface-variant mt-0.5 space-y-0.5">

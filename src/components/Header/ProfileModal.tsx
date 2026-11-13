@@ -4,6 +4,7 @@ import { triggerHaptic } from '../../utils/haptics';
 import { reloadApp } from '../../utils/pwaReload';
 import { ProfilePushControl } from './ProfilePushControl';
 import type { ClaimActionResult } from '../../context/ExpenseContextDef';
+import type { AuthUser, GroupSummary } from '../../api/types';
 import { AppIcon } from '../Icon/AppIcon';
 
 interface ProfileModalProps {
@@ -23,6 +24,12 @@ interface ProfileModalProps {
     onOpenSyncStatus?: () => void;
     onOpenSpendHistory?: () => void;
     onOpenAdminConsole?: () => void;
+    user?: AuthUser | null;
+    isAuthenticated?: boolean;
+    activeGroup?: GroupSummary | null;
+    groupsCount?: number;
+    onOpenGroups?: () => void;
+    onLogoutUser?: () => void;
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({
@@ -42,10 +49,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     onOpenSyncStatus,
     onOpenSpendHistory,
     onOpenAdminConsole,
+    user,
+    isAuthenticated = false,
+    activeGroup,
+    groupsCount = 0,
+    onOpenGroups,
+    onLogoutUser,
 }) => {
     const [passcodeInput, setPasscodeInput] = useState('');
     const [unlockError, setUnlockError] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showAdminUnlockForm, setShowAdminUnlockForm] = useState(false);
 
     if (!isOpen) return null;
 
@@ -95,7 +109,15 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     const handleClose = () => {
         setUnlockError(false);
         setPasscodeInput('');
+        setShowAdminUnlockForm(false);
         onClose();
+    };
+
+    const handleLogoutClick = () => {
+        triggerHaptic('medium');
+        handleClose();
+        onLogoutUser?.();
+        showToast('Signed out of your SplitNest account', 'lock');
     };
 
     return (
@@ -119,7 +141,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                             <AppIcon
                                 name={isSwitcherUnlocked
                                     ? 'admin_panel_settings'
-                                    : isDeviceClaimed
+                                    : isAuthenticated || isDeviceClaimed
                                         ? 'verified_user'
                                         : 'switch_account'}
                                 className="text-[20px]"
@@ -129,16 +151,20 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                             <h3 className="font-bold text-base text-on-surface truncate">
                                 {isSwitcherUnlocked
                                     ? 'Admin Profile Switcher'
-                                    : isDeviceClaimed
-                                        ? 'Member Profile'
-                                        : 'Claim This Device'}
+                                    : isAuthenticated
+                                        ? 'Account & Active Room'
+                                        : isDeviceClaimed
+                                            ? 'Member Profile'
+                                            : 'Claim This Device'}
                             </h3>
                             <p className="text-xs text-on-surface-variant truncate">
                                 {isSwitcherUnlocked
                                     ? `Admin Active • Current: ${activePerson}`
-                                    : isDeviceClaimed
-                                        ? `Bound to ${claimedPerson}`
-                                        : 'Select your name to bind this device'}
+                                    : isAuthenticated && user
+                                        ? `${user.email || `${(user.authProvider || 'pin').toUpperCase()} account`} • ${activeGroup?.name || 'No active room'}${activeGroup?.isReadOnly ? ' (Read-Only)' : ''}`
+                                        : isDeviceClaimed
+                                            ? `Bound to ${claimedPerson}`
+                                            : 'Select your name to bind this device'}
                             </p>
                         </div>
                     </div>
@@ -154,8 +180,113 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
                 {/* Body Content */}
                 <div className="p-4 overflow-y-auto overscroll-contain flex-1 space-y-3">
-                    {/* CASE 1: Device is claimed and switcher is LOCKED -> Prompt for Admin Passcode */}
-                    {isDeviceClaimed && !isSwitcherUnlocked && (
+                    {/* AUTHENTICATED USER CARD (when not in Admin Switcher mode) */}
+                    {isAuthenticated && user && !isSwitcherUnlocked && (
+                        <div className="space-y-3">
+                            <div className="p-3.5 rounded-2xl bg-surface-container-low border border-outline-variant/30 space-y-2.5">
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <Avatar name={activePerson || user.name || 'Member'} size="md" />
+                                        <div className="min-w-0">
+                                            <div className="font-bold text-sm text-on-surface flex items-center gap-1.5 flex-wrap">
+                                                <span className="truncate">{user.name || activePerson || 'Account'}</span>
+                                                <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary text-[9px] font-bold uppercase">
+                                                    {user.authProvider || 'pin'}
+                                                </span>
+                                            </div>
+                                            <p className="text-[11px] text-on-surface-variant truncate">
+                                                {activeGroup
+                                                    ? `In "${activeGroup.name}" as ${activeGroup.myMemberName || activePerson}${activeGroup.isOwner ? ' (Owner)' : activeGroup.isReadOnly ? ' (Archived • Read-Only)' : ''}`
+                                                    : 'Join or create a room to track splits'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    {onLogoutUser && (
+                                        <button
+                                            type="button"
+                                            onClick={handleLogoutClick}
+                                            className="px-2.5 py-1.5 rounded-xl bg-error/10 hover:bg-error/15 text-error text-[11px] font-bold cursor-pointer shrink-0 transition-colors"
+                                        >
+                                            Sign Out
+                                        </button>
+                                    )}
+                                </div>
+
+                                {onOpenGroups && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            triggerHaptic('light');
+                                            handleClose();
+                                            onOpenGroups();
+                                        }}
+                                        className="w-full h-10 px-3 rounded-xl bg-primary text-on-primary text-xs font-bold flex items-center justify-between hover:bg-primary/90 transition-colors cursor-pointer shadow-xs"
+                                    >
+                                        <span className="flex items-center gap-1.5">
+                                            <AppIcon name="groups" className="text-[17px]" />
+                                            <span>Switch or Manage Rooms ({groupsCount})</span>
+                                        </span>
+                                        <AppIcon name="arrow_forward" className="text-[15px]" />
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Optional Collapsible Admin Unlock */}
+                            <div className="rounded-2xl border border-outline-variant/25 bg-surface-container-low/50 overflow-hidden">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAdminUnlockForm((v) => !v)}
+                                    className="w-full px-3.5 py-2.5 flex items-center justify-between text-xs font-semibold text-on-surface-variant hover:text-on-surface cursor-pointer"
+                                >
+                                    <span className="flex items-center gap-1.5">
+                                        <AppIcon name="admin_panel_settings" className="text-[16px] text-primary" />
+                                        <span>Trip Admin Passcode Unlock</span>
+                                    </span>
+                                    <AppIcon
+                                        name={showAdminUnlockForm ? 'expand_less' : 'expand_more'}
+                                        className="text-[18px]"
+                                    />
+                                </button>
+                                {showAdminUnlockForm && (
+                                    <form onSubmit={handleUnlock} className="px-3.5 pb-3.5 pt-1 space-y-2 border-t border-outline-variant/15">
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                id="admin-passcode-input"
+                                                type="password"
+                                                inputMode="numeric"
+                                                value={passcodeInput}
+                                                onChange={(e) => {
+                                                    setPasscodeInput(e.target.value);
+                                                    setUnlockError(false);
+                                                }}
+                                                placeholder="Admin passcode"
+                                                className={`flex-1 h-10 px-3 rounded-xl bg-surface-container-lowest text-xs font-mono text-on-surface border focus:outline-hidden ${unlockError
+                                                        ? 'border-error focus:border-error'
+                                                        : 'border-outline-variant focus:border-primary'
+                                                    }`}
+                                                required
+                                            />
+                                            <button
+                                                type="submit"
+                                                disabled={isSubmitting}
+                                                className="h-10 px-3.5 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 cursor-pointer disabled:opacity-60"
+                                            >
+                                                {isSubmitting ? '...' : 'Unlock'}
+                                            </button>
+                                        </div>
+                                        {unlockError && (
+                                            <span className="text-[11px] text-error font-medium block">
+                                                Incorrect passcode.
+                                            </span>
+                                        )}
+                                    </form>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* CASE 1 (Legacy unauthenticated): Device is claimed and switcher is LOCKED -> Prompt for Admin Passcode */}
+                    {!isAuthenticated && isDeviceClaimed && !isSwitcherUnlocked && (
                         <form onSubmit={handleUnlock} className="space-y-3.5 py-1">
                             <div className="p-3.5 rounded-2xl bg-surface-container-low border border-outline-variant/30 space-y-2">
                                 <div className="flex items-center gap-2.5">
@@ -222,8 +353,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                         </form>
                     )}
 
-                    {/* CASE 2: Switcher is UNLOCKED (Admin Mode) OR Device is Unclaimed */}
-                    {(!isDeviceClaimed || isSwitcherUnlocked) && (
+                    {/* CASE 2: Switcher is UNLOCKED (Admin Mode) OR Legacy Unclaimed Device */}
+                    {((!isAuthenticated && !isDeviceClaimed) || isSwitcherUnlocked) && (
                         <div className="space-y-3">
                             {/* Admin Mode Status Banner */}
                             {isSwitcherUnlocked && (

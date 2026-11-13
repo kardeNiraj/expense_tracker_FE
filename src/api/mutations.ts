@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from './queries';
+import { getActiveGroupId } from '../utils/authStorage';
 import {
     enqueueOfflineMutation,
     processOfflineQueue,
@@ -75,6 +76,7 @@ function createOptimisticSplit(payload: AddSplitPayload): Split {
 
     return {
         splitId,
+        groupId: payload.groupId ?? getActiveGroupId(),
         description: payload.description,
         category: payload.category,
         totalAmount: payload.amount,
@@ -97,6 +99,7 @@ export function useAddExpenseMutation() {
         mutationFn: async (variables: AddExpensePayload) => {
             const payload = preparedExpenseMap.get(variables) || {
                 ...variables,
+                groupId: variables.groupId ?? getActiveGroupId(),
                 expenseId: variables.expenseId || createClientId('exp'),
                 timestamp: variables.timestamp || new Date().toISOString(),
             };
@@ -113,14 +116,16 @@ export function useAddExpenseMutation() {
             return { message: 'Saved and queued for sync', status: 'queued', offline: true };
         },
         onMutate: async (newExpense) => {
+            const groupId = newExpense.groupId ?? getActiveGroupId();
             const prepared: AddExpensePayload = {
                 ...newExpense,
+                groupId,
                 expenseId: newExpense.expenseId || createClientId('exp'),
                 timestamp: newExpense.timestamp || new Date().toISOString(),
             };
             preparedExpenseMap.set(newExpense, prepared);
 
-            const spendingsKey = queryKeys.spendings(prepared.payee);
+            const spendingsKey = queryKeys.spendings(prepared.payee, groupId);
             const prevSpendings = queryClient.getQueryData<SpendingsData>(spendingsKey);
 
             await queryClient.cancelQueries({ queryKey: ['spendings'] });
@@ -182,6 +187,7 @@ export function useAddSplitMutation() {
         mutationFn: async (variables: AddSplitPayload) => {
             const payload = preparedSplitMap.get(variables) || {
                 ...variables,
+                groupId: variables.groupId ?? getActiveGroupId(),
                 splitId: variables.splitId || createClientId('split'),
                 timestamp: variables.timestamp || new Date().toISOString(),
             };
@@ -198,15 +204,17 @@ export function useAddSplitMutation() {
             return { ...createOptimisticSplit(payload), offline: true };
         },
         onMutate: async (newSplitPayload) => {
+            const groupId = newSplitPayload.groupId ?? getActiveGroupId();
             const prepared: AddSplitPayload = {
                 ...newSplitPayload,
+                groupId,
                 splitId: newSplitPayload.splitId || createClientId('split'),
                 timestamp: newSplitPayload.timestamp || new Date().toISOString(),
             };
             preparedSplitMap.set(newSplitPayload, prepared);
 
             const previousSplits = queryClient.getQueriesData<Split[]>({ queryKey: ['splits'] });
-            const spendingsKey = queryKeys.spendings(prepared.paidBy);
+            const spendingsKey = queryKeys.spendings(prepared.paidBy, groupId);
             const prevSpendings = prepared.recordExpense
                 ? queryClient.getQueryData<SpendingsData>(spendingsKey)
                 : undefined;
@@ -270,8 +278,13 @@ export function useAddContributionMutation() {
 
     return useMutation({
         networkMode: 'always',
-        mutationFn: async ({ splitId, person, amount }: AddContributionPayload) => {
-            const payload: AddContributionPayload = { splitId, person, amount };
+        mutationFn: async ({ splitId, groupId, person, amount }: AddContributionPayload) => {
+            const payload: AddContributionPayload = {
+                splitId,
+                groupId: groupId ?? getActiveGroupId(),
+                person,
+                amount,
+            };
             enqueueOfflineMutation('ADD_CONTRIBUTION', payload);
 
             setTimeout(() => {
@@ -283,19 +296,26 @@ export function useAddContributionMutation() {
             return { splitId, offline: true } as Split & { offline?: boolean };
         },
         onMutate: async (newContribution) => {
-            const detailKey = queryKeys.splitDetails(newContribution.splitId);
+            const groupId = newContribution.groupId ?? getActiveGroupId();
+            const detailKey = queryKeys.splitDetails(newContribution.splitId, groupId);
             const previousSplits = queryClient.getQueriesData<Split[]>({ queryKey: ['splits'] });
             const previousSplitDetail = queryClient.getQueryData<Split>(detailKey);
             await queryClient.cancelQueries({ queryKey: ['splits'] });
             await queryClient.cancelQueries({ queryKey: detailKey });
 
-            applySplitTransformToCaches(queryClient, newContribution.splitId, (s) => ({
-                ...s,
-                contributions: [
-                    ...(s.contributions || []),
-                    { person: newContribution.person, amount: newContribution.amount },
-                ],
-            }));
+            applySplitTransformToCaches(
+                queryClient,
+                newContribution.splitId,
+                (s) => ({
+                    ...s,
+                    contributions: [
+                        ...(s.contributions || []),
+                        { person: newContribution.person, amount: newContribution.amount },
+                    ],
+                }),
+                undefined,
+                groupId
+            );
             return { previousSplits, detailKey, previousSplitDetail };
         },
         onError: (_err, _vars, context) => {
@@ -320,7 +340,11 @@ export function useSettleParticipantMutation() {
 
     return useMutation({
         networkMode: 'always',
-        mutationFn: async (payload: SettleParticipantPayload) => {
+        mutationFn: async (variables: SettleParticipantPayload) => {
+            const payload: SettleParticipantPayload = {
+                ...variables,
+                groupId: variables.groupId ?? getActiveGroupId(),
+            };
             enqueueOfflineMutation('SETTLE_PARTICIPANT', payload);
 
             setTimeout(() => {
@@ -332,15 +356,20 @@ export function useSettleParticipantMutation() {
             return { splitId: payload.splitId, offline: true } as Split & { offline?: boolean };
         },
         onMutate: async (variables) => {
-            const detailKey = queryKeys.splitDetails(variables.splitId);
+            const groupId = variables.groupId ?? getActiveGroupId();
+            const detailKey = queryKeys.splitDetails(variables.splitId, groupId);
             const previousSplits = queryClient.getQueriesData<Split[]>({ queryKey: ['splits'] });
             const previousSplitDetail = queryClient.getQueryData<Split>(detailKey);
             await queryClient.cancelQueries({ queryKey: ['splits'] });
             await queryClient.cancelQueries({ queryKey: detailKey });
 
             // Optimistically update splits and detail caches cleanly across status filters
-            applySplitTransformToCaches(queryClient, variables.splitId, (s) =>
-                withSettlementStatus(s, variables.from, variables.to, variables.settled !== false)
+            applySplitTransformToCaches(
+                queryClient,
+                variables.splitId,
+                (s) => withSettlementStatus(s, variables.from, variables.to, variables.settled !== false),
+                undefined,
+                groupId
             );
             return { previousSplits, detailKey, previousSplitDetail };
         },
@@ -368,10 +397,11 @@ export function useUpdateUpiMutation() {
         networkMode: 'always',
         mutationFn: async (variables: UpdateUpiPayload) => {
             const { name, upiId, requestedBy } = variables;
+            const groupId = variables.groupId ?? getActiveGroupId();
             const previousUpiId = previousUpiMap.get(variables);
             previousUpiMap.delete(variables);
 
-            const payload = { name, upiId, requestedBy, previousUpiId };
+            const payload = { name, upiId, groupId, requestedBy, previousUpiId };
             enqueueOfflineMutation('UPDATE_UPI', payload);
 
             setTimeout(() => {
@@ -384,7 +414,8 @@ export function useUpdateUpiMutation() {
         },
         onMutate: async (variables) => {
             const { name, upiId } = variables;
-            const peopleKey = queryKeys.peopleDetails();
+            const groupId = variables.groupId ?? getActiveGroupId();
+            const peopleKey = queryKeys.peopleDetails(groupId);
             const prevPeople = queryClient.getQueryData<{ name: string; upiId?: string | null }[]>(peopleKey);
             const prevPerson = prevPeople?.find(
                 (p) => p.name.trim().toLowerCase() === name.trim().toLowerCase()
@@ -425,12 +456,13 @@ export function useDeleteSplitMutation() {
 
     return useMutation({
         networkMode: 'always',
-        mutationFn: async (variables: { splitId: string; requestedBy?: string }) => {
+        mutationFn: async (variables: { splitId: string; groupId?: string | null; requestedBy?: string }) => {
             const { splitId, requestedBy } = variables;
+            const groupId = variables.groupId ?? getActiveGroupId();
             const previousSplit = previousDeletedSplitMap.get(variables);
             previousDeletedSplitMap.delete(variables);
 
-            const payload = { splitId, requestedBy, previousSplit };
+            const payload = { splitId, groupId, requestedBy, previousSplit };
             enqueueOfflineMutation('DELETE_SPLIT', payload);
 
             setTimeout(() => {
@@ -443,17 +475,18 @@ export function useDeleteSplitMutation() {
         },
         onMutate: async (variables) => {
             const { splitId } = variables;
-            const detailKey = queryKeys.splitDetails(splitId);
+            const groupId = variables.groupId ?? getActiveGroupId();
+            const detailKey = queryKeys.splitDetails(splitId, groupId);
             const previousSplits = queryClient.getQueriesData<Split[]>({ queryKey: ['splits'] });
             const previousSplitDetail = queryClient.getQueryData<Split>(detailKey);
-            const previousSplit = findCachedSplitById(queryClient, splitId);
+            const previousSplit = findCachedSplitById(queryClient, splitId, groupId);
             previousDeletedSplitMap.set(variables, previousSplit);
 
             await queryClient.cancelQueries({ queryKey: ['splits'] });
             await queryClient.cancelQueries({ queryKey: detailKey });
 
-            // Optimistically remove deleted split from all splits caches & detail cache
-            applySplitRemoveToCaches(queryClient, splitId);
+            // Optimistically remove deleted split from all matching splits caches & detail cache
+            applySplitRemoveToCaches(queryClient, splitId, groupId);
 
             return { previousSplits, detailKey, previousSplitDetail };
         },
@@ -480,10 +513,11 @@ export function useUpdateSplitMutation() {
     return useMutation({
         networkMode: 'always',
         mutationFn: async (variables: UpdateSplitPayload) => {
+            const groupId = variables.groupId ?? getActiveGroupId();
             const previousSplit = previousUpdatedSplitMap.get(variables);
             previousUpdatedSplitMap.delete(variables);
 
-            enqueueOfflineMutation('UPDATE_SPLIT', { ...variables, previousSplit });
+            enqueueOfflineMutation('UPDATE_SPLIT', { ...variables, groupId, previousSplit });
 
             setTimeout(() => {
                 processOfflineQueue(queryClient).catch((err) => {
@@ -494,18 +528,23 @@ export function useUpdateSplitMutation() {
             return { success: true, data: variables as unknown as Split, offline: true };
         },
         onMutate: async (payload) => {
-            const detailKey = queryKeys.splitDetails(payload.splitId);
+            const groupId = payload.groupId ?? getActiveGroupId();
+            const detailKey = queryKeys.splitDetails(payload.splitId, groupId);
             const previousSplits = queryClient.getQueriesData<Split[]>({ queryKey: ['splits'] });
             const previousSplitDetail = queryClient.getQueryData<Split>(detailKey);
-            const previousSplit = findCachedSplitById(queryClient, payload.splitId);
+            const previousSplit = findCachedSplitById(queryClient, payload.splitId, groupId);
             previousUpdatedSplitMap.set(payload, previousSplit);
 
             await queryClient.cancelQueries({ queryKey: ['splits'] });
             await queryClient.cancelQueries({ queryKey: detailKey });
 
             // Optimistically update split across list and detail caches
-            applySplitTransformToCaches(queryClient, payload.splitId, (s) =>
-                withUpdatedSplitFields(s, payload)
+            applySplitTransformToCaches(
+                queryClient,
+                payload.splitId,
+                (s) => withUpdatedSplitFields(s, payload),
+                undefined,
+                groupId
             );
 
             return { previousSplits, detailKey, previousSplitDetail };

@@ -9,7 +9,8 @@ import type { ParsedUpiQr } from '../../utils/qr';
 const QrScannerModal = lazy(() => import('../../components/QRScanner/QrScannerModal'));
 
 export function PeoplePage() {
-    const { activePerson, claimedPerson, isSwitcherUnlocked, showToast } = useExpense();
+    const { activePerson, claimedPerson, isSwitcherUnlocked, isFormerActiveGroup, showToast } =
+        useExpense();
     const { data: peopleDetails = [], isLoading, refetch } = usePeopleDetails();
     const { refetch: refetchPeople } = usePeople(true);
     const updateUpiMutation = useUpdateUpiMutation();
@@ -82,6 +83,7 @@ export function PeoplePage() {
                             ? person.name.toLowerCase() === claimedPerson.toLowerCase()
                             : person.name.toLowerCase() === activePerson.toLowerCase();
                         const canEdit = isSwitcherUnlocked || isOwner;
+                        const canEditUpi = !isFormerActiveGroup && canEdit;
 
                         const handleCardClick = () => {
                             if (person.upiId) {
@@ -154,18 +156,20 @@ export function PeoplePage() {
                                                 <span>My Spends</span>
                                             </button>
 
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setEditingPerson(person);
-                                                    setUpiInput(person.upiId || '');
-                                                }}
-                                                className="h-8 px-2.5 rounded-lg bg-surface-container text-primary hover:bg-primary hover:text-on-primary text-xs font-semibold transition-colors cursor-pointer border border-outline-variant/20 flex items-center gap-1 shadow-2xs"
-                                            >
-                                                <AppIcon name={person.upiId ? 'edit' : 'add'} className="text-[15px]" />
-                                                <span>{person.upiId ? 'Edit' : 'Add UPI'}</span>
-                                            </button>
+                                            {canEditUpi && (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setEditingPerson(person);
+                                                        setUpiInput(person.upiId || '');
+                                                    }}
+                                                    className="h-8 px-2.5 rounded-lg bg-surface-container text-primary hover:bg-primary hover:text-on-primary text-xs font-semibold transition-colors cursor-pointer border border-outline-variant/20 flex items-center gap-1 shadow-2xs"
+                                                >
+                                                    <AppIcon name={person.upiId ? 'edit' : 'add'} className="text-[15px]" />
+                                                    <span>{person.upiId ? 'Edit' : 'Add UPI'}</span>
+                                                </button>
+                                            )}
                                         </div>
                                     )}
                                 </div>
