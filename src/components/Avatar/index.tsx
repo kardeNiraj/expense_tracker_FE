@@ -27,18 +27,29 @@ export const Avatar: React.FC<AvatarProps> = ({
     size = 'md',
     className = '',
 }) => {
-    const initials = name
-        ? name
-              .split(' ')
-              .map((n) => n[0])
-              .join('')
-              .slice(0, 2)
-              .toUpperCase()
-        : '??';
+    // Ignore any characters except alphabets and numbers (preserve whitespace to separate words)
+    const sanitizedWords = (name || '')
+        .replace(/[^\p{L}\p{N}\s]/gu, '')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+
+    const initials =
+        sanitizedWords.length > 0
+            ? sanitizedWords
+                  .map((w) => w[0])
+                  .join('')
+                  .slice(0, 2)
+                  .toUpperCase()
+            : (name || '')
+                  .replace(/[^\p{L}\p{N}]/gu, '')
+                  .slice(0, 2)
+                  .toUpperCase() || '??';
 
     let charCodeSum = 0;
-    for (let i = 0; i < (name || '').length; i++) {
-        charCodeSum += name.charCodeAt(i);
+    const cleanForColor = (name || '').replace(/[^\p{L}\p{N}\s]/gu, '').trim() || name || '';
+    for (let i = 0; i < cleanForColor.length; i++) {
+        charCodeSum += cleanForColor.charCodeAt(i);
     }
     const colorClass = colorPalette[charCodeSum % colorPalette.length];
 
