@@ -133,7 +133,7 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
                     />
                     <span className="font-sans">
                         {isRefreshing
-                            ? 'Reloading from Sheet...'
+                            ? 'Refreshing data...'
                             : progress >= 1
                             ? 'Release to reload'
                             : 'Pull down to reload'}

@@ -166,7 +166,7 @@ export const ClaimIdentityScreen: React.FC = () => {
 
                 {isError && (
                     <div className="p-4 rounded-2xl bg-error-container text-on-error-container text-xs text-center space-y-2">
-                        <p>Could not load trip members from Google Sheets.</p>
+                        <p>Could not load trip members from server.</p>
                         <button
                             type="button"
                             onClick={() => refetch()}

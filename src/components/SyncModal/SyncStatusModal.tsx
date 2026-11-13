@@ -195,7 +195,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
                                     You are currently offline
                                 </span>
                                 <p className="text-on-surface-variant mt-0.5 leading-relaxed text-[11px]">
-                                    Transactions are stored safely in local IndexedDB. They will automatically sync to Google Sheets as soon as internet connection is restored.
+                                    Transactions are stored safely in local IndexedDB. They will automatically sync to SplitNest as soon as internet connection is restored.
                                 </p>
                             </div>
                         </div>
@@ -204,7 +204,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
                             <AppIcon name="sync" className="text-[20px] text-primary shrink-0 animate-spin" />
                             <div className="text-xs">
                                 <span className="font-bold text-primary">
-                                    Synchronizing with Google Sheets...
+                                    Synchronizing with SplitNest...
                                 </span>
                                 <p className="text-on-surface-variant text-[11px]">
                                     Independent split groups are syncing in parallel.
@@ -242,7 +242,7 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({ isOpen, onClos
                                     All transactions synchronized!
                                 </span>
                                 <p className="text-on-surface-variant text-[11px]">
-                                    Your app is up to date with Google Sheets.
+                                    Your app is up to date with SplitNest.
                                 </p>
                             </div>
                         </div>

@@ -1014,14 +1014,14 @@ export function AddPage() {
                                         try {
                                             await apiFetch('/people?refresh=true');
                                             await refetchPeople();
-                                            showToast('Refreshed member list from Sheet!', 'sync');
+                                            showToast('Refreshed member list!', 'sync');
                                         } catch {
                                             showToast('Failed to refresh members', 'error');
                                         }
                                     }}
                                     disabled={isPeopleFetching}
                                     className="h-7 w-7 sm:w-auto sm:px-2 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors cursor-pointer flex items-center justify-center sm:justify-start gap-1 text-[11px] font-semibold border border-outline-variant/20 shadow-2xs whitespace-nowrap shrink-0"
-                                    title="Reload members from Google Sheet"
+                                    title="Reload members from server"
                                     aria-label="Reload members"
                                 >
                                     <AppIcon
