@@ -48,6 +48,7 @@ export const OnboardingScreen: React.FC = () => {
         setActiveGroupId,
         setActiveTab,
         logoutUser,
+        claimedPerson,
         showToast,
     } = useExpense();
 
@@ -56,7 +57,7 @@ export const OnboardingScreen: React.FC = () => {
     const [emailMode, setEmailMode] = useState<'register' | 'login' | 'recover'>(() =>
         pendingRecoverToken ? 'recover' : 'register'
     );
-    const [name, setName] = useState('');
+    const [name, setName] = useState(() => claimedPerson || '');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [pin, setPin] = useState('');

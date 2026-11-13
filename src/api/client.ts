@@ -111,7 +111,13 @@ async function parseErrorResponse(response: Response): Promise<ApiError> {
 
     const err = new ApiError(parsedMessage, response.status, code, person, retryAfterSeconds);
 
-    if (code === 'USER_UNAUTHORIZED') {
+    if (
+        code === 'USER_UNAUTHORIZED' ||
+        code === 'USER_NOT_FOUND' ||
+        code === 'TOKEN_EXPIRED' ||
+        code === 'INVALID_TOKEN' ||
+        (response.status === 401 && (!code || code === 'UNAUTHORIZED'))
+    ) {
         notifyUserAuthExpired();
     } else if (response.status === 401 || response.status === 403) {
         notifyAccessError({

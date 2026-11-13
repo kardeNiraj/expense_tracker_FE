@@ -27,6 +27,7 @@ export function subscribeToUserAuthExpired(listener: UserAuthExpiredListener): (
 }
 
 export function notifyUserAuthExpired(): void {
+    clearAllUserAuthStorage();
     authExpiredListeners.forEach((fn) => {
         try {
             fn();

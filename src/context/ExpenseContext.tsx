@@ -4,6 +4,7 @@ import type { AppTab } from './ExpenseContextDef';
 import { ExpenseContext } from './ExpenseContextDef';
 import { ENV } from '../config';
 import { queryKeys } from '../api';
+import { ApiError } from '../api/client';
 import {
     authQueryKeys,
     useAuthConfig,
@@ -85,8 +86,19 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     const user: AuthUser | null = useMemo(() => {
         if (!hasUserSession) return null;
+        if (authMeQuery.isError) {
+            const err = authMeQuery.error;
+            const isAuthError =
+                (err instanceof ApiError &&
+                    (err.status === 401 ||
+                        err.code === 'USER_NOT_FOUND' ||
+                        err.code === 'USER_UNAUTHORIZED' ||
+                        err.code === 'TOKEN_EXPIRED')) ||
+                (err as { status?: number })?.status === 401;
+            if (isAuthError) return null;
+        }
         return authMeQuery.data?.user ?? getStoredUserProfile();
-    }, [hasUserSession, authMeQuery.data]);
+    }, [hasUserSession, authMeQuery.data, authMeQuery.isError, authMeQuery.error]);
 
     const groups: GroupSummary[] = useMemo(() => {
         if (!hasUserSession) return [];
@@ -479,14 +491,14 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     useEffect(() => {
         return subscribeToUserAuthExpired(() => {
-            if (!getUserToken()) return;
             clearAllUserAuthStorage();
+            clearPersistedClaim();
             setHasUserSession(false);
             setSelectedGroupId(null);
             queryClient.removeQueries({ queryKey: authQueryKeys.me() });
             queryClient.removeQueries({ queryKey: groupQueryKeys.all() });
             queryClient.removeQueries({ queryKey: groupQueryKeys.former() });
-            showToast('Your session expired. Please sign in again.', 'lock');
+            showToast('Account not found or session expired. Please register or sign in.', 'login');
         });
     }, [queryClient, showToast]);
 

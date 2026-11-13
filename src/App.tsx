@@ -201,7 +201,7 @@ function MainApp() {
         );
     }
 
-    if (isAuthLoading && !isAuthenticated && !isSwitcherUnlocked) {
+    if (isAuthLoading && !isAuthenticated) {
         return (
             <div className="min-h-screen w-full bg-surface text-on-surface flex flex-col relative font-sans">
                 <PwaUpdatePrompt />
@@ -211,13 +211,27 @@ function MainApp() {
         );
     }
 
-    // Show onboarding & room setup/join screen when signed out, without any active/selected room, or joining an invited QR room
+    // Require authentication: if not authenticated on the server DB, throw directly to OnboardingScreen (login/register)
+    if (!isAuthenticated && activeTab !== 'admin') {
+        return (
+            <div className="min-h-screen w-full bg-surface text-on-surface flex flex-col relative font-sans">
+                <PwaUpdatePrompt />
+                <div className="max-w-md mx-auto w-full px-4 pt-3">
+                    <InstallPrompt />
+                </div>
+                <Suspense fallback={<ClaimIdentitySkeleton />}>
+                    <OnboardingScreen />
+                </Suspense>
+                <Toast />
+            </div>
+        );
+    }
+
+    // Show room setup/join screen when authenticated but without any active/selected room, or joining an invited QR room
     if (
-        (!isAuthenticated && !isSwitcherUnlocked) ||
-        (isAuthenticated &&
-            !isSwitcherUnlocked &&
-            ((groups.length === 0 && !isFormerActiveGroup && activeTab !== 'groups') ||
-                Boolean(pendingInviteCode)))
+        isAuthenticated &&
+        ((groups.length === 0 && !isFormerActiveGroup && activeTab !== 'groups') ||
+            Boolean(pendingInviteCode))
     ) {
         return (
             <div className="min-h-screen w-full bg-surface text-on-surface flex flex-col relative font-sans">
