@@ -98,6 +98,7 @@ export interface TripInfo {
     subtitle?: string;
     icon?: string;
     inviteCode?: string | null;
+    roomCode?: string | null;
     status?: 'ACTIVE' | 'ARCHIVED' | 'CLOSED';
     archivedAt?: string | null;
     closedAt?: string | null;
@@ -562,6 +563,7 @@ export interface GroupSummary {
     subtitle: string;
     icon: string;
     inviteCode: string | null;
+    roomCode?: string | null;
     createdByUserId: string;
     createdByName: string;
     status: 'ACTIVE' | 'ARCHIVED' | 'CLOSED';
@@ -592,6 +594,7 @@ export interface GroupInvitePreview {
     subtitle: string;
     icon: string;
     inviteCode: string;
+    roomCode?: string | null;
     inviteLabel?: string;
     expiresAt?: string | null;
     createdByName: string;

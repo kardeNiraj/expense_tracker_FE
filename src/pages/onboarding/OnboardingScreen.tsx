@@ -324,7 +324,7 @@ export const OnboardingScreen: React.FC = () => {
                 initialMembers,
             });
             triggerHaptic('success');
-            showToast(`Room "${created.name}" created! Share QR ${created.inviteCode} to invite friends.`);
+            showToast(`Room "${created.name}" created! Share code ${created.roomCode || created.inviteCode} to invite friends.`);
             onJoinedOrCreatedGroup(created);
         } catch (err) {
             triggerHaptic('warning');

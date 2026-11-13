@@ -160,11 +160,11 @@ export const GroupsPage: React.FC = () => {
     const handleWhatsAppShare = (customUrl?: string, customCode?: string) => {
         if (!activeGroup) return;
         const urlToShare = customUrl || inviteUrl;
-        const codeToShare = customCode || activeGroup.inviteCode;
+        const codeToShare = customCode || activeGroup.roomCode || activeGroup.inviteCode;
         if (!urlToShare) return;
         triggerHaptic('light');
         const msg = `Hey! Join "${activeGroup.name}" on SplitNest to track & split bills:\n👉 ${urlToShare}${
-            codeToShare ? `\nInvite Code: ${codeToShare}` : ''
+            codeToShare ? `\nRoom Code: ${codeToShare}` : ''
         }`;
         window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
     };
@@ -549,10 +549,10 @@ export const GroupsPage: React.FC = () => {
                                     </div>
                                     <span className="text-[11px] text-on-surface-variant block truncate mt-0.5">
                                         {g.memberCount} members • {g.myMemberName || user?.name}
-                                        {g.inviteCode && roomStatus === 'ACTIVE' ? (
+                                        {roomStatus === 'ACTIVE' && (g.roomCode || g.inviteCode) ? (
                                             <>
                                                 {' '}
-                                                • <code className="font-mono">{g.inviteCode}</code>
+                                                • <code className="font-mono">{g.roomCode || g.inviteCode}</code>
                                             </>
                                         ) : null}
                                     </span>
@@ -710,7 +710,7 @@ export const GroupsPage: React.FC = () => {
                     <RoomLifecycleActions group={activeGroup} />
 
                     {/* Active Room QR Invite Card */}
-                    <div className="rounded-3xl bg-surface-container-lowest border border-outline-variant/30 p-4 space-y-4 shadow-xs">
+                    <div className="rounded-3xl bg-surface-container-lowest border border-outline-variant/30 p-4 space-y-4 shadow-xs overflow-hidden">
                         <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
@@ -778,28 +778,32 @@ export const GroupsPage: React.FC = () => {
                             </div>
                         ) : activeGroup.inviteCode ? (
                             <>
-                                <div className="bg-surface-container/40 border border-outline-variant/25 rounded-2xl p-4 flex flex-col items-center text-center space-y-2.5">
+                                <div className="bg-surface-container/40 border border-outline-variant/25 rounded-2xl p-4 flex flex-col items-center text-center space-y-3 w-full max-w-full overflow-hidden">
                                     <div className="p-3 bg-white rounded-2xl shadow-sm border border-neutral-200">
                                         <QRCode value={inviteUrl} size={172} />
                                     </div>
-                                    <div className="space-y-1">
-                                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface-container-lowest border border-outline-variant/30">
-                                            <span className="text-[10px] font-mono uppercase text-on-surface-variant">
+                                    <div className="w-full max-w-full flex flex-col items-center text-center space-y-1.5 min-w-0">
+                                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-container-lowest border border-outline-variant/30 max-w-full min-w-0 shadow-2xs">
+                                            <span className="text-[10px] font-mono uppercase text-on-surface-variant font-bold shrink-0">
                                                 Code
                                             </span>
-                                            <span className="text-sm font-mono font-bold tracking-widest text-primary">
-                                                {activeGroup.inviteCode}
+                                            <span
+                                                className="text-xs sm:text-sm font-mono font-bold text-primary truncate min-w-0 select-all"
+                                                title={activeGroup.roomCode || activeGroup.inviteCode || ''}
+                                            >
+                                                {activeGroup.roomCode || activeGroup.inviteCode}
                                             </span>
                                             <button
                                                 type="button"
                                                 onClick={() =>
                                                     void handleCopy(
-                                                        activeGroup.inviteCode || '',
+                                                        activeGroup.roomCode || activeGroup.inviteCode || '',
                                                         'code'
                                                     )
                                                 }
-                                                className="text-on-surface-variant hover:text-primary cursor-pointer"
-                                                title="Copy invite code"
+                                                className="text-on-surface-variant hover:text-primary cursor-pointer shrink-0 p-0.5"
+                                                title="Copy room code"
+                                                aria-label="Copy room code"
                                             >
                                                 <AppIcon
                                                     name={
@@ -811,8 +815,8 @@ export const GroupsPage: React.FC = () => {
                                                 />
                                             </button>
                                         </div>
-                                        <p className="text-[11px] text-on-surface-variant max-w-[240px]">
-                                            Friends scan this QR or open your invite link to sign in &amp; join this room.
+                                        <p className="text-[11px] text-on-surface-variant max-w-[260px] mx-auto text-center leading-relaxed">
+                                            Friends scan this QR, enter code, or open invite link to join this room.
                                         </p>
                                     </div>
                                 </div>
@@ -1122,7 +1126,7 @@ export const GroupsPage: React.FC = () => {
                     </div>
 
                     {/* Room Members Card */}
-                    <div className="rounded-3xl bg-surface-container-lowest border border-outline-variant/30 p-4 space-y-3.5 shadow-xs">
+                    <div className="rounded-3xl bg-surface-container-lowest border border-outline-variant/30 p-4 space-y-3.5 shadow-xs overflow-hidden">
                         <div className="flex items-center justify-between">
                             <div>
                                 <h3 className="text-sm font-bold text-on-surface font-headline">
@@ -1153,9 +1157,9 @@ export const GroupsPage: React.FC = () => {
                                         key={member.memberId}
                                         className="p-2.5 rounded-2xl bg-surface-container-low border border-outline-variant/25 flex items-center justify-between gap-2.5"
                                     >
-                                        <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
                                             <Avatar name={member.name} size="sm" />
-                                            <div className="min-w-0">
+                                            <div className="min-w-0 flex-1">
                                                 <div className="flex items-center gap-1.5 flex-wrap">
                                                     <span className="text-xs font-bold text-on-surface truncate">
                                                         {member.name}
@@ -1211,26 +1215,26 @@ export const GroupsPage: React.FC = () => {
                         (activeGroup.status || 'ACTIVE').toUpperCase() === 'ACTIVE' ? (
                             <form
                                 onSubmit={handleAddMember}
-                                className="pt-2 border-t border-outline-variant/20 space-y-2"
+                                className="pt-2.5 border-t border-outline-variant/20 space-y-2.5"
                             >
                                 <span className="text-[11px] font-semibold text-on-surface-variant block">
                                     Add / Pre-add Member Slot
                                 </span>
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-col sm:flex-row gap-2">
                                     <input
                                         type="text"
                                         value={addMemberName}
                                         onChange={(e) => setAddMemberName(e.target.value)}
                                         placeholder="Member name (e.g. Priya)"
                                         required
-                                        className="flex-1 h-10 px-3 rounded-xl bg-surface-container-low border border-outline-variant/35 text-xs text-on-surface focus:outline-none focus:border-primary"
+                                        className="w-full sm:flex-1 min-w-0 h-10 px-3 rounded-xl bg-surface-container-low border border-outline-variant/35 text-xs text-on-surface focus:outline-none focus:border-primary"
                                     />
                                     <input
                                         type="text"
                                         value={addMemberUpi}
                                         onChange={(e) => setAddMemberUpi(e.target.value)}
-                                        placeholder="UPI (optional)"
-                                        className="w-32 h-10 px-3 rounded-xl bg-surface-container-low border border-outline-variant/35 text-xs font-mono text-on-surface focus:outline-none focus:border-primary"
+                                        placeholder="UPI ID (optional)"
+                                        className="w-full sm:w-44 min-w-0 h-10 px-3 rounded-xl bg-surface-container-low border border-outline-variant/35 text-xs font-mono text-on-surface focus:outline-none focus:border-primary"
                                     />
                                 </div>
                                 <button
@@ -1377,7 +1381,7 @@ export const GroupsPage: React.FC = () => {
                                         }
                                     }}
                                     placeholder="Friend name..."
-                                    className="flex-1 h-10 px-3 rounded-xl bg-surface-container-low border border-outline-variant/40 text-xs text-on-surface focus:outline-none focus:border-primary"
+                                    className="flex-1 min-w-0 h-10 px-3 rounded-xl bg-surface-container-low border border-outline-variant/40 text-xs text-on-surface focus:outline-none focus:border-primary"
                                 />
                                 <button
                                     type="button"
@@ -1388,7 +1392,7 @@ export const GroupsPage: React.FC = () => {
                                         }
                                         setMemberDraft('');
                                     }}
-                                    className="h-10 px-3 rounded-xl bg-surface-container text-xs font-bold text-primary cursor-pointer"
+                                    className="h-10 px-3 rounded-xl bg-surface-container text-xs font-bold text-primary cursor-pointer shrink-0"
                                 >
                                     Add
                                 </button>
@@ -1464,12 +1468,12 @@ export const GroupsPage: React.FC = () => {
                                 type="text"
                                 value={joinInput}
                                 onChange={(e) => setJoinInput(e.target.value)}
-                                placeholder="Paste invite URL or code..."
-                                className="flex-1 h-10 px-3 rounded-xl bg-surface-container-low border border-outline-variant/40 text-xs font-mono text-on-surface focus:outline-none focus:border-primary"
+                                placeholder="Room code (e.g. SN-4821) or link..."
+                                className="flex-1 min-w-0 h-10 px-3 rounded-xl bg-surface-container-low border border-outline-variant/40 text-xs font-mono text-on-surface focus:outline-none focus:border-primary"
                             />
                             <button
                                 type="submit"
-                                className="h-10 px-3.5 rounded-xl bg-surface-container-high text-primary text-xs font-bold cursor-pointer"
+                                className="h-10 px-3.5 rounded-xl bg-surface-container-high text-primary text-xs font-bold cursor-pointer shrink-0"
                             >
                                 Lookup
                             </button>

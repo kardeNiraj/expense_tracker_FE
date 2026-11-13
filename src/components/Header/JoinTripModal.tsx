@@ -26,6 +26,8 @@ export const JoinTripModal: React.FC<JoinTripModalProps> = ({
     if (!isOpen) return null;
 
     const inviteCode = activeGroup ? activeGroup.inviteCode || '' : '';
+    const roomCode = activeGroup ? activeGroup.roomCode || null : null;
+    const displayCode = roomCode || inviteCode;
     const isPrimaryRevoked = Boolean(activeGroup && !activeGroup.inviteCode);
     const displayTitle = activeGroup?.name || tripTitle;
     const displaySubtitle = activeGroup?.subtitle || tripSubtitle;
@@ -39,7 +41,7 @@ export const JoinTripModal: React.FC<JoinTripModalProps> = ({
             setCopied(kind);
             showToast(
                 kind === 'code'
-                    ? `Invite code ${text} copied!`
+                    ? `Room code ${text} copied!`
                     : 'Invite link copied to clipboard!',
                 'content_copy'
             );
@@ -52,7 +54,7 @@ export const JoinTripModal: React.FC<JoinTripModalProps> = ({
 
     const handleWhatsAppShare = () => {
         triggerHaptic('light');
-        const codeLine = inviteCode ? `\nInvite Code: ${inviteCode}` : '';
+        const codeLine = displayCode ? `\nRoom Code: ${displayCode}` : '';
         const text = `Hey! Join "${displayTitle}" on SplitNest to track and split bills seamlessly:\n👉 ${joinUrl}${codeLine}`;
         window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
     };
@@ -148,17 +150,17 @@ export const JoinTripModal: React.FC<JoinTripModalProps> = ({
                         <div className="p-3 bg-white rounded-2xl shadow-sm border border-neutral-200">
                             <QRCode value={joinUrl} size={190} />
                         </div>
-                        {inviteCode && (
+                        {displayCode && (
                             <button
                                 type="button"
-                                onClick={() => void handleCopy(inviteCode, 'code')}
-                                className="px-3 py-1 rounded-full bg-surface-container-lowest border border-outline-variant/35 hover:border-primary/40 flex items-center gap-1.5 text-xs font-mono font-bold text-primary cursor-pointer"
-                                title="Tap to copy invite code"
+                                onClick={() => void handleCopy(displayCode, 'code')}
+                                className="px-3 py-1 rounded-full bg-surface-container-lowest border border-outline-variant/35 hover:border-primary/40 flex items-center gap-1.5 text-xs font-mono font-bold text-primary cursor-pointer max-w-full min-w-0"
+                                title="Tap to copy room code"
                             >
-                                <span>Code: {inviteCode}</span>
+                                <span className="truncate min-w-0">Code: {displayCode}</span>
                                 <AppIcon
                                     name={copied === 'code' ? 'check' : 'content_copy'}
-                                    className="text-[13px]"
+                                    className="text-[13px] shrink-0"
                                 />
                             </button>
                         )}
