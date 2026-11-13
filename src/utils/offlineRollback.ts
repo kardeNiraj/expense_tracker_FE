@@ -30,11 +30,11 @@ export function rollbackMutationInQueryCache(item: QueuedItem, queryClient: Quer
                 const splitId = p.splitId || item.splitId || item.id;
 
                 // 1. Remove the optimistic split from all matching splits queries
-                applySplitRemoveToCaches(queryClient, splitId);
+                applySplitRemoveToCaches(queryClient, splitId, p.groupId);
 
                 // 2. If recordExpense was enabled, deduct from payee's spendings
                 if (p.recordExpense && p.paidBy) {
-                    const spendingsKey = queryKeys.spendings(p.paidBy);
+                    const spendingsKey = queryKeys.spendings(p.paidBy, p.groupId);
                     const splitTag = `(split: ${splitId})`.toLowerCase();
                     const matchesSplitExpense = (e: { amount: number; description?: string; timestamp?: string }) => {
                         if (e.description?.toLowerCase().includes(splitTag)) return true;
@@ -89,7 +89,7 @@ export function rollbackMutationInQueryCache(item: QueuedItem, queryClient: Quer
             case 'ADD_EXPENSE': {
                 const p = item.payload as AddExpensePayload;
                 if (p.payee) {
-                    const spendingsKey = queryKeys.spendings(p.payee);
+                    const spendingsKey = queryKeys.spendings(p.payee, p.groupId);
                     const matchesDirectExpense = (e: {
                         amount: number;
                         description?: string;
@@ -169,20 +169,24 @@ export function rollbackMutationInQueryCache(item: QueuedItem, queryClient: Quer
                         ...s,
                         contributions,
                     };
-                });
+                }, undefined, p.groupId);
                 break;
             }
 
             case 'SETTLE_PARTICIPANT': {
                 const p = item.payload as SettleParticipantPayload;
-                applySplitTransformToCaches(queryClient, p.splitId, (s) =>
-                    withSettlementStatus(s, p.from, p.to, p.settled === false)
+                applySplitTransformToCaches(
+                    queryClient,
+                    p.splitId,
+                    (s) => withSettlementStatus(s, p.from, p.to, p.settled === false),
+                    undefined,
+                    p.groupId
                 );
                 break;
             }
 
             case 'DELETE_SPLIT': {
-                const p = item.payload as { splitId: string; previousSplit?: Split };
+                const p = item.payload as { splitId: string; groupId?: string | null; previousSplit?: Split };
                 if (p.previousSplit) {
                     applySplitAddToCaches(queryClient, p.previousSplit);
                 }
@@ -197,7 +201,8 @@ export function rollbackMutationInQueryCache(item: QueuedItem, queryClient: Quer
                         queryClient,
                         p.splitId,
                         () => revertedSplit,
-                        revertedSplit
+                        revertedSplit,
+                        p.groupId
                     );
                 }
                 break;
@@ -207,7 +212,7 @@ export function rollbackMutationInQueryCache(item: QueuedItem, queryClient: Quer
                 const p = item.payload as UpdateUpiPayload & { previousUpiId?: string };
                 if (p.previousUpiId !== undefined) {
                     queryClient.setQueriesData<{ name: string; upiId?: string }[]>(
-                        { queryKey: queryKeys.peopleDetails() },
+                        { queryKey: queryKeys.peopleDetails(p.groupId) },
                         (old) => {
                             if (!old) return old;
                             return old.map((person) => {

@@ -158,24 +158,17 @@ export function getCategoryMeta(category?: string): CategoryMeta {
     const c = (category || '').toLowerCase().trim();
 
     if (
-        c.includes('food') ||
-        c.includes('dine') ||
-        c.includes('snack') ||
-        c.includes('lunch') ||
-        c.includes('dinner') ||
-        c.includes('breakfast') ||
-        c.includes('cafe') ||
+        c.includes('beverage') ||
+        c.includes('drink') ||
+        c.includes('water') ||
+        c.includes('bar') ||
+        c.includes('beer') ||
         c.includes('tea') ||
-        c.includes('chai')
+        c.includes('chai') ||
+        c.includes('coffee') ||
+        c.includes('juice') ||
+        (c.includes('snack') && !c.includes('bulk'))
     ) {
-        return {
-            icon: 'restaurant',
-            bgClass: 'bg-amber-500/10',
-            textClass: 'text-amber-600 dark:text-amber-400',
-        };
-    }
-
-    if (c.includes('drink') || c.includes('water') || c.includes('bar') || c.includes('beverage') || c.includes('beer')) {
         return {
             icon: 'local_bar',
             bgClass: 'bg-cyan-500/10',
@@ -184,29 +177,97 @@ export function getCategoryMeta(category?: string): CategoryMeta {
     }
 
     if (
+        c.includes('grocer') ||
+        c.includes('suppl') ||
+        c.includes('toiletr') ||
+        c.includes('disposable') ||
+        c.includes('mart')
+    ) {
+        return {
+            icon: 'shopping_bag',
+            bgClass: 'bg-teal-500/10',
+            textClass: 'text-teal-600 dark:text-teal-400',
+        };
+    }
+
+    if (
+        c.includes('food') ||
+        c.includes('dine') ||
+        c.includes('dining') ||
+        c.includes('lunch') ||
+        c.includes('dinner') ||
+        c.includes('breakfast') ||
+        c.includes('cafe') ||
+        c.includes('dhaba')
+    ) {
+        return {
+            icon: 'restaurant',
+            bgClass: 'bg-amber-500/10',
+            textClass: 'text-amber-600 dark:text-amber-400',
+        };
+    }
+
+    if (
+        c.includes('fuel') ||
+        c.includes('petrol') ||
+        c.includes('diesel') ||
+        c.includes('charging')
+    ) {
+        return {
+            icon: 'directions_car',
+            bgClass: 'bg-orange-500/10',
+            textClass: 'text-orange-600 dark:text-orange-400',
+        };
+    }
+
+    if (
+        c.includes('transport') ||
         c.includes('travel') ||
         c.includes('cab') ||
         c.includes('taxi') ||
         c.includes('auto') ||
-        c.includes('fuel') ||
-        c.includes('petrol') ||
-        c.includes('diesel') ||
+        c.includes('bus') ||
+        c.includes('rental') ||
+        c.includes('parking') ||
         c.includes('toll') ||
         c.includes('flight') ||
         c.includes('train')
     ) {
         return {
-            icon: 'directions_car',
+            icon: 'directions_bus',
             bgClass: 'bg-blue-500/10',
             textClass: 'text-blue-600 dark:text-blue-400',
         };
     }
 
-    if (c.includes('stay') || c.includes('hotel') || c.includes('resort') || c.includes('room') || c.includes('camp') || c.includes('hostel')) {
+    if (
+        c.includes('accommodat') ||
+        c.includes('stay') ||
+        c.includes('hotel') ||
+        c.includes('resort') ||
+        c.includes('room') ||
+        c.includes('camp') ||
+        c.includes('hostel') ||
+        c.includes('homestay')
+    ) {
         return {
             icon: 'hotel',
             bgClass: 'bg-purple-500/10',
             textClass: 'text-purple-600 dark:text-purple-400',
+        };
+    }
+
+    if (
+        c.includes('entertain') ||
+        c.includes('movie') ||
+        c.includes('club') ||
+        c.includes('game') ||
+        c.includes('recreation')
+    ) {
+        return {
+            icon: 'auto_awesome',
+            bgClass: 'bg-violet-500/10',
+            textClass: 'text-violet-600 dark:text-violet-400',
         };
     }
 
@@ -218,7 +279,9 @@ export function getCategoryMeta(category?: string): CategoryMeta {
         c.includes('sport') ||
         c.includes('adventure') ||
         c.includes('paragliding') ||
-        c.includes('rafting')
+        c.includes('rafting') ||
+        c.includes('ropeway') ||
+        c.includes('sightseeing')
     ) {
         return {
             icon: 'snowboarding',
@@ -231,9 +294,10 @@ export function getCategoryMeta(category?: string): CategoryMeta {
         c.includes('shopping') ||
         c.includes('mall') ||
         c.includes('market') ||
-        c.includes('groceries') ||
-        c.includes('mart') ||
-        c.includes('souvenir')
+        c.includes('souvenir') ||
+        c.includes('handicraft') ||
+        c.includes('cloth') ||
+        c.includes('gift')
     ) {
         return {
             icon: 'shopping_bag',
@@ -242,9 +306,26 @@ export function getCategoryMeta(category?: string): CategoryMeta {
         };
     }
 
+    if (
+        c.includes('personal') ||
+        c.includes('laundry') ||
+        c.includes('individual')
+    ) {
+        return {
+            icon: 'person',
+            bgClass: 'bg-indigo-500/10',
+            textClass: 'text-indigo-600 dark:text-indigo-400',
+        };
+    }
+
     return {
         icon: 'receipt_long',
         bgClass: 'bg-primary/10',
         textClass: 'text-primary',
     };
+}
+
+export function formatCurrency(amount: number): string {
+    const safe = Number(amount) || 0;
+    return `₹${safe.toLocaleString('en-IN')}`;
 }

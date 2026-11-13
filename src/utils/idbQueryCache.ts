@@ -1,4 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
+import { queryKeys } from '../api/queries';
 import { getOfflineQueue } from './offlineQueue';
 import {
     applySplitAddToCaches,
@@ -240,6 +241,7 @@ export function rehydratePendingOfflineData(queryClient: QueryClient): void {
                 const splitId = p.splitId || it.splitId || it.id;
                 applySplitAddToCaches(queryClient, {
                     splitId,
+                    groupId: p.groupId ?? null,
                     description: p.description,
                     category: p.category,
                     totalAmount: p.amount,
@@ -258,7 +260,7 @@ export function rehydratePendingOfflineData(queryClient: QueryClient): void {
                 if (!p.recordExpense || !p.paidBy) continue;
 
                 const splitId = p.splitId || it.splitId || it.id;
-                const spendingsKey = ['spendings', p.paidBy];
+                const spendingsKey = queryKeys.spendings(p.paidBy, p.groupId);
                 const prevSpendings = queryClient.getQueryData<SpendingsData>(spendingsKey);
                 if (!prevSpendings) continue;
 
@@ -299,7 +301,7 @@ export function rehydratePendingOfflineData(queryClient: QueryClient): void {
         const pendingExpenseItems = queue.filter((it) => it.type === 'ADD_EXPENSE');
         for (const it of pendingExpenseItems) {
             const p = it.payload as AddExpensePayload;
-            const spendingsKey = ['spendings', p.payee];
+            const spendingsKey = queryKeys.spendings(p.payee, p.groupId);
             const prevSpendings = queryClient.getQueryData<SpendingsData>(spendingsKey);
             if (prevSpendings) {
                 const expTimestamp = p.timestamp || new Date(it.timestamp).toISOString();
@@ -351,8 +353,12 @@ export function rehydratePendingOfflineData(queryClient: QueryClient): void {
         const pendingUpdateItems = queue.filter((it) => it.type === 'UPDATE_SPLIT');
         for (const it of pendingUpdateItems) {
             const p = it.payload as UpdateSplitPayload;
-            applySplitTransformToCaches(queryClient, p.splitId, (s) =>
-                withUpdatedSplitFields(s, p)
+            applySplitTransformToCaches(
+                queryClient,
+                p.splitId,
+                (s) => withUpdatedSplitFields(s, p),
+                undefined,
+                p.groupId
             );
         }
 
@@ -360,35 +366,46 @@ export function rehydratePendingOfflineData(queryClient: QueryClient): void {
         const pendingContribItems = queue.filter((it) => it.type === 'ADD_CONTRIBUTION');
         for (const it of pendingContribItems) {
             const p = it.payload as AddContributionPayload;
-            applySplitTransformToCaches(queryClient, p.splitId, (s) => {
-                const alreadyExists = (s.contributions || []).some(
-                    (c) => c.person === p.person && c.amount === p.amount
-                );
-                if (alreadyExists) return s;
-                return {
-                    ...s,
-                    contributions: [...(s.contributions || []), { person: p.person, amount: p.amount }],
-                };
-            });
+            applySplitTransformToCaches(
+                queryClient,
+                p.splitId,
+                (s) => {
+                    const alreadyExists = (s.contributions || []).some(
+                        (c) => c.person === p.person && c.amount === p.amount
+                    );
+                    if (alreadyExists) return s;
+                    return {
+                        ...s,
+                        contributions: [...(s.contributions || []), { person: p.person, amount: p.amount }],
+                    };
+                },
+                undefined,
+                p.groupId
+            );
         }
 
         // 5. Rehydrate SETTLE_PARTICIPANT items
         const pendingSettleItems = queue.filter((it) => it.type === 'SETTLE_PARTICIPANT');
         for (const it of pendingSettleItems) {
             const p = it.payload as SettleParticipantPayload;
-            applySplitTransformToCaches(queryClient, p.splitId, (s) =>
-                withSettlementStatus(s, p.from, p.to, p.settled !== false)
+            applySplitTransformToCaches(
+                queryClient,
+                p.splitId,
+                (s) => withSettlementStatus(s, p.from, p.to, p.settled !== false),
+                undefined,
+                p.groupId
             );
         }
 
         // 6. Rehydrate DELETE_SPLIT items (filter out deleted splits & any linked split spend row)
         const pendingDeleteItems = queue.filter((it) => it.type === 'DELETE_SPLIT');
         for (const it of pendingDeleteItems) {
-            const p = it.payload as { splitId: string };
-            applySplitRemoveToCaches(queryClient, p.splitId);
+            const p = it.payload as { splitId: string; groupId?: string | null };
+            applySplitRemoveToCaches(queryClient, p.splitId, p.groupId);
 
             const splitTag = `(split: ${p.splitId})`.toLowerCase();
-            queryClient.setQueriesData<SpendingsData>({ queryKey: ['spendings'] }, (old) => {
+            const scopeFilter = p.groupId ? (['spendings', p.groupId] as const) : (['spendings'] as const);
+            queryClient.setQueriesData<SpendingsData>({ queryKey: scopeFilter }, (old) => {
                 if (!old) return old;
                 const matchedRow = (old.allExpenses || old.recentExpenses || []).find((e) =>
                     e.description?.toLowerCase().includes(splitTag)
@@ -538,7 +555,8 @@ export async function setupQueryCachePersistence(
                     !keyStr.includes('"health"') &&
                     !keyStr.includes('"admin"') &&
                     !keyStr.includes('"notifications"') &&
-                    !keyStr.includes('"device"')
+                    !keyStr.includes('"device"') &&
+                    !keyStr.includes('"auth"')
                 ) {
                     persistQueryToIdb(keyStr, query.state.data);
                 }

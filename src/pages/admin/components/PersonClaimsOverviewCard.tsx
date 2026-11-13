@@ -155,9 +155,21 @@ export const PersonClaimsOverviewCard: React.FC<PersonClaimsOverviewCardProps> =
                                                                     THIS DEVICE
                                                                 </span>
                                                             )}
-                                                            {dev.status === 'BLOCKED' && (
+                                                            {dev.status === 'BLOCKED' ? (
                                                                 <span className="px-1.5 py-0.5 rounded-full bg-error-container text-negative text-[9px] font-bold">
                                                                     BLOCKED
+                                                                </span>
+                                                            ) : dev.status === 'ACTIVE' ? (
+                                                                <span className="px-1.5 py-0.5 rounded-full bg-status-settled-bg text-status-settled-text text-[9px] font-bold">
+                                                                    ACTIVE
+                                                                </span>
+                                                            ) : dev.status === 'IDLE' ? (
+                                                                <span className="px-1.5 py-0.5 rounded-full bg-status-pending-bg text-status-pending-text text-[9px] font-bold">
+                                                                    IDLE
+                                                                </span>
+                                                            ) : (
+                                                                <span className="px-1.5 py-0.5 rounded-full bg-surface-card-subtle text-on-surface-variant border border-border-subtle text-[9px] font-bold">
+                                                                    DORMANT
                                                                 </span>
                                                             )}
                                                         </div>

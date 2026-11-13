@@ -14,34 +14,502 @@ import { DEFAULT_CATEGORIES } from '../../config';
 const QUICK_INCREMENTS = [50, 100, 200, 500];
 
 const CATEGORY_KEYWORDS: Record<string, string[]> = {
-    Food: ['food', 'lunch', 'dinner', 'breakfast', 'brunch', 'cafe', 'coffee', 'chai', 'tea', 'pizza', 'burger', 'restaurant', 'biryani', 'snack', 'snacks', 'sweets', 'bakery', 'meal', 'maggi', 'momo', 'momos', 'roti', 'thali', 'paneer', 'dosa'],
-    Drinks: ['beer', 'wine', 'alcohol', 'drinks', 'water', 'bottle', 'beverage', 'bar', 'cocktail', 'whiskey', 'vodka', 'rum', 'soda', 'coke', 'juice'],
-    Travel: ['cab', 'uber', 'ola', 'taxi', 'auto', 'fuel', 'petrol', 'diesel', 'toll', 'parking', 'flight', 'train', 'bus', 'metro', 'fare', 'rapido'],
-    Stay: ['hotel', 'resort', 'room', 'airbnb', 'stay', 'hostel', 'lodge', 'camp', 'tent', 'cottage'],
-    Activities: ['ticket', 'paragliding', 'rafting', 'trek', 'skiing', 'ski', 'entry', 'safari', 'pass', 'rental', 'bike', 'scooter', 'cable car', 'ropeway', 'boating'],
-    Shopping: ['shopping', 'market', 'mall', 'souvenir', 'clothes', 'groceries', 'mart', 'store'],
+    'Food & Dining': [
+        'street food',
+        'food & dining',
+        'restaurant',
+        'restaurants',
+        'dining',
+        'dhaba',
+        'dhabas',
+        'cafe',
+        'cafes',
+        'breakfast',
+        'brunch',
+        'lunch',
+        'dinner',
+        'supper',
+        'meal',
+        'meals',
+        'momos',
+        'momo',
+        'maggi',
+        'paratha',
+        'parathas',
+        'biryani',
+        'thali',
+        'roti',
+        'naan',
+        'paneer',
+        'dosa',
+        'idli',
+        'poha',
+        'chole',
+        'pav bhaji',
+        'vada pav',
+        'chaat',
+        'samosa',
+        'pizza',
+        'burger',
+        'pasta',
+        'sandwich',
+        'shawarma',
+        'noodles',
+        'fried rice',
+        'curry',
+        'buffet',
+        'bakery',
+        'canteen',
+        'tiffin',
+        'food',
+    ],
+    'Beverages & Snacks': [
+        'water bottle',
+        'water bottles',
+        'soft drink',
+        'soft drinks',
+        'cold drink',
+        'cold drinks',
+        'energy drink',
+        'beverages & snacks',
+        'beverage',
+        'beverages',
+        'refreshment',
+        'refreshments',
+        'drinks',
+        'drink',
+        'water',
+        'bottle',
+        'bottles',
+        'tea',
+        'chai',
+        'coffee',
+        'latte',
+        'cappuccino',
+        'espresso',
+        'juice',
+        'soda',
+        'coke',
+        'pepsi',
+        'sprite',
+        'lassi',
+        'milkshake',
+        'smoothie',
+        'chips',
+        'biscuit',
+        'biscuits',
+        'cookies',
+        'namkeen',
+        'snack',
+        'snacks',
+        'beer',
+        'wine',
+        'alcohol',
+        'cocktail',
+        'whiskey',
+        'vodka',
+        'rum',
+        'bar',
+    ],
+    Accommodation: [
+        'early check-in',
+        'early checkin',
+        'room upgrade',
+        'room upgrades',
+        'guest house',
+        'night stay',
+        'accommodation',
+        'lodging',
+        'homestay',
+        'homestays',
+        'check-in',
+        'checkin',
+        'checkout',
+        'hotel',
+        'hotels',
+        'hostel',
+        'hostels',
+        'resort',
+        'resorts',
+        'airbnb',
+        'zostel',
+        'oyo',
+        'lodge',
+        'guesthouse',
+        'cottage',
+        'villa',
+        'camp',
+        'camping',
+        'tent',
+        'dorm',
+        'dormitory',
+        'room',
+        'stay',
+    ],
+    Transportation: [
+        'bus ticket',
+        'bus tickets',
+        'train ticket',
+        'train tickets',
+        'flight ticket',
+        'flight tickets',
+        'local cab',
+        'local cabs',
+        'bike rental',
+        'bike rentals',
+        'scooter rental',
+        'scooty rental',
+        'car rental',
+        'e-rickshaw',
+        'transportation',
+        'transport',
+        'commute',
+        'bus',
+        'taxi',
+        'taxis',
+        'cab',
+        'cabs',
+        'uber',
+        'ola',
+        'rapido',
+        'auto',
+        'rickshaw',
+        'rental',
+        'rentals',
+        'parking',
+        'toll',
+        'tolls',
+        'fastag',
+        'flight',
+        'train',
+        'metro',
+        'ferry',
+        'shuttle',
+        'fare',
+        'transfer',
+        'pickup',
+        'drop',
+        'volvo',
+        'travel',
+    ],
+    Fuel: [
+        'ev charging',
+        'charging station',
+        'petrol pump',
+        'fuel pump',
+        'full tank',
+        'tank full',
+        'fuel',
+        'petrol',
+        'diesel',
+        'cng',
+        'gasoline',
+        'refuel',
+        'ev',
+    ],
+    'Activities & Adventure': [
+        'sightseeing entry fee',
+        'sightseeing entry fees',
+        'activities & adventure',
+        'snow activities',
+        'snow activity',
+        'river rafting',
+        'entry fee',
+        'entry fees',
+        'cable car',
+        'zip line',
+        'park entry',
+        'horse riding',
+        'yak ride',
+        'paragliding',
+        'sightseeing',
+        'adventure',
+        'activities',
+        'activity',
+        'tourism',
+        'skiing',
+        'ski',
+        'rafting',
+        'ropeway',
+        'gondola',
+        'snow',
+        'trek',
+        'trekking',
+        'safari',
+        'boating',
+        'kayaking',
+        'zipline',
+        'bungee',
+        'scuba',
+        'snorkeling',
+        'museum',
+        'monument',
+        'fort',
+        'ticket',
+    ],
+    Shopping: [
+        'local product',
+        'local products',
+        'handicraft',
+        'handicrafts',
+        'souvenir',
+        'souvenirs',
+        'shopping',
+        'clothes',
+        'clothing',
+        'gifts',
+        'gift',
+        'jacket',
+        'sweater',
+        'hoodie',
+        'shawl',
+        'gloves',
+        'shoes',
+        't-shirt',
+        'tshirt',
+        'jeans',
+        'merchandise',
+        'emporium',
+        'bazaar',
+        'market',
+        'mall',
+        'keychain',
+        'keepsake',
+        'backpack',
+    ],
+    'Groceries & Supplies': [
+        'groceries & supplies',
+        'disposable items',
+        'disposable item',
+        'snacks in bulk',
+        'packaged food',
+        'bulk snacks',
+        'paper plates',
+        'paper cups',
+        'wet wipes',
+        'first aid',
+        'groceries',
+        'grocery',
+        'supplies',
+        'toiletries',
+        'toiletry',
+        'tissue',
+        'tissues',
+        'medicines',
+        'medicine',
+        'disposable',
+        'disposables',
+        'napkin',
+        'napkins',
+        'wipes',
+        'sanitizer',
+        'sunscreen',
+        'soap',
+        'shampoo',
+        'toothpaste',
+        'toothbrush',
+        'pharmacy',
+        'chemist',
+        'supermarket',
+        'kirana',
+        'mart',
+        'bulk',
+        'milk',
+        'bread',
+        'eggs',
+        'fruits',
+    ],
+    Entertainment: [
+        'recreational events',
+        'recreational event',
+        'movie ticket',
+        'movie tickets',
+        'club entry',
+        'entertainment',
+        'recreational',
+        'recreation',
+        'nightclub',
+        'movie',
+        'movies',
+        'cinema',
+        'theatre',
+        'theater',
+        'pvr',
+        'inox',
+        'club',
+        'disco',
+        'dj',
+        'party',
+        'games',
+        'game',
+        'gaming',
+        'bowling',
+        'arcade',
+        'billiards',
+        'snooker',
+        'concert',
+        'comedy',
+        'standup',
+        'karaoke',
+        'event',
+        'events',
+        'music',
+        'show',
+    ],
+    Personal: [
+        'personal medicines',
+        'personal medicine',
+        'individual purchases',
+        'individual purchase',
+        'personal services',
+        'personal service',
+        'dry cleaning',
+        'dry clean',
+        'sim card',
+        'personal',
+        'individual',
+        'laundry',
+        'ironing',
+        'haircut',
+        'salon',
+        'barber',
+        'spa',
+        'massage',
+        'grooming',
+        'tailor',
+        'recharge',
+    ],
+    Miscellaneous: [
+        'unclassified small fees',
+        'unclassified small fee',
+        'unexpected charges',
+        'unexpected charge',
+        'incidental expenses',
+        'incidental expense',
+        'convenience fee',
+        'processing fee',
+        'service charge',
+        'miscellaneous',
+        'unclassified',
+        'incidental',
+        'incidentals',
+        'unexpected',
+        'small fees',
+        'small fee',
+        'late fee',
+        'bank fee',
+        'atm fee',
+        'penalty',
+        'porter',
+        'coolie',
+        'charge',
+        'charges',
+        'misc',
+        'fees',
+        'fee',
+        'tip',
+        'tips',
+        'fine',
+        'atm',
+    ],
 };
+
+const CATEGORY_PRIORITY_ORDER = [
+    'Personal',
+    'Fuel',
+    'Groceries & Supplies',
+    'Beverages & Snacks',
+    'Food & Dining',
+    'Accommodation',
+    'Transportation',
+    'Entertainment',
+    'Activities & Adventure',
+    'Shopping',
+    'Miscellaneous',
+];
+
+const CATEGORY_LEGACY_ALIASES: Record<string, string[]> = {
+    'Food & Dining': ['food', 'dining'],
+    'Beverages & Snacks': ['drinks', 'beverages', 'snacks', 'food'],
+    Accommodation: ['stay', 'hotel'],
+    Transportation: ['travel', 'transport'],
+    Fuel: ['fuel', 'travel'],
+    'Activities & Adventure': ['activities', 'activity', 'adventure'],
+    Shopping: ['shopping'],
+    'Groceries & Supplies': ['groceries', 'supplies', 'shopping'],
+    Entertainment: ['entertainment', 'activities'],
+    Personal: ['personal', 'misc'],
+    Miscellaneous: ['misc', 'miscellaneous', 'general', 'other'],
+};
+
+function matchesKeyword(lowerDesc: string, keyword: string): boolean {
+    const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(?:^|[^a-z0-9])${escaped}(?:$|[^a-z0-9])`, 'i');
+    return regex.test(lowerDesc);
+}
+
+function resolveAvailableCategory(catName: string, availableCategories: string[]): string | null {
+    const targetLower = catName.toLowerCase();
+    const exact = availableCategories.find((c) => c.toLowerCase() === targetLower);
+    if (exact) return exact;
+
+    const partial = availableCategories.find(
+        (c) => c.toLowerCase().includes(targetLower) || targetLower.includes(c.toLowerCase())
+    );
+    if (partial) return partial;
+
+    const aliases = CATEGORY_LEGACY_ALIASES[catName] || [];
+    for (const alias of aliases) {
+        const aliasMatch = availableCategories.find(
+            (c) =>
+                c.toLowerCase() === alias ||
+                c.toLowerCase().includes(alias) ||
+                alias.includes(c.toLowerCase())
+        );
+        if (aliasMatch) return aliasMatch;
+    }
+
+    return null;
+}
 
 function detectCategory(description: string, availableCategories: string[]): string | null {
     if (!description.trim() || availableCategories.length === 0) return null;
     const lower = description.toLowerCase();
-    for (const [catName, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
-        const matchedKeyword = keywords.find((kw) => lower.includes(kw));
-        if (matchedKeyword) {
-            const matchedCat = availableCategories.find(
-                (c) =>
-                    c.toLowerCase() === catName.toLowerCase() ||
-                    c.toLowerCase().includes(catName.toLowerCase()) ||
-                    catName.toLowerCase().includes(c.toLowerCase())
-            );
-            if (matchedCat) return matchedCat;
+
+    let bestMatch: { catName: string; specificity: number; priority: number } | null = null;
+
+    for (const catName of CATEGORY_PRIORITY_ORDER) {
+        const keywords = CATEGORY_KEYWORDS[catName] || [];
+        const priority = CATEGORY_PRIORITY_ORDER.indexOf(catName);
+
+        for (const kw of keywords) {
+            if (matchesKeyword(lower, kw)) {
+                const specificity = kw.length + (kw.includes(' ') ? 10 : 0);
+                if (
+                    !bestMatch ||
+                    specificity > bestMatch.specificity ||
+                    (specificity === bestMatch.specificity && priority < bestMatch.priority)
+                ) {
+                    bestMatch = { catName, specificity, priority };
+                }
+            }
         }
     }
-    return null;
+
+    if (!bestMatch) return null;
+    return resolveAvailableCategory(bestMatch.catName, availableCategories);
 }
 
 export function AddPage() {
-    const { activePerson, setActiveTab, showToast } = useExpense();
+    const {
+        activePerson,
+        activeGroup,
+        isFormerActiveGroup,
+        isRoomArchived,
+        isRoomClosed,
+        setActiveTab,
+        showToast,
+    } = useExpense();
     const [mode, setMode] = useState<'expense' | 'split'>('split');
 
     const { data: rawCategories = [] } = useCategories();
@@ -76,12 +544,32 @@ export function AddPage() {
     const addExpenseMutation = useAddExpenseMutation();
     const addSplitMutation = useAddSplitMutation();
 
-    // Derived defaults when not explicitly selected
-    const activeExpenseCategory = expenseCategory || categories[0] || 'Food';
-    const activeSplitCategory = splitCategory || categories[0] || 'Food';
-    const activeSplitPaidBy = splitPaidBy || activePerson;
-    const activeParticipants = selectedParticipants.length > 0 ? selectedParticipants : people;
-    const activeContributionPerson = contributionPerson || people[0] || '';
+    // Derived defaults when not explicitly selected (or when active room changes)
+    const defaultCategory =
+        categories.find((c) => c.toLowerCase() === 'food & dining') ||
+        categories[0] ||
+        'Food & Dining';
+    const activeExpenseCategory = expenseCategory || defaultCategory;
+    const activeSplitCategory = splitCategory || defaultCategory;
+    const activeExpensePayee =
+        people.length === 0 || people.includes(expensePayee)
+            ? expensePayee || activePerson
+            : people.includes(activePerson)
+              ? activePerson
+              : people[0] || activePerson;
+    const activeSplitPaidBy =
+        people.length === 0 || people.includes(splitPaidBy)
+            ? splitPaidBy || activePerson
+            : people.includes(activePerson)
+              ? activePerson
+              : people[0] || activePerson;
+    const validSelectedParticipants = selectedParticipants.filter((p) => people.includes(p));
+    const activeParticipants =
+        validSelectedParticipants.length > 0 ? validSelectedParticipants : people;
+    const activeContributionPerson =
+        contributionPerson && people.includes(contributionPerson)
+            ? contributionPerson
+            : people[0] || '';
 
     const adjustShare = (person: string, delta: number) => {
         triggerHaptic('light');
@@ -168,7 +656,7 @@ export function AddPage() {
 
         try {
             const res = await addExpenseMutation.mutateAsync({
-                payee: expensePayee || activePerson,
+                payee: activeExpensePayee,
                 category: activeExpenseCategory,
                 amount: amt,
                 description: expenseDesc,
@@ -270,16 +758,88 @@ export function AddPage() {
         setMode(newMode);
     };
 
+    if (isFormerActiveGroup || isRoomArchived || isRoomClosed) {
+        const title = isFormerActiveGroup
+            ? 'Former Membership (Read-Only)'
+            : isRoomClosed
+              ? 'Room is Closed (Read-Only)'
+              : 'Room is Archived';
+
+        const description = isFormerActiveGroup
+            ? `You are viewing historical records for ${activeGroup?.name || 'this room'}. New expenses cannot be added.`
+            : isRoomClosed
+              ? `"${activeGroup?.name || 'This room'}" has been permanently closed. All debts are settled and records are frozen.`
+              : `"${activeGroup?.name || 'This room'}" is currently archived. New expenses are disabled, but you can still settle remaining debts under Splits.`;
+
+        const icon = isRoomArchived ? 'inventory_2' : 'lock';
+
+        return (
+            <div className="flex flex-col w-full pb-12 space-y-4 pt-2">
+                <div className="p-5 rounded-3xl bg-surface-container-lowest border border-outline-variant/30 text-center space-y-3 shadow-xs">
+                    <div
+                        className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto ${
+                            isRoomArchived
+                                ? 'bg-tertiary/15 text-tertiary'
+                                : 'bg-surface-container-high text-on-surface-variant'
+                        }`}
+                    >
+                        <AppIcon name={icon} className="text-[24px]" />
+                    </div>
+                    <div className="space-y-1">
+                        <h2 className="text-base font-bold text-on-surface font-headline">
+                            {title}
+                        </h2>
+                        <p className="text-xs text-on-surface-variant max-w-xs mx-auto leading-relaxed">
+                            {description}
+                        </p>
+                    </div>
+                    <div className="flex items-center justify-center gap-2 pt-1">
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab('splits')}
+                            className="h-10 px-4 rounded-xl bg-primary text-on-primary text-xs font-bold cursor-pointer"
+                        >
+                            View Splits
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab('groups')}
+                            className="h-10 px-4 rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant/30 text-xs font-semibold text-on-surface cursor-pointer"
+                        >
+                            Room Settings
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="flex flex-col w-full pb-12 space-y-4">
             {/* Header */}
-            <div className="pt-1">
-                <h1 className="text-2xl font-bold text-on-surface tracking-tight font-headline">
-                    Add New Record
-                </h1>
-                <p className="text-xs text-on-surface-variant mt-0.5">
-                    Record a general trip expense or split a group bill
-                </p>
+            <div className="pt-1 flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                    <h1 className="text-2xl font-bold text-on-surface tracking-tight font-headline">
+                        Add New Record
+                    </h1>
+                    <p className="text-xs text-on-surface-variant mt-0.5">
+                        Record an expense or split mapped to this room
+                    </p>
+                </div>
+                {activeGroup && (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            triggerHaptic('light');
+                            setActiveTab('groups');
+                        }}
+                        className="mt-0.5 h-7 px-2.5 rounded-full bg-primary/10 hover:bg-primary/15 border border-primary/25 text-primary text-[11px] font-bold flex items-center gap-1 cursor-pointer shrink-0 max-w-[140px]"
+                        title={`Mapped to ${activeGroup.name} • Tap to switch room`}
+                    >
+                        <AppIcon name={activeGroup.icon || 'groups'} className="text-[13px] shrink-0" />
+                        <span className="truncate">{activeGroup.name}</span>
+                    </button>
+                )}
             </div>
 
             {/* Mode Switcher Toggle */}
@@ -374,7 +934,7 @@ export function AddPage() {
                             type="text"
                             value={splitDesc}
                             onChange={handleSplitDescChange}
-                            placeholder="e.g. Brunch at Mall Road, Paragliding, Cab"
+                            placeholder="e.g. Lunch at Dhaba, Paragliding, Local Cab"
                             className="w-full h-11 px-3 rounded-xl bg-surface-container-low text-sm text-on-surface focus:outline-none border border-outline-variant/20"
                             required
                         />
@@ -454,14 +1014,14 @@ export function AddPage() {
                                         try {
                                             await apiFetch('/people?refresh=true');
                                             await refetchPeople();
-                                            showToast('Refreshed member list from Sheet!', 'sync');
+                                            showToast('Refreshed member list!', 'sync');
                                         } catch {
                                             showToast('Failed to refresh members', 'error');
                                         }
                                     }}
                                     disabled={isPeopleFetching}
                                     className="h-7 w-7 sm:w-auto sm:px-2 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors cursor-pointer flex items-center justify-center sm:justify-start gap-1 text-[11px] font-semibold border border-outline-variant/20 shadow-2xs whitespace-nowrap shrink-0"
-                                    title="Reload members from Google Sheet"
+                                    title="Reload members from server"
                                     aria-label="Reload members"
                                 >
                                     <AppIcon
@@ -638,7 +1198,7 @@ export function AddPage() {
                         {hasContribution && (
                             <div className="grid grid-cols-2 gap-2 pt-2 border-t border-outline-variant/20">
                                 <select
-                                    value={contributionPerson}
+                                    value={activeContributionPerson}
                                     onChange={(e) => setContributionPerson(e.target.value)}
                                     className="h-10 px-2 rounded-xl bg-surface-container-low text-xs font-semibold text-on-surface border border-outline-variant/20"
                                 >
@@ -660,10 +1220,10 @@ export function AddPage() {
                         )}
                     </div>
 
-                    {/* Record Expense in Sheet checkbox */}
+                    {/* Record Expense in room log checkbox */}
                     <div className="p-3 rounded-xl bg-surface-container-low flex items-center justify-between border border-outline-variant/20">
                         <span className="text-xs text-on-surface font-semibold">
-                            Record in October 2026 Expense Sheet
+                            Record in {activeGroup?.name || 'room'} expense log
                         </span>
                         <input
                             type="checkbox"
@@ -751,7 +1311,7 @@ export function AddPage() {
                             type="text"
                             value={expenseDesc}
                             onChange={handleExpenseDescChange}
-                            placeholder="e.g. Water Bottle, Snacks, Entry Ticket"
+                            placeholder="e.g. Water Bottles, Tea & Chips, Petrol"
                             className="w-full h-11 px-3 rounded-xl bg-surface-container-low text-sm text-on-surface focus:outline-none border border-outline-variant/20"
                             required
                         />
@@ -806,7 +1366,7 @@ export function AddPage() {
                                             setExpensePayee(person);
                                         }}
                                         className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer border ${
-                                            (expensePayee || activePerson) === person
+                                            activeExpensePayee === person
                                                 ? 'bg-primary text-on-primary border-primary shadow-2xs'
                                                 : 'bg-surface-container-low text-on-surface border-outline-variant/20 hover:bg-surface-container'
                                         }`}

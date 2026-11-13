@@ -1,5 +1,10 @@
 import { ENV } from '../config';
 import {
+    getActiveGroupId,
+    getUserToken,
+    notifyUserAuthExpired,
+} from '../utils/authStorage';
+import {
     getActiveAdminToken,
     getDeviceIdSync,
     getDevicePlatformLabel,
@@ -14,10 +19,26 @@ const REQUEST_COMPRESSION_THRESHOLD_BYTES = 1024;
 let activeBaseUrl = BASE_URL;
 let isRequestCompressionSupported = typeof CompressionStream !== 'undefined';
 
+function isServerlessOrNetlifyEndpoint(url: string): boolean {
+    const lower = url.toLowerCase();
+    return (
+        lower.includes('.netlify') ||
+        lower.includes('netlify.app') ||
+        lower.includes('/.netlify/functions') ||
+        lower.includes('lambda-url') ||
+        lower.includes('execute-api')
+    );
+}
+
 async function maybeCompressBody(
-    body: BodyInit | null | undefined
+    body: BodyInit | null | undefined,
+    targetUrl?: string
 ): Promise<{ body: BodyInit | null | undefined; compressed: boolean }> {
     if (!isRequestCompressionSupported || typeof body !== 'string') {
+        return { body, compressed: false };
+    }
+    const checkUrl = targetUrl || activeBaseUrl;
+    if (checkUrl && isServerlessOrNetlifyEndpoint(checkUrl)) {
         return { body, compressed: false };
     }
     if (body.length < REQUEST_COMPRESSION_THRESHOLD_BYTES) {
@@ -90,7 +111,9 @@ async function parseErrorResponse(response: Response): Promise<ApiError> {
 
     const err = new ApiError(parsedMessage, response.status, code, person, retryAfterSeconds);
 
-    if (response.status === 401 || response.status === 403) {
+    if (code === 'USER_UNAUTHORIZED') {
+        notifyUserAuthExpired();
+    } else if (response.status === 401 || response.status === 403) {
         notifyAccessError({
             status: response.status,
             code,
@@ -112,6 +135,16 @@ function buildRequestHeaders(customHeaders?: HeadersInit): Record<string, string
     const claimed = getStoredClaimedPerson();
     if (claimed) {
         headers['x-claimed-person'] = claimed;
+    }
+
+    const userToken = getUserToken();
+    if (userToken) {
+        headers['x-user-token'] = `Bearer ${userToken}`;
+    }
+
+    const activeGroupId = getActiveGroupId();
+    if (activeGroupId) {
+        headers['x-group-id'] = activeGroupId;
     }
 
     const adminToken = getActiveAdminToken();
@@ -139,7 +172,7 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
 
     const prepared = hasExplicitEncoding
         ? { body: options.body, compressed: false }
-        : await maybeCompressBody(options.body);
+        : await maybeCompressBody(options.body, url);
 
     const requestHeaders: Record<string, string> = prepared.compressed
         ? { ...defaultHeaders, 'Content-Encoding': 'gzip' }
@@ -156,15 +189,38 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
             signal: options.signal || controller.signal,
         });
 
-        // Graceful fallback if proxy/gateway rejects compressed request body
-        if (prepared.compressed && response.status === 415) {
-            isRequestCompressionSupported = false;
-            response = await fetch(url, {
-                ...options,
-                body: options.body,
-                headers: defaultHeaders,
-                signal: options.signal || controller.signal,
-            });
+        // Graceful fallback if proxy/gateway rejects or fails to handle compressed request body
+        if (prepared.compressed) {
+            let shouldRetryUncompressed =
+                response.status === 415 ||
+                response.status === 502 ||
+                response.status === 500;
+
+            if (!shouldRetryUncompressed && response.status === 400) {
+                try {
+                    const cloned = response.clone();
+                    const errJson = await cloned.json();
+                    if (
+                        errJson?.code === 'UNSUPPORTED_MEDIA_TYPE' ||
+                        errJson?.code === 'INVALID_REQUEST_BODY' ||
+                        errJson?.code === 'PAYLOAD_DECOMPRESSION_FAILED'
+                    ) {
+                        shouldRetryUncompressed = true;
+                    }
+                } catch {
+                    // Ignore clone JSON parse errors
+                }
+            }
+
+            if (shouldRetryUncompressed) {
+                isRequestCompressionSupported = false;
+                response = await fetch(url, {
+                    ...options,
+                    body: options.body,
+                    headers: defaultHeaders,
+                    signal: options.signal || controller.signal,
+                });
+            }
         }
 
         clearTimeout(timeoutId);

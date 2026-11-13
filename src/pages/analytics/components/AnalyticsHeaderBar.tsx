@@ -67,7 +67,7 @@ export const AnalyticsHeaderBar: React.FC<AnalyticsHeaderBarProps> = ({
                     onClick={onRefresh}
                     disabled={isRefreshing}
                     className="w-9 h-9 rounded-xl bg-surface-card hover:bg-surface-card-subtle flex items-center justify-center text-on-surface transition-colors cursor-pointer border border-border-subtle shadow-[0_1px_3px_rgba(15,23,42,0.05)] shrink-0"
-                    title="Refresh analytics from Google Sheets"
+                    title="Refresh analytics from server"
                     aria-label="Refresh analytics"
                 >
                     <AppIcon

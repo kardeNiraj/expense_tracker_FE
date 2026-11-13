@@ -36,6 +36,7 @@ export interface SplitNotifications {
 
 export interface Split {
     splitId: string;
+    groupId?: string | null;
     timestamp?: string;
     description: string;
     category: string;
@@ -92,14 +93,22 @@ export interface TripMetaItem {
 }
 
 export interface TripInfo {
+    groupId?: string | null;
     title: string;
     subtitle?: string;
     icon?: string;
+    inviteCode?: string | null;
+    status?: 'ACTIVE' | 'ARCHIVED' | 'CLOSED';
+    archivedAt?: string | null;
+    closedAt?: string | null;
+    isReadOnly?: boolean;
+    membershipStatus?: 'ACTIVE' | 'FORMER';
 }
 
 // Mutation Payloads
 export interface AddExpensePayload {
     expenseId?: string;
+    groupId?: string | null;
     payee: string;
     category: string;
     amount: number;
@@ -109,6 +118,7 @@ export interface AddExpensePayload {
 
 export interface AddSplitPayload {
     splitId?: string;
+    groupId?: string | null;
     amount: number;
     description: string;
     category: string;
@@ -124,12 +134,14 @@ export interface AddSplitPayload {
 
 export interface AddContributionPayload {
     splitId: string;
+    groupId?: string | null;
     person: string;
     amount: number;
 }
 
 export interface SettleParticipantPayload {
     splitId: string;
+    groupId?: string | null;
     from: string;
     to?: string;
     settled?: boolean;
@@ -139,11 +151,13 @@ export interface SettleParticipantPayload {
 export interface UpdateUpiPayload {
     name: string;
     upiId: string;
+    groupId?: string | null;
     requestedBy?: string;
 }
 
 export interface UpdateSplitPayload {
     splitId: string;
+    groupId?: string | null;
     amount?: number;
     description?: string;
     category?: string;
@@ -157,6 +171,7 @@ export interface UpdateSplitPayload {
 export type AnalyticsRange = 'all' | 'this_month' | 'last_month' | '30d' | '7d';
 
 export interface AnalyticsScope {
+    groupId?: string | null;
     person: string;
     isGroupView: boolean;
     month: string;
@@ -303,7 +318,7 @@ export interface AnalyticsData {
 }
 
 // Device Registry & Strict Admin Types
-export type DeviceStatus = 'ACTIVE' | 'BLOCKED';
+export type DeviceStatus = 'ACTIVE' | 'IDLE' | 'DORMANT' | 'BLOCKED';
 
 export interface DeviceAuditEvent {
     id?: string;
@@ -371,15 +386,36 @@ export interface AdminDeviceRecord {
     platform: string;
     userAgent?: string;
     pendingPerson: string | null;
+    pendingGroupId?: string | null;
+    pendingGroupName?: string | null;
     firstSeenAt: string | null;
     lastSeenAt: string | null;
     claimCount: number;
     auditHistory?: DeviceAuditEvent[];
 }
 
+export interface AdminRoomSummary {
+    groupId: string;
+    name: string;
+    subtitle?: string;
+    icon?: string;
+    status: 'ACTIVE' | 'ARCHIVED' | 'CLOSED';
+    createdByName: string;
+    createdByUserId?: string | null;
+    memberCount: number;
+    claimedMemberCount: number;
+    unclaimedMemberCount: number;
+    totalSpend: number;
+    activeSplitsCount: number;
+    pendingSettlementsAmount: number;
+    createdAt: string;
+}
+
 export interface AdminDashboardSummary {
     totalDevices: number;
     activeDevices: number;
+    idleDevices?: number;
+    dormantDevices?: number;
     blockedDevices: number;
     claimedDevices: number;
     unclaimedDevices: number;
@@ -387,6 +423,22 @@ export interface AdminDashboardSummary {
     lockedPeopleCount: number;
     multiDevicePeopleCount: number;
     totalPeople: number;
+    totalRooms?: number;
+    activeRooms?: number;
+    archivedRooms?: number;
+    closedRooms?: number;
+    totalUsers?: number;
+    totalPlatformSpend?: number;
+    totalInFlightDebt?: number;
+    scope?: {
+        isGlobal: boolean;
+        groupId: string | null;
+        groupName?: string;
+        roomStatus?: string | null;
+        ownerName?: string | null;
+        memberCount?: number;
+        claimedMemberCount?: number | null;
+    };
 }
 
 export interface AdminRecentEvent extends DeviceAuditEvent {
@@ -398,6 +450,7 @@ export interface AdminRecentEvent extends DeviceAuditEvent {
 export interface AdminDashboardData {
     generatedAt: string;
     summary: AdminDashboardSummary;
+    rooms?: AdminRoomSummary[];
     personLocks: Record<string, boolean>;
     personDeviceStats: AdminPersonStat[];
     pendingApprovals: AdminDeviceRecord[];
@@ -478,5 +531,224 @@ export interface TestPushResponse {
     failed: number;
     message: string;
 }
+
+// Auth & Multi-Room / Group Types
+export type AuthProvider = 'email' | 'google' | 'pin';
+
+export interface AuthUser {
+    userId: string;
+    name: string;
+    email: string | null;
+    authProvider: AuthProvider;
+    avatarUrl?: string | null;
+    upiId?: string | null;
+    defaultGroupId?: string | null;
+    createdAt?: string;
+}
+
+export interface GroupMember {
+    memberId: string;
+    name: string;
+    userId: string | null;
+    role: 'OWNER' | 'MEMBER';
+    upiId?: string | null;
+    joinedAt?: string | null;
+    isClaimed: boolean;
+}
+
+export interface GroupSummary {
+    groupId: string;
+    name: string;
+    subtitle: string;
+    icon: string;
+    inviteCode: string | null;
+    createdByUserId: string;
+    createdByName: string;
+    status: 'ACTIVE' | 'ARCHIVED' | 'CLOSED';
+    memberCount: number;
+    myRole: 'OWNER' | 'MEMBER' | null;
+    myMemberName: string | null;
+    isOwner: boolean;
+    members: GroupMember[];
+    membershipStatus?: 'ACTIVE' | 'FORMER';
+    isReadOnly?: boolean;
+    archivedAt?: string | null;
+    closedAt?: string | null;
+    leftAt?: string | null;
+    leftEpoch?: number | null;
+    leftReason?: 'REMOVED' | 'LEFT' | null;
+    createdAt?: string;
+    updatedAt?: string;
+}
+
+export interface UpdateGroupStatusPayload {
+    groupId: string;
+    status: 'ACTIVE' | 'ARCHIVED' | 'CLOSED' | 'active' | 'archived' | 'closed';
+}
+
+export interface GroupInvitePreview {
+    groupId: string;
+    name: string;
+    subtitle: string;
+    icon: string;
+    inviteCode: string;
+    inviteLabel?: string;
+    expiresAt?: string | null;
+    createdByName: string;
+    memberCount: number;
+    unclaimedMembers: {
+        memberId: string;
+        name: string;
+        upiId?: string | null;
+    }[];
+    members: {
+        memberId: string;
+        name: string;
+        role: 'OWNER' | 'MEMBER';
+        isClaimed: boolean;
+    }[];
+}
+
+export interface GroupInviteToken {
+    inviteId: string;
+    groupId: string;
+    label: string;
+    tokenPreview?: string;
+    isPrimary: boolean;
+    status: 'ACTIVE' | 'REVOKED' | 'EXHAUSTED';
+    useCount: number;
+    maxUses: number | null;
+    expiresAt: string | null;
+    createdByUserId: string;
+    createdAt: string;
+    revokedAt?: string | null;
+}
+
+export interface CreateGroupInvitePayload {
+    groupId: string;
+    label?: string;
+    expiresInHours?: number | null;
+    maxUses?: number | null;
+    setAsPrimary?: boolean;
+}
+
+export interface CreateGroupInviteResponse {
+    invite: GroupInviteToken;
+    token: string;
+    isPrimary: boolean;
+}
+
+export interface RevokeGroupInviteResponse {
+    revoked: boolean;
+    invite: GroupInviteToken;
+    group: GroupSummary;
+}
+
+export interface AuthConfigResponse {
+    googleEnabled: boolean;
+    googleClientId: string | null;
+    methods: AuthProvider[];
+    emailRecoveryEnabled?: boolean;
+    emailDeliveryConfigured?: boolean;
+}
+
+export interface AuthResponse {
+    token: string;
+    expiresAt: number;
+    user: AuthUser;
+    groups: GroupSummary[];
+    formerGroups?: GroupSummary[];
+    isNewUser?: boolean;
+}
+
+export interface AuthMeResponse {
+    user: AuthUser;
+    groups: GroupSummary[];
+    formerGroups?: GroupSummary[];
+}
+
+export interface ForgotPasswordPayload {
+    email: string;
+}
+
+export interface ForgotPasswordResponse {
+    sent: boolean;
+    expiresInMinutes: number;
+    deliveryMode: string;
+    message: string;
+    devRecoveryCode?: string;
+    devResetToken?: string;
+}
+
+export interface ResetPasswordPayload {
+    email?: string;
+    code?: string;
+    token?: string;
+    newPassword: string;
+}
+
+export interface RegisterEmailPayload {
+    name: string;
+    email: string;
+    password: string;
+    upiId?: string;
+}
+
+export interface LoginEmailPayload {
+    email: string;
+    password: string;
+}
+
+export interface GoogleAuthPayload {
+    credential: string;
+}
+
+export interface PinAuthPayload {
+    name: string;
+    pin: string;
+    upiId?: string;
+}
+
+export interface UpdateMePayload {
+    name?: string;
+    upiId?: string | null;
+    defaultGroupId?: string | null;
+}
+
+export interface CreateGroupPayload {
+    name: string;
+    subtitle?: string;
+    icon?: string;
+    initialMembers?: string[];
+}
+
+export interface JoinGroupPayload {
+    inviteCode: string;
+    linkMemberName?: string;
+    displayName?: string;
+    upiId?: string;
+}
+
+export interface JoinGroupResponse {
+    group: GroupSummary;
+    alreadyMember: boolean;
+    joinedAs: string;
+}
+
+export interface UpdateGroupPayload {
+    groupId: string;
+    name?: string;
+    subtitle?: string;
+    icon?: string;
+    regenerateInvite?: boolean;
+    regenerateInviteCode?: boolean;
+}
+
+export interface AddGroupMemberPayload {
+    groupId: string;
+    name: string;
+    upiId?: string;
+}
+
 
 

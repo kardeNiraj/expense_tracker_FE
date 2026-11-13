@@ -17,6 +17,7 @@ import {
     ClaimIdentitySkeleton,
     AnalyticsSkeleton,
     AdminSkeleton,
+    AppIcon,
 } from './components';
 import { apiFetch, queryKeys } from './api';
 import Dashboard from './pages/home/index.tsx';
@@ -24,6 +25,7 @@ import { ENV } from './config';
 import { setupQueryCachePersistence } from './utils/idbQueryCache';
 import { processOfflineQueue } from './utils/offlineQueue';
 import { syncPersistentDeviceId } from './utils/deviceIdentity';
+import { getActiveGroupId, getUserToken } from './utils/authStorage';
 import {
     resetPushSyncSession,
     syncExistingPushSubscription,
@@ -32,7 +34,8 @@ import {
 const SplitsPage = lazy(() => import('./pages/splits/index.tsx'));
 const AddPage = lazy(() => import('./pages/add/index.tsx'));
 const PeoplePage = lazy(() => import('./pages/people/index.tsx'));
-const ClaimIdentityScreen = lazy(() => import('./pages/claim/ClaimIdentityScreen.tsx'));
+const GroupsPage = lazy(() => import('./pages/groups/GroupsPage.tsx'));
+const OnboardingScreen = lazy(() => import('./pages/onboarding/OnboardingScreen.tsx'));
 const DeviceBlockedScreen = lazy(() => import('./pages/claim/DeviceBlockedScreen.tsx'));
 const AnalyticsPage = lazy(() => import('./pages/analytics/index.tsx'));
 const AdminPage = lazy(() => import('./pages/admin/index.tsx'));
@@ -61,10 +64,17 @@ function MainApp() {
         setActiveTab,
         setFocusedSplitId,
         claimedPerson,
-        isDeviceClaimed,
         isDeviceBlocked,
         isSwitcherUnlocked,
+        isAuthenticated,
+        isAuthLoading,
+        groups,
+        activeGroup,
+        isFormerActiveGroup,
+        pendingInviteCode,
+        setActiveGroupId,
         refreshDeviceStatus,
+        refreshAuthAndGroups,
         showToast,
     } = useExpense();
     const queryClient = useQueryClient();
@@ -85,34 +95,36 @@ function MainApp() {
 
             if (!msg?.type) return;
 
+            if (msg.type === 'NAVIGATE_TO' && msg.url) {
+                try {
+                    const parsed = new URL(msg.url, window.location.origin);
+                    const urlGroupId = parsed.searchParams.get('groupId');
+                    if (urlGroupId) {
+                        setActiveGroupId(urlGroupId);
+                    }
+                    setActiveTab(getTabFromPathname(parsed.pathname));
+                    const urlSplitId = parsed.searchParams.get('splitId');
+                    const targetSplitId = msg.splitId || urlSplitId || null;
+                    if (targetSplitId) {
+                        setFocusedSplitId(targetSplitId);
+                    }
+                } catch {
+                    if (msg.splitId) {
+                        setActiveTab('splits');
+                        setFocusedSplitId(msg.splitId);
+                    }
+                }
+            } else if (msg.type === 'NAVIGATE_TO' && msg.splitId) {
+                setActiveTab('splits');
+                setFocusedSplitId(msg.splitId);
+            }
+
             if (msg.type === 'PUSH_RECEIVED' || msg.type === 'NAVIGATE_TO') {
                 void queryClient.invalidateQueries({ queryKey: ['splits'] });
                 void queryClient.invalidateQueries({ queryKey: ['spendings'] });
                 void queryClient.invalidateQueries({ queryKey: ['analytics'] });
                 void queryClient.invalidateQueries({ queryKey: ['admin'] });
                 void queryClient.invalidateQueries({ queryKey: ['device', 'me'] });
-            }
-
-            if (msg.type === 'NAVIGATE_TO') {
-                if (msg.url) {
-                    try {
-                        const parsed = new URL(msg.url, window.location.origin);
-                        setActiveTab(getTabFromPathname(parsed.pathname));
-                        const urlSplitId = parsed.searchParams.get('splitId');
-                        const targetSplitId = msg.splitId || urlSplitId || null;
-                        if (targetSplitId) {
-                            setFocusedSplitId(targetSplitId);
-                        }
-                    } catch {
-                        if (msg.splitId) {
-                            setActiveTab('splits');
-                            setFocusedSplitId(msg.splitId);
-                        }
-                    }
-                } else if (msg.splitId) {
-                    setActiveTab('splits');
-                    setFocusedSplitId(msg.splitId);
-                }
             }
 
             if (msg.type === 'PUSH_SUBSCRIPTION_CHANGED') {
@@ -129,7 +141,7 @@ function MainApp() {
         return () => {
             navigator.serviceWorker.removeEventListener('message', handleSwMessage);
         };
-    }, [claimedPerson, queryClient, setActiveTab, setFocusedSplitId]);
+    }, [claimedPerson, queryClient, setActiveGroupId, setActiveTab, setFocusedSplitId]);
 
     const handleGlobalRefresh = async () => {
         try {
@@ -138,18 +150,25 @@ function MainApp() {
                 navigator.serviceWorker.ready.then((reg) => reg.update()).catch(() => {});
             }
 
-            await Promise.allSettled([
+            const refreshPromises: Promise<unknown>[] = [
+                refreshAuthAndGroups(),
                 refreshDeviceStatus(),
-                apiFetch('/people?refresh=true'),
-                apiFetch('/categories?refresh=true'),
-                apiFetch('/trip-info?refresh=true'),
-                apiFetch('/people/details?refresh=true'),
-            ]);
+            ];
+            if (getActiveGroupId() || isSwitcherUnlocked) {
+                refreshPromises.push(
+                    apiFetch('/people?refresh=true'),
+                    apiFetch('/categories?refresh=true'),
+                    apiFetch('/trip-info?refresh=true'),
+                    apiFetch('/people/details?refresh=true')
+                );
+            }
+
+            await Promise.allSettled(refreshPromises);
             // Also flush any pending queued operations in the background
             processOfflineQueue(queryClient).catch(() => {});
             await queryClient.invalidateQueries();
             await queryClient.refetchQueries({ type: 'active' });
-            showToast('Refreshed latest data from Sheet!', 'sync');
+            showToast('Refreshed latest SplitNest data!', 'sync');
         } catch {
             showToast('Refreshed!', 'sync');
         }
@@ -167,8 +186,8 @@ function MainApp() {
         );
     }
 
-    // Direct /admin visit before claiming still renders strict Admin Sign-In Gate
-    if (!isDeviceClaimed && !isSwitcherUnlocked && activeTab === 'admin') {
+    // Direct /admin visit before auth still renders strict Admin Sign-In Gate
+    if (!isAuthenticated && !isSwitcherUnlocked && activeTab === 'admin') {
         return (
             <div className="min-h-screen w-full bg-surface-canvas text-on-surface flex flex-col relative font-sans">
                 <PwaUpdatePrompt />
@@ -182,8 +201,24 @@ function MainApp() {
         );
     }
 
-    // Show device claim & identity selection screen on first load / unclaimed device
-    if (!isDeviceClaimed && !isSwitcherUnlocked) {
+    if (isAuthLoading && !isAuthenticated && !isSwitcherUnlocked) {
+        return (
+            <div className="min-h-screen w-full bg-surface text-on-surface flex flex-col relative font-sans">
+                <PwaUpdatePrompt />
+                <ClaimIdentitySkeleton />
+                <Toast />
+            </div>
+        );
+    }
+
+    // Show onboarding & room setup/join screen when signed out, without any active/selected room, or joining an invited QR room
+    if (
+        (!isAuthenticated && !isSwitcherUnlocked) ||
+        (isAuthenticated &&
+            !isSwitcherUnlocked &&
+            ((groups.length === 0 && !isFormerActiveGroup && activeTab !== 'groups') ||
+                Boolean(pendingInviteCode)))
+    ) {
         return (
             <div className="min-h-screen w-full bg-surface text-on-surface flex flex-col relative font-sans">
                 <PwaUpdatePrompt />
@@ -191,7 +226,7 @@ function MainApp() {
                     <InstallPrompt />
                 </div>
                 <Suspense fallback={<ClaimIdentitySkeleton />}>
-                    <ClaimIdentityScreen />
+                    <OnboardingScreen />
                 </Suspense>
                 <Toast />
             </div>
@@ -208,6 +243,40 @@ function MainApp() {
             <PullToRefresh onRefresh={handleGlobalRefresh}>
                 <main className="flex-1 w-full max-w-md mx-auto px-4 pt-20 pb-24 relative">
                     <InstallPrompt />
+                    {isFormerActiveGroup && activeTab !== 'groups' && (
+                        <div className="mb-3 p-3 rounded-2xl bg-surface-container-low border border-outline-variant/35 flex items-center justify-between gap-2.5 shadow-2xs">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-8 h-8 rounded-xl bg-primary/12 text-primary flex items-center justify-center shrink-0">
+                                    <AppIcon name="schedule" className="text-[18px]" />
+                                </div>
+                                <div className="min-w-0">
+                                    <span className="text-xs font-bold text-on-surface block truncate">
+                                        Read-Only Historical Archive
+                                    </span>
+                                    <span className="text-[10px] text-on-surface-variant block truncate">
+                                        {activeGroup?.leftReason === 'REMOVED'
+                                            ? 'Removed from room'
+                                            : 'Left room'}{' '}
+                                        {activeGroup?.leftAt
+                                            ? `• Snapshot up to ${new Date(
+                                                  activeGroup.leftAt
+                                              ).toLocaleDateString('en-IN', {
+                                                  day: 'numeric',
+                                                  month: 'short',
+                                              })}`
+                                            : ''}
+                                    </span>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('groups')}
+                                className="h-8 px-2.5 rounded-xl bg-primary/12 hover:bg-primary/20 text-primary text-[11px] font-bold shrink-0 cursor-pointer"
+                            >
+                                Rooms
+                            </button>
+                        </div>
+                    )}
                     {activeTab === 'dashboard' && <Dashboard />}
                     {activeTab === 'splits' && (
                         <Suspense fallback={<SplitsSkeleton />}>
@@ -232,6 +301,11 @@ function MainApp() {
                     {activeTab === 'people' && (
                         <Suspense fallback={<PeopleSkeleton />}>
                             <PeoplePage />
+                        </Suspense>
+                    )}
+                    {activeTab === 'groups' && (
+                        <Suspense fallback={<PeopleSkeleton />}>
+                            <GroupsPage />
                         </Suspense>
                     )}
                 </main>
@@ -259,15 +333,16 @@ export function App() {
             if (!mounted || settled) return;
             settled = true;
             setIsCacheReady(true);
-            // Proactively prefetch people details & member list on startup
+            // Proactively prefetch people details & member list on startup when a user room is active
             // so UPI IDs and QR collection are ready offline even before visiting People tab
-            if (typeof navigator !== 'undefined' && navigator.onLine) {
+            const activeGroupId = getActiveGroupId();
+            if (typeof navigator !== 'undefined' && navigator.onLine && getUserToken() && activeGroupId) {
                 queryClient.prefetchQuery({
-                    queryKey: queryKeys.peopleDetails(),
+                    queryKey: queryKeys.peopleDetails(activeGroupId),
                     queryFn: () => apiFetch('/people/details?refresh=false'),
                 });
                 queryClient.prefetchQuery({
-                    queryKey: queryKeys.people(false),
+                    queryKey: queryKeys.people(false, activeGroupId),
                     queryFn: () => apiFetch('/people?refresh=false'),
                 });
             }
@@ -299,6 +374,8 @@ export function App() {
             void import('./pages/add/index.tsx');
             void import('./pages/people/index.tsx');
             void import('./pages/analytics/index.tsx');
+            void import('./pages/groups/GroupsPage.tsx');
+            void import('./pages/onboarding/OnboardingScreen.tsx');
         };
 
         const win = window as Window & {

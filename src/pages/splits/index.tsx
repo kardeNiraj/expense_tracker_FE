@@ -33,7 +33,20 @@ import {
 } from '../../utils/pairwiseNetting';
 
 export function SplitsPage() {
-    const { activePerson, focusedSplitId, setFocusedSplitId, showToast } = useExpense();
+    const {
+        activePerson,
+        activeGroup,
+        isFormerActiveGroup,
+        isRoomArchived,
+        isRoomClosed,
+        focusedSplitId,
+        setFocusedSplitId,
+        setActiveTab,
+        showToast,
+    } = useExpense();
+
+    const canSettle = !isFormerActiveGroup && !isRoomClosed;
+    const canEditSplit = !isFormerActiveGroup && !isRoomArchived && !isRoomClosed;
     const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'SETTLED'>('ALL');
     const [paymentSettlement, setPaymentSettlement] = useState<PaymentSettlementData | null>(null);
     const [collectSettlement, setCollectSettlement] = useState<CollectQrModalData | null>(null);
@@ -459,8 +472,8 @@ export function SplitsPage() {
     return (
         <div className="flex flex-col w-full pb-12 space-y-4">
             {/* Page Header */}
-            <div className="flex items-center justify-between pt-1">
-                <div>
+            <div className="flex items-start justify-between gap-2 pt-1">
+                <div className="min-w-0">
                     <h1 className="text-2xl font-bold text-on-surface tracking-tight font-headline">
                         Money Splitter
                     </h1>
@@ -468,6 +481,20 @@ export function SplitsPage() {
                         Group splits, settlement links, and contributions
                     </p>
                 </div>
+                {activeGroup && (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            triggerHaptic('light');
+                            setActiveTab('groups');
+                        }}
+                        className="mt-0.5 h-7 px-2.5 rounded-full bg-primary/10 hover:bg-primary/15 border border-primary/25 text-primary text-[11px] font-bold flex items-center gap-1 cursor-pointer shrink-0 max-w-[140px]"
+                        title={`Viewing splits in ${activeGroup.name} • Tap to switch room`}
+                    >
+                        <AppIcon name={activeGroup.icon || 'groups'} className="text-[13px] shrink-0" />
+                        <span className="truncate">{activeGroup.name}</span>
+                    </button>
+                )}
             </div>
 
             {/* Filter Toggle: ALL vs ACTIVE vs SETTLED */}
@@ -528,8 +555,8 @@ export function SplitsPage() {
                                 triggerHaptic('medium');
                                 setGroupCollectData({
                                     title: 'Share Collect QRs to WhatsApp',
-                                    subtitle: tripInfo?.title
-                                        ? `${tripInfo.title} • Pay ${activePerson}`
+                                    subtitle: (activeGroup?.name || tripInfo?.title)
+                                        ? `${activeGroup?.name || tripInfo?.title} • Pay ${activePerson}`
                                         : `Pay ${activePerson}`,
                                     debtors: activeReceivableDebtors,
                                 });
@@ -586,19 +613,21 @@ export function SplitsPage() {
                                         </span>
                                     </div>
                                 </div>
-                                <button
-                                    type="button"
-                                    disabled={isClearing}
-                                    onClick={() => void handleClearMutualOffset(pair)}
-                                    className="h-8 px-2.5 rounded-xl bg-primary text-on-primary text-[11px] font-bold flex items-center gap-1 shadow-2xs hover:bg-primary/90 transition-colors cursor-pointer disabled:opacity-50 shrink-0"
-                                    title={`Mark both directions (${pair.allSplits.length} splits) as settled`}
-                                >
-                                    <AppIcon
-                                        name={isClearing ? 'hourglass_top' : 'done_all'}
-                                        className="text-[14px]"
-                                    />
-                                    <span>{isClearing ? 'Clearing...' : 'Clear Splits'}</span>
-                                </button>
+                                {canSettle && (
+                                    <button
+                                        type="button"
+                                        disabled={isClearing}
+                                        onClick={() => void handleClearMutualOffset(pair)}
+                                        className="h-8 px-2.5 rounded-xl bg-primary text-on-primary text-[11px] font-bold flex items-center gap-1 shadow-2xs hover:bg-primary/90 transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+                                        title={`Mark both directions (${pair.allSplits.length} splits) as settled`}
+                                    >
+                                        <AppIcon
+                                            name={isClearing ? 'hourglass_top' : 'done_all'}
+                                            className="text-[14px]"
+                                        />
+                                        <span>{isClearing ? 'Clearing...' : 'Clear Splits'}</span>
+                                    </button>
+                                )}
                             </div>
                         );
                     })}
@@ -772,7 +801,7 @@ export function SplitsPage() {
                                             <span className="text-lg sm:text-xl font-bold text-primary font-mono tracking-tight">
                                                 ₹{split.totalAmount.toLocaleString('en-IN')}
                                             </span>
-                                            {isOwner && (
+                                            {isOwner && canEditSplit && (
                                                 <button
                                                     type="button"
                                                     onClick={(e) => {
@@ -909,7 +938,7 @@ export function SplitsPage() {
                                                 <span className="text-xs font-bold text-on-surface font-headline uppercase tracking-wider">
                                                     Settlements Breakdown
                                                 </span>
-                                                {split.status === 'ACTIVE' && (
+                                                {split.status === 'ACTIVE' && canSettle && (
                                                     <button
                                                         type="button"
                                                         onClick={() => {
@@ -989,7 +1018,7 @@ export function SplitsPage() {
                                                                 })()}
 
                                                             {/* Row 3: Action Buttons (Dedicated Line Below Details) */}
-                                                            {isPending && (
+                                                            {isPending && canSettle && (
                                                                 <>
                                                                     {/* Creditor: Collect via QR, Remind & Confirm */}
                                                                     {isCreditor && (
@@ -1159,24 +1188,41 @@ export function SplitsPage() {
                                         {/* Owner Management: Edit & Delete Split */}
                                         {(() => {
                                             const canDelete =
-                                                isOwner && (split.settlements?.every((s) => s.status === 'PENDING') ?? true);
+                                                isOwner &&
+                                                !isRoomClosed &&
+                                                (split.settlements?.every((s) => s.status === 'PENDING') ?? true);
 
-                                            if (!isOwner) return null;
+                                            if (!isOwner || isFormerActiveGroup) return null;
+                                            if (isRoomClosed) {
+                                                return (
+                                                    <div className="pt-2 border-t border-outline-variant/15 flex items-center justify-between text-[11px] text-on-surface-variant/70 italic">
+                                                        <span className="flex items-center gap-1">
+                                                            <AppIcon name="lock" className="text-[13px]" />
+                                                            <span>Room closed (read-only)</span>
+                                                        </span>
+                                                        <span className="text-[10px] text-on-surface-variant font-mono">
+                                                            By {split.createdBy || split.paidBy}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            }
 
                                             return (
                                                 <div className="pt-2 border-t border-outline-variant/15 flex items-center justify-between">
                                                     <div className="flex items-center gap-2">
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setSplitToEdit(split);
-                                                            }}
-                                                            className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 font-semibold p-1 rounded-lg hover:bg-primary/10 transition-colors cursor-pointer"
-                                                        >
-                                                            <AppIcon name="edit" className="text-[16px]" />
-                                                            <span>Edit Split</span>
-                                                        </button>
+                                                        {canEditSplit && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setSplitToEdit(split);
+                                                                }}
+                                                                className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 font-semibold p-1 rounded-lg hover:bg-primary/10 transition-colors cursor-pointer"
+                                                            >
+                                                                <AppIcon name="edit" className="text-[16px]" />
+                                                                <span>Edit Split</span>
+                                                            </button>
+                                                        )}
                                                         {canDelete ? (
                                                             <button
                                                                 type="button"

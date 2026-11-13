@@ -1,20 +1,28 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import jsQR from 'jsqr';
-import { parseUpiQrPayload, type ParsedUpiQr } from '../../utils/qr';
+import {
+    parseGroupInviteCode,
+    parseUpiQrPayload,
+    type ParsedUpiQr,
+} from '../../utils/qr';
 import { triggerHaptic } from '../../utils/haptics';
 import { AppIcon } from '../Icon/AppIcon';
 
 export interface QrScannerModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onScanUpi: (parsed: ParsedUpiQr) => void;
+    mode?: 'upi' | 'invite';
+    onScanUpi?: (parsed: ParsedUpiQr) => void;
+    onScanInvite?: (inviteCode: string) => void;
     title?: string;
     subtitle?: string;
 }
 
 interface QrScannerContentProps {
     onClose: () => void;
-    onScanUpi: (parsed: ParsedUpiQr) => void;
+    mode: 'upi' | 'invite';
+    onScanUpi?: (parsed: ParsedUpiQr) => void;
+    onScanInvite?: (inviteCode: string) => void;
     title: string;
     subtitle: string;
 }
@@ -107,7 +115,9 @@ async function decodeFileToQrText(file: File): Promise<string | null> {
 
 const QrScannerContent: React.FC<QrScannerContentProps> = ({
     onClose,
+    mode,
     onScanUpi,
+    onScanInvite,
     title,
     subtitle,
 }) => {
@@ -128,7 +138,9 @@ const QrScannerContent: React.FC<QrScannerContentProps> = ({
     const [cameraError, setCameraError] = useState<string | null>(
         hasMediaDevices
             ? null
-            : 'Camera access requires HTTPS or a supported browser. Upload a QR photo or paste a UPI ID below.'
+            : mode === 'invite'
+              ? 'Camera access requires HTTPS or a supported browser. Upload a QR photo or enter the room code below.'
+              : 'Camera access requires HTTPS or a supported browser. Upload a QR photo or paste a UPI ID below.'
     );
     const [scanWarning, setScanWarning] = useState<string | null>(null);
     const [torchSupported, setTorchSupported] = useState(false);
@@ -154,6 +166,23 @@ const QrScannerContent: React.FC<QrScannerContentProps> = ({
     const handleDecodedRawText = useCallback(
         (rawText: string) => {
             if (handledRef.current) return;
+
+            if (mode === 'invite') {
+                const code = parseGroupInviteCode(rawText);
+                if (!code) {
+                    triggerHaptic('warning');
+                    setScanWarning(
+                        'That QR code does not look like a SplitNest room invite link or code.'
+                    );
+                    return;
+                }
+                handledRef.current = true;
+                stopCamera();
+                triggerHaptic('success');
+                onScanInvite?.(code);
+                return;
+            }
+
             const parsed = parseUpiQrPayload(rawText);
             if (!parsed) {
                 triggerHaptic('warning');
@@ -165,9 +194,9 @@ const QrScannerContent: React.FC<QrScannerContentProps> = ({
             handledRef.current = true;
             stopCamera();
             triggerHaptic('success');
-            onScanUpi(parsed);
+            onScanUpi?.(parsed);
         },
-        [onScanUpi, stopCamera]
+        [mode, onScanInvite, onScanUpi, stopCamera]
     );
 
     useEffect(() => {
@@ -313,6 +342,19 @@ const QrScannerContent: React.FC<QrScannerContentProps> = ({
     const handleManualSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         setScanWarning(null);
+        if (mode === 'invite') {
+            const code = parseGroupInviteCode(manualInput);
+            if (!code) {
+                triggerHaptic('warning');
+                setScanWarning('Enter a valid invite link or room code (e.g. A1B2C3D4).');
+                return;
+            }
+            handledRef.current = true;
+            stopCamera();
+            triggerHaptic('success');
+            onScanInvite?.(code);
+            return;
+        }
         const parsed = parseUpiQrPayload(manualInput);
         if (!parsed) {
             triggerHaptic('warning');
@@ -322,7 +364,7 @@ const QrScannerContent: React.FC<QrScannerContentProps> = ({
         handledRef.current = true;
         stopCamera();
         triggerHaptic('success');
-        onScanUpi(parsed);
+        onScanUpi?.(parsed);
     };
 
     return (
@@ -441,7 +483,7 @@ const QrScannerContent: React.FC<QrScannerContentProps> = ({
                         className="h-11 px-3 rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant/30 text-on-surface text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                     >
                         <AppIcon name="edit" className="text-[17px] text-primary" />
-                        <span>Paste UPI</span>
+                        <span>{mode === 'invite' ? 'Enter Code' : 'Paste UPI'}</span>
                     </button>
                 </div>
 
@@ -452,7 +494,11 @@ const QrScannerContent: React.FC<QrScannerContentProps> = ({
                                 type="text"
                                 value={manualInput}
                                 onChange={(e) => setManualInput(e.target.value)}
-                                placeholder="Paste upi://pay?... or name@bank"
+                                placeholder={
+                                    mode === 'invite'
+                                        ? 'Paste invite URL or code (e.g. AB12CD34)'
+                                        : 'Paste upi://pay?... or name@bank'
+                                }
                                 className="flex-1 h-10 px-3 rounded-xl bg-surface-container-low border border-outline-variant/40 text-xs font-mono text-on-surface focus:outline-none focus:border-primary"
                                 autoCapitalize="none"
                                 autoCorrect="off"
@@ -468,7 +514,9 @@ const QrScannerContent: React.FC<QrScannerContentProps> = ({
                 )}
 
                 <p className="text-[11px] text-on-surface-variant text-center">
-                    Point at a friend&apos;s PhonePe, GPay, Paytm, or SplitNest QR — or upload a saved screenshot.
+                    {mode === 'invite'
+                        ? "Point at a friend's SplitNest Room Invite QR — or upload a saved screenshot."
+                        : "Point at a friend's PhonePe, GPay, Paytm, or SplitNest QR — or upload a saved screenshot."}
                 </p>
             </div>
         </div>
@@ -478,18 +526,28 @@ const QrScannerContent: React.FC<QrScannerContentProps> = ({
 export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     isOpen,
     onClose,
+    mode = 'upi',
     onScanUpi,
-    title = 'Scan UPI QR Code',
-    subtitle = 'Camera or screenshot upload',
+    onScanInvite,
+    title,
+    subtitle,
 }) => {
     if (!isOpen) return null;
+
+    const resolvedTitle =
+        title || (mode === 'invite' ? 'Scan Room Invite QR' : 'Scan UPI QR Code');
+    const resolvedSubtitle =
+        subtitle ||
+        (mode === 'invite' ? 'Camera or invite QR photo' : 'Camera or screenshot upload');
 
     return (
         <QrScannerContent
             onClose={onClose}
+            mode={mode}
             onScanUpi={onScanUpi}
-            title={title}
-            subtitle={subtitle}
+            onScanInvite={onScanInvite}
+            title={resolvedTitle}
+            subtitle={resolvedSubtitle}
         />
     );
 };

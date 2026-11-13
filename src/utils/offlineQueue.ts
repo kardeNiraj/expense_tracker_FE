@@ -379,10 +379,16 @@ export interface SyncResult {
  * Executes a single queued API operation against the backend.
  */
 async function executeSingleMutation(item: QueuedItem): Promise<void> {
+    const itemGroupId = (item.payload as { groupId?: string | null } | undefined)?.groupId;
+    const groupHeaders: Record<string, string> | undefined = itemGroupId
+        ? { 'x-group-id': itemGroupId }
+        : undefined;
+
     switch (item.type) {
         case 'ADD_EXPENSE': {
             await apiFetch<{ message?: string; status?: string }>('/add-expense', {
                 method: 'POST',
+                headers: groupHeaders,
                 body: JSON.stringify(item.payload as AddExpensePayload),
             });
             break;
@@ -391,6 +397,7 @@ async function executeSingleMutation(item: QueuedItem): Promise<void> {
         case 'ADD_SPLIT': {
             const res = await apiFetch<Split>('/split', {
                 method: 'POST',
+                headers: groupHeaders,
                 body: JSON.stringify(item.payload as AddSplitPayload),
             });
             const sentId = (item.payload as AddSplitPayload)?.splitId;
@@ -423,6 +430,7 @@ async function executeSingleMutation(item: QueuedItem): Promise<void> {
             const { splitId, person, amount } = item.payload as AddContributionPayload;
             await apiFetch<Split>(`/split/${splitId}/contributions`, {
                 method: 'POST',
+                headers: groupHeaders,
                 body: JSON.stringify({ person, amount }),
             });
             break;
@@ -432,6 +440,7 @@ async function executeSingleMutation(item: QueuedItem): Promise<void> {
             const { splitId, from, to, settled, confirmedBy } = item.payload as SettleParticipantPayload;
             await apiFetch<Split>(`/split/${splitId}/settle`, {
                 method: 'PATCH',
+                headers: groupHeaders,
                 body: JSON.stringify({ from, to, settled, confirmedBy }),
             });
             break;
@@ -440,6 +449,7 @@ async function executeSingleMutation(item: QueuedItem): Promise<void> {
         case 'UPDATE_UPI': {
             await apiFetch<{ message?: string; status?: string }>('/people/upi', {
                 method: 'POST',
+                headers: groupHeaders,
                 body: JSON.stringify(item.payload as UpdateUpiPayload),
             });
             break;
@@ -452,6 +462,7 @@ async function executeSingleMutation(item: QueuedItem): Promise<void> {
                 `/split/${splitId}${query}`,
                 {
                     method: 'DELETE',
+                    headers: groupHeaders,
                 }
             );
             break;
@@ -461,6 +472,7 @@ async function executeSingleMutation(item: QueuedItem): Promise<void> {
             const payload = item.payload as UpdateSplitPayload;
             await apiFetch<{ success: boolean; data: Split }>(`/split/${payload.splitId}`, {
                 method: 'PUT',
+                headers: groupHeaders,
                 body: JSON.stringify(payload),
             });
             break;

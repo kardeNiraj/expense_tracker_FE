@@ -998,3 +998,62 @@ export async function shareOrDownloadQrCard(
     });
     return outcome === 'shared_files_only' ? 'shared' : outcome;
 }
+
+const INVITE_CODE_REGEX = /^[A-Za-z0-9_-]{4,128}$/;
+
+/**
+ * Extracts a room invite token/code from a scanned QR URL (`https://.../?join=sn_...`, `.../join/sn_...`),
+ * `splitnest://join/sn_...`, or raw alphanumeric/token invite code (preserving case!).
+ */
+export function parseGroupInviteCode(rawText: string): string | null {
+    const trimmed = rawText.trim();
+    if (!trimmed) return null;
+
+    if (INVITE_CODE_REGEX.test(trimmed)) {
+        return trimmed;
+    }
+
+    try {
+        const normalized = /^https?:\/\//i.test(trimmed) || /^splitnest:\/\//i.test(trimmed)
+            ? trimmed
+            : trimmed.startsWith('/') || trimmed.includes('join=')
+              ? `https://splitnest.local${trimmed.startsWith('/') ? '' : '/'}${trimmed}`
+              : '';
+
+        if (normalized) {
+            const parsed = new URL(normalized);
+            const paramCode = parsed.searchParams.get('join')?.trim() || parsed.searchParams.get('code')?.trim();
+            if (paramCode && INVITE_CODE_REGEX.test(paramCode)) {
+                return paramCode;
+            }
+            const pathMatch = parsed.pathname.match(/\/join\/([A-Za-z0-9_-]{4,128})/i);
+            if (pathMatch?.[1]) {
+                return pathMatch[1];
+            }
+            const hostJoinMatch =
+                parsed.protocol === 'splitnest:' && parsed.hostname.toLowerCase() === 'join'
+                    ? parsed.pathname.replace(/^\/+|\/+$/g, '')
+                    : '';
+            if (hostJoinMatch && INVITE_CODE_REGEX.test(hostJoinMatch)) {
+                return hostJoinMatch;
+            }
+        }
+    } catch {
+        // fallback regex search
+    }
+
+    const queryFallback = trimmed.match(/[?&#](?:join|code)=([A-Za-z0-9_-]{4,128})/i);
+    if (queryFallback?.[1]) {
+        return queryFallback[1];
+    }
+
+    return null;
+}
+
+export function buildGroupInviteUrl(inviteCode?: string | null): string {
+    if (typeof window === 'undefined') return '';
+    const clean = (inviteCode || '').trim();
+    if (!clean) return window.location.origin;
+    return `${window.location.origin}/?join=${encodeURIComponent(clean)}`;
+}
+

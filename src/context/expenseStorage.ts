@@ -8,6 +8,7 @@ export const TAB_TO_PATH: Record<AppTab, string> = {
     add: '/add',
     analytics: '/analytics',
     people: '/people',
+    groups: '/groups',
     admin: '/admin',
 };
 
@@ -18,6 +19,7 @@ export function getTabFromPathname(pathname: string): AppTab {
     if (clean === '/splits') return 'splits';
     if (clean === '/add') return 'add';
     if (clean === '/people') return 'people';
+    if (clean === '/groups') return 'groups';
     return 'dashboard';
 }
 

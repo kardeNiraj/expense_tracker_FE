@@ -16,13 +16,25 @@ export const PendingApprovalsCard: React.FC<PendingApprovalsCardProps> = ({
     if (pendingApprovals.length === 0) return null;
 
     return (
-        <section className="bg-surface-card border border-status-awaiting-text/30 rounded-3xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
+        <section className="bg-surface-card border-2 border-status-pending-text/40 rounded-3xl p-4 space-y-3 shadow-xs">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2">
-                    <AppIcon name="approval_delegation" className="text-status-awaiting-text text-[20px]" />
-                    <h2 className="headline-md text-on-surface text-base">
-                        Pending Claim Approvals ({pendingApprovals.length})
-                    </h2>
+                    <span className="w-8 h-8 rounded-xl bg-status-pending-bg text-status-pending-text flex items-center justify-center">
+                        <AppIcon name="approval_delegation" className="text-[18px]" />
+                    </span>
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <h2 className="headline-md text-on-surface text-base">
+                                Requires Attention: Device Approvals ({pendingApprovals.length})
+                            </h2>
+                            <span className="px-2 py-0.5 rounded-full bg-status-pending-bg text-status-pending-text text-[10px] font-bold uppercase animate-pulse">
+                                Action Needed
+                            </span>
+                        </div>
+                        <p className="text-[11px] text-on-surface-variant">
+                            Unrecognized devices requesting access to claimed member profiles.
+                        </p>
+                    </div>
                 </div>
             </div>
 
@@ -34,32 +46,37 @@ export const PendingApprovalsCard: React.FC<PendingApprovalsCardProps> = ({
                     return (
                         <div
                             key={dev.deviceId}
-                            className="p-3.5 rounded-2xl bg-status-awaiting-bg/40 border border-border-subtle space-y-2.5"
+                            className="p-3.5 rounded-2xl bg-status-pending-bg/25 border border-status-pending-text/25 space-y-3"
                         >
                             <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0">
                                     <div className="flex items-center gap-1.5 flex-wrap">
                                         <span className="font-bold text-sm text-on-surface">
-                                            Wants ID: {dev.pendingPerson}
+                                            Wants Identity: {dev.pendingPerson}
                                         </span>
-                                        <span className="px-2 py-0.5 rounded-full bg-status-awaiting-bg text-status-awaiting-text text-[10px] font-bold font-mono">
+                                        <span className="px-2 py-0.5 rounded-full bg-surface-card text-on-surface-variant text-[10px] font-bold font-mono border border-border-subtle">
                                             #{shortId}
                                         </span>
+                                        {dev.pendingGroupName && (
+                                            <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold">
+                                                Room: {dev.pendingGroupName}
+                                            </span>
+                                        )}
                                     </div>
                                     <span className="text-[11px] text-on-surface-variant block mt-0.5">
-                                        {dev.platform || 'Unknown OS'} · Seen {dev.lastSeenAt || 'just now'}
+                                        {dev.platform || 'Unknown OS'} · Requested: {dev.lastSeenAt || 'recently'}
                                     </span>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                                 <button
                                     type="button"
                                     disabled={isBusy}
                                     onClick={() =>
                                         onUpdateDevice(dev.deviceId, { approvePending: true })
                                     }
-                                    className="flex-1 h-9 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary-dark cursor-pointer transition-colors disabled:opacity-50"
+                                    className="flex-1 min-w-[130px] h-9 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary-dark cursor-pointer transition-colors disabled:opacity-50"
                                 >
                                     Approve {dev.pendingPerson}
                                 </button>
@@ -69,7 +86,7 @@ export const PendingApprovalsCard: React.FC<PendingApprovalsCardProps> = ({
                                     onClick={() =>
                                         onUpdateDevice(dev.deviceId, { rejectPending: true })
                                     }
-                                    className="h-9 px-3 rounded-xl bg-surface-card text-on-surface-variant hover:text-on-surface text-xs font-semibold border border-border-subtle cursor-pointer transition-colors disabled:opacity-50"
+                                    className="h-9 px-3.5 rounded-xl bg-surface-card text-on-surface-variant hover:text-on-surface text-xs font-semibold border border-border-subtle cursor-pointer transition-colors disabled:opacity-50"
                                 >
                                     Reject
                                 </button>
@@ -82,9 +99,9 @@ export const PendingApprovalsCard: React.FC<PendingApprovalsCardProps> = ({
                                             rejectPending: true,
                                         })
                                     }
-                                    className="h-9 px-3 rounded-xl bg-error-container text-negative text-xs font-bold cursor-pointer transition-colors disabled:opacity-50"
+                                    className="h-9 px-3.5 rounded-xl bg-error-container text-negative text-xs font-bold cursor-pointer transition-colors disabled:opacity-50"
                                 >
-                                    Block
+                                    Block Device
                                 </button>
                             </div>
                         </div>

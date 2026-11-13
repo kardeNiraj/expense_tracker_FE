@@ -1,13 +1,17 @@
 /**
- * Default fallback categories if offline before initial Google Sheet synchronization.
+ * Default fallback categories if offline before initial database synchronization.
  */
 export const DEFAULT_CATEGORIES: string[] = [
-    'Food',
-    'Travel',
-    'Stay',
-    'Activities',
-    'Shopping',
+    'Food & Dining',
+    'Beverages & Snacks',
+    'Accommodation',
+    'Transportation',
     'Fuel',
-    'Misc',
+    'Activities & Adventure',
+    'Shopping',
+    'Groceries & Supplies',
+    'Entertainment',
+    'Personal',
+    'Miscellaneous',
 ];
 

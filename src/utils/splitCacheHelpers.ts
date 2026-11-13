@@ -1,12 +1,12 @@
 import type { QueryClient } from '@tanstack/react-query';
-import { queryKeys, type SplitsFilterParams } from '../api/queries';
+import { getGroupCacheScope, queryKeys, type SplitsFilterParams } from '../api/queries';
 import type {
     Split,
     UpdateSplitPayload,
 } from '../api/types';
 
 /**
- * Checks whether a split satisfies a cached `['splits', filter]` query key filter.
+ * Checks whether a split satisfies a cached `['splits', groupScope, filter]` query key filter.
  */
 export function matchesSplitsFilter(
     split: Split,
@@ -45,38 +45,56 @@ export function matchesSplitsFilter(
     return true;
 }
 
+function getSplitsGroupScope(queryKey: readonly unknown[]): string {
+    if (typeof queryKey[1] === 'string' && queryKey[1]) {
+        return queryKey[1];
+    }
+    return '__default__';
+}
+
 function getSplitsFilter(queryKey: readonly unknown[]): SplitsFilterParams | undefined {
-    const maybeFilter = queryKey[1];
+    const maybeFilter = typeof queryKey[1] === 'string' ? queryKey[2] : queryKey[1];
     if (maybeFilter && typeof maybeFilter === 'object') {
         return maybeFilter as SplitsFilterParams;
     }
     return undefined;
 }
 
-/**
- * Finds the best cached snapshot of a split across all `['splits', ...]` and `['split', splitId]` queries.
- */
-export function findCachedSplitById(
-    queryClient: QueryClient,
-    splitId: string
-): Split | undefined {
-    const splitQueries = queryClient.getQueriesData<Split[]>({ queryKey: ['splits'] });
-    for (const [, list] of splitQueries) {
-        const found = list?.find((s) => s.splitId === splitId);
-        if (found) return found;
-    }
-    return queryClient.getQueryData<Split>(queryKeys.splitDetails(splitId));
+function doesGroupMatch(queryScope: string, targetScope: string): boolean {
+    return queryScope === targetScope;
 }
 
 /**
- * Inserts a newly created/restored split into every matching `['splits', filter]` query cache.
+ * Finds the best cached snapshot of a split across matching `['splits', ...]` and `['split', ...]` queries.
+ */
+export function findCachedSplitById(
+    queryClient: QueryClient,
+    splitId: string,
+    groupId?: string | null
+): Split | undefined {
+    const targetScope = getGroupCacheScope(groupId);
+    const splitQueries = queryClient.getQueriesData<Split[]>({ queryKey: ['splits'] });
+    for (const [key, list] of splitQueries) {
+        if (!doesGroupMatch(getSplitsGroupScope(key), targetScope)) continue;
+        const found = list?.find((s) => s.splitId === splitId);
+        if (found) return found;
+    }
+    return queryClient.getQueryData<Split>(queryKeys.splitDetails(splitId, groupId));
+}
+
+/**
+ * Inserts a newly created/restored split into every matching `['splits', groupScope, filter]` query cache.
  */
 export function applySplitAddToCaches(
     queryClient: QueryClient,
     newSplit: Split
 ): void {
+    const splitGroupScope = getGroupCacheScope(newSplit.groupId);
     const queries = queryClient.getQueryCache().findAll({ queryKey: ['splits'] });
     for (const query of queries) {
+        if (!doesGroupMatch(getSplitsGroupScope(query.queryKey), splitGroupScope)) {
+            continue;
+        }
         const filter = getSplitsFilter(query.queryKey);
         if (!matchesSplitsFilter(newSplit, filter)) {
             continue;
@@ -90,26 +108,31 @@ export function applySplitAddToCaches(
 }
 
 /**
- * Transforms an existing split across all `['splits', filter]` list caches AND `['split', splitId]` detail cache.
- * Moves splits cleanly between filtered views (e.g. removing from `ACTIVE` and inserting into `SETTLED`)
- * while updating canonical `['splits', {}]` in place.
+ * Transforms an existing split across matching `['splits', ...]` list caches AND `['split', ...]` detail cache.
  */
 export function applySplitTransformToCaches(
     queryClient: QueryClient,
     splitId: string,
     updater: (split: Split) => Split,
-    fallbackSplit?: Split
+    fallbackSplit?: Split,
+    groupId?: string | null
 ): void {
-    const baseSplit = findCachedSplitById(queryClient, splitId) || fallbackSplit;
+    const targetGroupId = groupId !== undefined ? groupId : fallbackSplit?.groupId;
+    const targetScope = getGroupCacheScope(targetGroupId);
+    const baseSplit =
+        findCachedSplitById(queryClient, splitId, targetGroupId) || fallbackSplit;
     const transformedFallback = baseSplit ? updater(baseSplit) : undefined;
 
-    const detailKey = queryKeys.splitDetails(splitId);
+    const detailKey = queryKeys.splitDetails(splitId, targetGroupId);
     if (queryClient.getQueryData<Split>(detailKey) !== undefined) {
         queryClient.setQueryData<Split>(detailKey, (old) => (old ? updater(old) : old));
     }
 
     const queries = queryClient.getQueryCache().findAll({ queryKey: ['splits'] });
     for (const query of queries) {
+        if (!doesGroupMatch(getSplitsGroupScope(query.queryKey), targetScope)) {
+            continue;
+        }
         const filter = getSplitsFilter(query.queryKey);
         queryClient.setQueryData<Split[]>(query.queryKey, (old) => {
             if (!old) return old;
@@ -137,14 +160,19 @@ export function applySplitTransformToCaches(
 }
 
 /**
- * Removes a deleted split from every cached `['splits', ...]` list and clears its cached detail query.
+ * Removes a deleted split from matching cached `['splits', ...]` lists and clears its cached detail query.
  */
 export function applySplitRemoveToCaches(
     queryClient: QueryClient,
-    splitId: string
+    splitId: string,
+    groupId?: string | null
 ): void {
+    const targetScope = getGroupCacheScope(groupId);
     const queries = queryClient.getQueryCache().findAll({ queryKey: ['splits'] });
     for (const query of queries) {
+        if (!doesGroupMatch(getSplitsGroupScope(query.queryKey), targetScope)) {
+            continue;
+        }
         queryClient.setQueryData<Split[]>(query.queryKey, (old) => {
             if (!old) return old;
             if (!old.some((s) => s.splitId === splitId)) return old;
@@ -152,7 +180,7 @@ export function applySplitRemoveToCaches(
         });
     }
     queryClient.removeQueries({
-        queryKey: queryKeys.splitDetails(splitId),
+        queryKey: queryKeys.splitDetails(splitId, groupId),
         exact: true,
     });
 }
@@ -204,4 +232,3 @@ export function withUpdatedSplitFields(
         participants: updates.participants ?? split.participants,
     };
 }
-

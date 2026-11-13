@@ -1,6 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { apiFetch } from './client';
 import { ENV } from '../config';
+import { getActiveGroupId } from '../utils/authStorage';
 import type {
     AdminDashboardData,
     AnalyticsData,
@@ -17,6 +18,11 @@ import type {
 
 const DYNAMIC_LIST_STALE_TIME_MS = Math.min(ENV.QUERY_STALE_TIME_MS, 30_000);
 
+export function getGroupCacheScope(groupId?: string | null): string {
+    const resolved = groupId !== undefined ? groupId : getActiveGroupId();
+    return resolved && resolved.trim() ? resolved.trim() : '__default__';
+}
+
 export interface AnalyticsQueryParams {
     person?: string;
     month?: string;
@@ -31,20 +37,28 @@ export interface SplitsFilterParams {
     [key: string]: unknown;
 }
 
-// Query Keys
+// Query Keys (strictly scoped by active room / groupId so multi-room caches stay isolated)
 export const queryKeys = {
     categories: (refresh = false) => ['categories', { refresh }] as const,
-    people: (refresh = false) => ['people', { refresh }] as const,
-    peopleDetails: () => ['people', 'details'] as const,
-    splits: (filters?: SplitsFilterParams) => ['splits', filters || {}] as const,
-    splitDetails: (splitId: string) => ['split', splitId] as const,
-    spendings: (payee: string) => ['spendings', payee] as const,
-    analytics: (params?: AnalyticsQueryParams) => ['analytics', params || {}] as const,
-    meta: () => ['meta'] as const,
-    tripInfo: (refresh = false) => ['trip-info', { refresh }] as const,
+    people: (refresh = false, groupId?: string | null) =>
+        ['people', getGroupCacheScope(groupId), { refresh }] as const,
+    peopleDetails: (groupId?: string | null) =>
+        ['people', 'details', getGroupCacheScope(groupId)] as const,
+    splits: (filters?: SplitsFilterParams, groupId?: string | null) =>
+        ['splits', getGroupCacheScope(groupId), filters || {}] as const,
+    splitDetails: (splitId: string, groupId?: string | null) =>
+        ['split', getGroupCacheScope(groupId), splitId] as const,
+    spendings: (payee: string, groupId?: string | null) =>
+        ['spendings', getGroupCacheScope(groupId), payee] as const,
+    analytics: (params?: AnalyticsQueryParams, groupId?: string | null) =>
+        ['analytics', getGroupCacheScope(groupId), params || {}] as const,
+    meta: (groupId?: string | null) => ['meta', getGroupCacheScope(groupId)] as const,
+    tripInfo: (refresh = false, groupId?: string | null) =>
+        ['trip-info', getGroupCacheScope(groupId), { refresh }] as const,
     health: () => ['health'] as const,
-    deviceMe: () => ['device', 'me'] as const,
-    adminAnalytics: (refresh = false) => ['admin', 'analytics', { refresh }] as const,
+    deviceMe: (groupId?: string | null) => ['device', 'me', getGroupCacheScope(groupId)] as const,
+    adminAnalytics: (refresh = false, groupId?: string | null) =>
+        ['admin', 'analytics', getGroupCacheScope(groupId), { refresh }] as const,
     pushConfig: () => ['notifications', 'config'] as const,
     pushStatus: () => ['notifications', 'status'] as const,
 };
@@ -61,10 +75,16 @@ export function useCategories(refresh = false) {
 }
 
 // 2. People Query
-export function usePeople(refresh = false) {
+export function usePeople(refresh = false, groupId?: string | null) {
+    const queryParam = groupId && groupId !== 'ALL' ? `groupId=${encodeURIComponent(groupId)}` : '';
+    const refreshParam = refresh ? 'refresh=true' : '';
+    const queryParams = [queryParam, refreshParam].filter(Boolean).join('&');
     return useQuery<string[]>({
-        queryKey: queryKeys.people(refresh),
-        queryFn: () => apiFetch<string[]>(`/people?refresh=${refresh}`),
+        queryKey: queryKeys.people(refresh, groupId),
+        queryFn: () =>
+            apiFetch<string[]>(
+                `/people${queryParams ? `?${queryParams}` : ''}`
+            ),
         staleTime: 1000 * 60 * 2, // 2 minutes cache
         gcTime: 1000 * 60 * 60 * 24 * 7,
         networkMode: 'offlineFirst',
@@ -73,8 +93,9 @@ export function usePeople(refresh = false) {
 
 // 3. People Details Query (with UPI IDs)
 export function usePeopleDetails(refresh = false) {
+    const groupScope = getGroupCacheScope();
     return useQuery<PersonDetail[]>({
-        queryKey: queryKeys.peopleDetails(),
+        queryKey: queryKeys.peopleDetails(groupScope),
         queryFn: () => apiFetch<PersonDetail[]>(`/people/details?refresh=${refresh}`),
         staleTime: 1000 * 60 * 2, // 2 minutes cache
         gcTime: 1000 * 60 * 60 * 24 * 7,
@@ -84,6 +105,7 @@ export function usePeopleDetails(refresh = false) {
 
 // 4. Splits Query
 export function useSplits(params?: SplitsFilterParams) {
+    const groupScope = getGroupCacheScope();
     const queryParams = new URLSearchParams();
     if (params?.payee) queryParams.set('payee', params.payee);
     if (params?.participant) queryParams.set('participant', params.participant);
@@ -94,7 +116,7 @@ export function useSplits(params?: SplitsFilterParams) {
     const endpoint = queryString ? `/splits?${queryString}` : '/splits';
 
     return useQuery<Split[]>({
-        queryKey: queryKeys.splits(params),
+        queryKey: queryKeys.splits(params, groupScope),
         queryFn: () => apiFetch<Split[]>(endpoint),
         staleTime: DYNAMIC_LIST_STALE_TIME_MS,
         gcTime: 1000 * 60 * 60 * 24 * 7,
@@ -104,8 +126,9 @@ export function useSplits(params?: SplitsFilterParams) {
 
 // 5. Split Details by ID
 export function useSplitDetails(splitId?: string) {
+    const groupScope = getGroupCacheScope();
     return useQuery<Split>({
-        queryKey: queryKeys.splitDetails(splitId || ''),
+        queryKey: queryKeys.splitDetails(splitId || '', groupScope),
         queryFn: () => apiFetch<Split>(`/split/${splitId}`),
         enabled: Boolean(splitId),
         staleTime: DYNAMIC_LIST_STALE_TIME_MS,
@@ -116,8 +139,9 @@ export function useSplitDetails(splitId?: string) {
 
 // 6. Spendings by Payee
 export function useSpendings(payee?: string) {
+    const groupScope = getGroupCacheScope();
     return useQuery<SpendingsData>({
-        queryKey: queryKeys.spendings(payee || ''),
+        queryKey: queryKeys.spendings(payee || '', groupScope),
         queryFn: () => apiFetch<SpendingsData>(`/spend/${encodeURIComponent(payee || '')}`),
         enabled: Boolean(payee),
         staleTime: DYNAMIC_LIST_STALE_TIME_MS,
@@ -128,8 +152,9 @@ export function useSpendings(payee?: string) {
 
 // 7. Trip Metadata Query
 export function useTripMeta() {
+    const groupScope = getGroupCacheScope();
     return useQuery<TripMetaItem[]>({
-        queryKey: queryKeys.meta(),
+        queryKey: queryKeys.meta(groupScope),
         queryFn: () => apiFetch<TripMetaItem[]>('/meta'),
         staleTime: 1000 * 60 * 30, // 30 minutes
         gcTime: 1000 * 60 * 60 * 24 * 7,
@@ -149,8 +174,9 @@ export function useHealthCheck() {
 
 // 9. Trip Info & Branding Query
 export function useTripInfo(refresh = false) {
+    const groupScope = getGroupCacheScope();
     return useQuery<TripInfo>({
-        queryKey: queryKeys.tripInfo(refresh),
+        queryKey: queryKeys.tripInfo(refresh, groupScope),
         queryFn: () => apiFetch<TripInfo>(`/trip-info${refresh ? '?refresh=true' : ''}`),
         staleTime: 1000 * 60 * 15, // 15 minutes
         gcTime: 1000 * 60 * 60 * 24 * 7,
@@ -161,6 +187,7 @@ export function useTripInfo(refresh = false) {
 
 // 10. Spend Analytics Query
 export function useAnalytics(params?: AnalyticsQueryParams & { enabled?: boolean }) {
+    const groupScope = getGroupCacheScope();
     const queryParams = new URLSearchParams();
     if (params?.person) queryParams.set('person', params.person);
     if (params?.month && params.month !== 'ALL') queryParams.set('month', params.month);
@@ -176,7 +203,7 @@ export function useAnalytics(params?: AnalyticsQueryParams & { enabled?: boolean
     };
 
     return useQuery<AnalyticsData>({
-        queryKey: queryKeys.analytics(cleanKeyParams),
+        queryKey: queryKeys.analytics(cleanKeyParams, groupScope),
         queryFn: () => apiFetch<AnalyticsData>(endpoint),
         enabled: params?.enabled ?? true,
         placeholderData: keepPreviousData,
@@ -188,8 +215,9 @@ export function useAnalytics(params?: AnalyticsQueryParams & { enabled?: boolean
 
 // 11. Current Device State Query
 export function useDeviceMe(enabled = true) {
+    const groupScope = getGroupCacheScope();
     return useQuery<DeviceStateResponse>({
-        queryKey: queryKeys.deviceMe(),
+        queryKey: queryKeys.deviceMe(groupScope),
         queryFn: () => apiFetch<DeviceStateResponse>('/devices/me'),
         enabled,
         staleTime: 1000 * 30,
@@ -199,12 +227,20 @@ export function useDeviceMe(enabled = true) {
 }
 
 // 12. Strict Admin Analytics & Device Control Query
-export function useAdminDashboard(enabled = true, refresh = false) {
+export function useAdminDashboard(
+    enabled = true,
+    refresh = false,
+    scopeGroupId?: string | null
+) {
+    const scope = scopeGroupId !== undefined ? scopeGroupId : 'ALL';
+    const scopeParam = `groupId=${encodeURIComponent(scope || 'ALL')}`;
+    const refreshParam = refresh ? 'refresh=true' : '';
+    const queryParams = [scopeParam, refreshParam].filter(Boolean).join('&');
     return useQuery<AdminDashboardData>({
-        queryKey: queryKeys.adminAnalytics(refresh),
+        queryKey: queryKeys.adminAnalytics(refresh, scope),
         queryFn: () =>
             apiFetch<AdminDashboardData>(
-                `/admin/analytics${refresh ? '?refresh=true' : ''}`
+                `/admin/analytics?${queryParams}`
             ),
         enabled,
         staleTime: 1000 * 15,
