@@ -10,6 +10,8 @@ export const TAB_TO_PATH: Record<AppTab, string> = {
     people: '/people',
     groups: '/groups',
     admin: '/admin',
+    privacy: '/privacy',
+    terms: '/terms',
 };
 
 export function getTabFromPathname(pathname: string): AppTab {
@@ -20,6 +22,8 @@ export function getTabFromPathname(pathname: string): AppTab {
     if (clean === '/add') return 'add';
     if (clean === '/people') return 'people';
     if (clean === '/groups') return 'groups';
+    if (clean === '/privacy' || clean === '/privacy-policy') return 'privacy';
+    if (clean === '/terms' || clean === '/terms-of-service' || clean === '/tos') return 'terms';
     return 'dashboard';
 }
 

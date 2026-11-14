@@ -10,6 +10,7 @@ import { SpendHistoryModal } from '../SpendHistory/SpendHistoryModal';
 import { useOfflineSync } from '../../utils/useOfflineSync';
 import { triggerHaptic } from '../../utils/haptics';
 import { AppIcon } from '../Icon/AppIcon';
+import { pushTabPath } from '../../context/expenseStorage';
 
 export const Header: React.FC = () => {
     const {
@@ -501,6 +502,16 @@ export const Header: React.FC = () => {
                 groupsCount={groups.length + formerGroups.length}
                 onOpenGroups={() => setActiveTab('groups')}
                 onLogoutUser={logoutUser}
+                onOpenPrivacy={() => {
+                    setShowSwitcher(false);
+                    setActiveTab('privacy');
+                    pushTabPath('privacy');
+                }}
+                onOpenTerms={() => {
+                    setShowSwitcher(false);
+                    setActiveTab('terms');
+                    pushTabPath('terms');
+                }}
             />
 
             {/* Join Trip / Invite Members QR Modal */}

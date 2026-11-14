@@ -31,6 +31,8 @@ interface ProfileModalProps {
     groupsCount?: number;
     onOpenGroups?: () => void;
     onLogoutUser?: () => void;
+    onOpenPrivacy?: () => void;
+    onOpenTerms?: () => void;
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({
@@ -56,6 +58,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     groupsCount = 0,
     onOpenGroups,
     onLogoutUser,
+    onOpenPrivacy,
+    onOpenTerms,
 }) => {
     const [passcodeInput, setPasscodeInput] = useState('');
     const [unlockError, setUnlockError] = useState(false);
@@ -747,6 +751,30 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                                 <span>Hard Reload</span>
                             </button>
                         </div>
+                    </div>
+
+                    <div className="flex items-center justify-center gap-3 pt-1 text-[11px] text-on-surface-variant">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                handleClose();
+                                onOpenPrivacy?.();
+                            }}
+                            className="hover:text-primary hover:underline cursor-pointer"
+                        >
+                            Privacy Policy
+                        </button>
+                        <span>•</span>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                handleClose();
+                                onOpenTerms?.();
+                            }}
+                            className="hover:text-primary hover:underline cursor-pointer"
+                        >
+                            Terms of Service
+                        </button>
                     </div>
 
                     <button

@@ -14,7 +14,9 @@ export type AppTab =
     | 'analytics'
     | 'people'
     | 'groups'
-    | 'admin';
+    | 'admin'
+    | 'privacy'
+    | 'terms';
 
 export interface ClaimActionResult {
     ok: boolean;

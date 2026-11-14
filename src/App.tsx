@@ -39,6 +39,7 @@ const OnboardingScreen = lazy(() => import('./pages/onboarding/OnboardingScreen.
 const DeviceBlockedScreen = lazy(() => import('./pages/claim/DeviceBlockedScreen.tsx'));
 const AnalyticsPage = lazy(() => import('./pages/analytics/index.tsx'));
 const AdminPage = lazy(() => import('./pages/admin/index.tsx'));
+const LegalPage = lazy(() => import('./pages/legal/LegalPage.tsx'));
 
 const IDB_STARTUP_TIMEOUT_MS = 1200;
 
@@ -181,6 +182,21 @@ function MainApp() {
                 <Suspense fallback={<ClaimIdentitySkeleton />}>
                     <DeviceBlockedScreen />
                 </Suspense>
+                <Toast />
+            </div>
+        );
+    }
+
+    // Privacy Policy and Terms of Service (accessible publicly or authenticated)
+    if (activeTab === 'privacy' || activeTab === 'terms') {
+        return (
+            <div className="min-h-screen w-full bg-surface text-on-surface flex flex-col relative font-sans">
+                <PwaUpdatePrompt />
+                <main className="flex-1 w-full max-w-2xl mx-auto px-4 pt-4 pb-12 relative">
+                    <Suspense fallback={<ClaimIdentitySkeleton />}>
+                        <LegalPage initialMode={activeTab === 'terms' ? 'terms' : 'privacy'} />
+                    </Suspense>
+                </main>
                 <Toast />
             </div>
         );

@@ -1323,16 +1323,37 @@ export const OnboardingScreen: React.FC = () => {
                 )}
             </div>
 
-            {/* Footer Admin Access Link */}
-            <div className="text-center pt-2">
-                <button
-                    type="button"
-                    onClick={() => setActiveTab('admin')}
-                    className="inline-flex items-center gap-1.5 text-[11px] text-on-surface-variant hover:text-primary font-medium cursor-pointer"
-                >
-                    <AppIcon name="admin_panel_settings" className="text-[14px]" />
-                    <span>Admin Console</span>
-                </button>
+            {/* Footer Legal & Admin Links */}
+            <div className="text-center pt-3 pb-6 space-y-2">
+                <p className="text-[11px] text-on-surface-variant/80">
+                    By continuing, you agree to our{' '}
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('terms')}
+                        className="text-primary hover:underline font-medium cursor-pointer"
+                    >
+                        Terms of Service
+                    </button>{' '}
+                    and{' '}
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('privacy')}
+                        className="text-primary hover:underline font-medium cursor-pointer"
+                    >
+                        Privacy Policy
+                    </button>
+                    .
+                </p>
+                <div>
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('admin')}
+                        className="inline-flex items-center gap-1.5 text-[11px] text-on-surface-variant hover:text-primary font-medium cursor-pointer"
+                    >
+                        <AppIcon name="admin_panel_settings" className="text-[14px]" />
+                        <span>Admin Console</span>
+                    </button>
+                </div>
             </div>
 
             <Suspense fallback={null}>
