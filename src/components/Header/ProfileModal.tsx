@@ -73,8 +73,20 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     const [nameDraft, setNameDraft] = useState('');
     const [upiDraft, setUpiDraft] = useState('');
     const [profileEditError, setProfileEditError] = useState<string | null>(null);
+    const [reloadingType, setReloadingType] = useState<'reload' | 'hard' | null>(null);
 
     if (!isOpen) return null;
+
+    const handleReloadAction = async (force: boolean) => {
+        if (reloadingType !== null) return;
+        triggerHaptic('medium');
+        setReloadingType(force ? 'hard' : 'reload');
+        try {
+            await reloadApp(force);
+        } catch {
+            setReloadingType(null);
+        }
+    };
 
     const handleStartEditProfile = () => {
         setNameDraft(user?.name || activePerson || '');
@@ -768,21 +780,37 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                         <div className="flex items-center gap-1.5 shrink-0">
                             <button
                                 type="button"
-                                onClick={() => reloadApp(false)}
-                                className="h-8 px-2.5 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-primary text-xs font-bold border border-outline-variant/30 flex items-center gap-1 cursor-pointer transition-colors active:scale-95 shadow-2xs"
+                                disabled={reloadingType !== null}
+                                onClick={() => void handleReloadAction(false)}
+                                className={`h-8 px-2.5 rounded-xl text-xs font-bold border flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-2xs ${
+                                    reloadingType === 'reload'
+                                        ? 'bg-primary/15 text-primary border-primary/40 ring-2 ring-primary/20 pointer-events-none'
+                                        : 'bg-surface-container-high hover:bg-surface-container-highest text-primary border-outline-variant/30 disabled:opacity-50'
+                                }`}
                                 title="Check for SW updates and reload frontend"
                             >
-                                <AppIcon name="refresh" className="text-[15px]" />
-                                <span>Reload</span>
+                                <AppIcon
+                                    name="refresh"
+                                    className={`text-[15px] ${reloadingType === 'reload' ? 'animate-spin' : ''}`}
+                                />
+                                <span>{reloadingType === 'reload' ? 'Reloading...' : 'Reload'}</span>
                             </button>
                             <button
                                 type="button"
-                                onClick={() => reloadApp(true)}
-                                className="h-8 px-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-medium border border-outline-variant/20 flex items-center gap-1 cursor-pointer transition-colors active:scale-95"
+                                disabled={reloadingType !== null}
+                                onClick={() => void handleReloadAction(true)}
+                                className={`h-8 px-2.5 rounded-xl text-xs font-medium border flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 ${
+                                    reloadingType === 'hard'
+                                        ? 'bg-secondary/15 text-secondary border-secondary/40 ring-2 ring-secondary/20 pointer-events-none'
+                                        : 'bg-surface-container hover:bg-surface-container-high text-on-surface border-outline-variant/20 disabled:opacity-50'
+                                }`}
                                 title="Purge static bundle cache and reload. Your user claim and offline data remain safe in localStorage."
                             >
-                                <AppIcon name="restart_alt" className="text-[15px] text-secondary" />
-                                <span>Hard Reload</span>
+                                <AppIcon
+                                    name="restart_alt"
+                                    className={`text-[15px] text-secondary ${reloadingType === 'hard' ? 'animate-spin' : ''}`}
+                                />
+                                <span>{reloadingType === 'hard' ? 'Purging...' : 'Hard Reload'}</span>
                             </button>
                         </div>
                     </div>

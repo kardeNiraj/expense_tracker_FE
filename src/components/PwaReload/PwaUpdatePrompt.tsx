@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { triggerHaptic } from '../../utils/haptics';
 import { AppIcon } from '../Icon/AppIcon';
@@ -35,10 +35,13 @@ export const PwaUpdatePrompt: React.FC = () => {
         return () => document.removeEventListener('visibilitychange', onVisibilityChange);
     }, []);
 
+    const [isReloading, setIsReloading] = useState(false);
+
     if (!needRefresh) return null;
 
     const handleReload = () => {
         triggerHaptic('success');
+        setIsReloading(true);
         updateServiceWorker(true);
     };
 
@@ -57,10 +60,12 @@ export const PwaUpdatePrompt: React.FC = () => {
                 <div className="flex items-center gap-1.5 shrink-0">
                     <button
                         type="button"
+                        disabled={isReloading}
                         onClick={handleReload}
-                        className="h-8 px-3 rounded-xl bg-white text-primary text-xs font-bold hover:bg-neutral-100 transition-colors shadow-xs cursor-pointer active:scale-95"
+                        className="h-8 px-3 rounded-xl bg-white text-primary text-xs font-bold hover:bg-neutral-100 transition-colors shadow-xs cursor-pointer active:scale-95 flex items-center gap-1.5 disabled:opacity-80"
                     >
-                        Reload
+                        {isReloading && <AppIcon name="refresh" className="text-[14px] animate-spin text-primary" />}
+                        <span>{isReloading ? 'Updating...' : 'Reload'}</span>
                     </button>
                     <button
                         type="button"
