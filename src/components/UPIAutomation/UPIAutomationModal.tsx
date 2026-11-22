@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { AppIcon } from '../Icon/AppIcon';
 import { Avatar } from '../Avatar';
 import { triggerHaptic } from '../../utils/haptics';
 import { useExpense } from '../../context';
 import {
+    useCategories,
     useQuickExpenseIntegration,
     useGenerateQuickExpenseTokenMutation,
     useRotateQuickExpenseTokenMutation,
@@ -26,12 +27,13 @@ export const UPIAutomationModal: React.FC<UPIAutomationModalProps> = ({
 
     const [activeOsTab, setActiveOsTab] = useState<'ios' | 'android'>('ios');
     const [showSecret, setShowSecret] = useState(false);
-    const [copiedField, setCopiedField] = useState<'url' | 'token' | 'curl' | 'payload' | null>(null);
-    const [defaultCategory, setDefaultCategory] = useState('Food & Dining');
+    const [copiedField, setCopiedField] = useState<'url' | 'token' | 'curl' | 'payload' | 'shortcut' | null>(null);
+    const [selectedCategoryOverride, setSelectedCategoryOverride] = useState<string | null>(null);
     const [lastTestExpenseId, setLastTestExpenseId] = useState<string | null>(null);
     const [showSafeguards, setShowSafeguards] = useState(false);
     const [showJsonSchema, setShowJsonSchema] = useState(false);
 
+    const { data: serverCategories } = useCategories();
     const {
         data: integrationConfig,
         isLoading,
@@ -44,23 +46,50 @@ export const UPIAutomationModal: React.FC<UPIAutomationModalProps> = ({
     const testMutation = useTestQuickExpenseMutation();
     const undoMutation = useUndoQuickExpenseMutation();
 
-    if (!isOpen) return null;
+    const iosShortcutUrl =
+        (import.meta.env.VITE_IOS_SHORTCUT_URL || '').trim() ||
+        'https://www.icloud.com/shortcuts/5313d107fb104900b4e06a23dfc917a4';
 
     const tokenDoc = integrationConfig?.integration;
     const isConfigured = Boolean(tokenDoc?.token);
-    const availableCategories = integrationConfig?.categories || [
-        'Food & Dining',
-        'Beverages & Snacks',
-        'Fuel',
-        'Groceries & Supplies',
-        'Transportation',
-        'Accommodation',
-        'Entertainment',
-        'Activities & Adventure',
-        'Shopping',
-        'Personal',
-        'Miscellaneous',
-    ];
+
+    const availableCategories = useMemo(() => {
+        if (Array.isArray(serverCategories) && serverCategories.length > 0) {
+            const list = serverCategories
+                .map((c) => (typeof c === 'string' ? c : (c as { name?: string })?.name || ''))
+                .filter(Boolean);
+            if (list.length > 0) return list;
+        }
+        const intCats = integrationConfig?.categories;
+        if (Array.isArray(intCats) && intCats.length > 0) {
+            const list = intCats
+                .map((c) => (typeof c === 'string' ? c : (c as { name?: string })?.name || ''))
+                .filter(Boolean);
+            if (list.length > 0) return list;
+        }
+        return [
+            'Food & Dining',
+            'Beverages & Snacks',
+            'Fuel',
+            'Groceries & Supplies',
+            'Transportation',
+            'Accommodation',
+            'Entertainment',
+            'Activities & Adventure',
+            'Shopping',
+            'Personal',
+            'Miscellaneous',
+        ];
+    }, [serverCategories, integrationConfig?.categories]);
+
+    const activeDefaultCategory = useMemo(() => {
+        if (selectedCategoryOverride && availableCategories.includes(selectedCategoryOverride)) {
+            return selectedCategoryOverride;
+        }
+        return availableCategories[0] || 'Food & Dining';
+    }, [selectedCategoryOverride, availableCategories]);
+
+    if (!isOpen) return null;
 
     const getBaseApiUrl = (): string => {
         const raw = (import.meta.env.VITE_API_BASE_URL || '').trim();
@@ -73,7 +102,7 @@ export const UPIAutomationModal: React.FC<UPIAutomationModalProps> = ({
     const webhookUrl = getBaseApiUrl();
     const webhookToken = tokenDoc?.token || '';
 
-    const handleCopy = async (text: string, field: 'url' | 'token' | 'curl' | 'payload') => {
+    const handleCopy = async (text: string, field: 'url' | 'token' | 'curl' | 'payload' | 'shortcut') => {
         try {
             await navigator.clipboard.writeText(text);
             triggerHaptic('success');
@@ -83,6 +112,8 @@ export const UPIAutomationModal: React.FC<UPIAutomationModalProps> = ({
                     ? 'Secret token copied!'
                     : field === 'url'
                     ? 'Webhook URL copied!'
+                    : field === 'shortcut'
+                    ? 'Shortcut link copied!'
                     : field === 'curl'
                     ? 'cURL command copied!'
                     : 'Payload copied!',
@@ -101,7 +132,7 @@ export const UPIAutomationModal: React.FC<UPIAutomationModalProps> = ({
             await generateMutation.mutateAsync({
                 groupId: activeGroup?.groupId,
                 memberName: currentMemberName,
-                defaultCategory,
+                defaultCategory: activeDefaultCategory,
             });
             showToast('Webhook integration key generated!', 'check_circle');
             refetch();
@@ -121,7 +152,7 @@ export const UPIAutomationModal: React.FC<UPIAutomationModalProps> = ({
             await rotateMutation.mutateAsync({
                 groupId: activeGroup?.groupId,
                 memberName: currentMemberName,
-                defaultCategory,
+                defaultCategory: activeDefaultCategory,
             });
             showToast('New webhook key generated!', 'autorenew');
             refetch();
@@ -318,8 +349,8 @@ export const UPIAutomationModal: React.FC<UPIAutomationModalProps> = ({
                                     Default Category for Unknown Spends
                                 </label>
                                 <select
-                                    value={defaultCategory}
-                                    onChange={(e) => setDefaultCategory(e.target.value)}
+                                    value={activeDefaultCategory}
+                                    onChange={(e) => setSelectedCategoryOverride(e.target.value)}
                                     className="w-full h-8.5 px-3 rounded-xl bg-surface-card border border-border-strong text-xs text-on-surface focus:outline-hidden focus:ring-1 focus:ring-primary font-medium"
                                 >
                                     {availableCategories.map((cat) => (
@@ -482,20 +513,58 @@ export const UPIAutomationModal: React.FC<UPIAutomationModalProps> = ({
 
                         {/* iOS Guide Body */}
                         {activeOsTab === 'ios' && (
-                            <div className="p-3.5 rounded-2xl bg-surface-card border border-border-subtle space-y-3 text-xs">
+                            <div className="p-3.5 rounded-2xl bg-surface-card border border-border-subtle space-y-3.5 text-xs">
+                                {/* 1-Tap iCloud Shortcut Install Banner */}
+                                <div className="p-3 rounded-xl bg-primary/10 border border-primary/25 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
+                                            <AppIcon name="bolt" className="text-[16px]" />
+                                            <span>Pre-Built Apple Shortcut</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleCopy(iosShortcutUrl, 'shortcut')}
+                                            className="text-[11px] font-bold text-primary hover:underline flex items-center gap-0.5 cursor-pointer"
+                                        >
+                                            <AppIcon name={copiedField === 'shortcut' ? 'check' : 'content_copy'} className="text-[12px]" />
+                                            <span>{copiedField === 'shortcut' ? 'Copied' : 'Copy Link'}</span>
+                                        </button>
+                                    </div>
+                                    <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                                        Includes live room category sync, 1-tap lockscreen prompt, and automatic bank SMS extraction.
+                                    </p>
+                                    <a
+                                        href={iosShortcutUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="w-full h-8.5 px-3 rounded-xl bg-primary hover:bg-primary-dark text-on-primary font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-xs active:scale-98 cursor-pointer"
+                                    >
+                                        <AppIcon name="phone_iphone" className="text-[16px]" />
+                                        <span>Install Shortcut (iCloud Link)</span>
+                                        <AppIcon name="open_in_new" className="text-[14px]" />
+                                    </a>
+                                </div>
+
                                 {/* Step 1 */}
                                 <div className="flex items-start gap-2.5">
                                     <span className="w-5 h-5 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">
                                         1
                                     </span>
-                                    <div className="space-y-1 min-w-0">
+                                    <div className="space-y-1.5 min-w-0">
                                         <span className="font-bold text-on-surface block">
-                                            Create SMS Automation
+                                            Create SMS Automation in Shortcuts
                                         </span>
+                                        <div className="flex items-center flex-wrap gap-1 text-[11px] text-on-surface py-0.5">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-surface-card-subtle font-semibold border border-border-subtle">Shortcuts</span>
+                                            <AppIcon name="arrow_forward" className="text-[11px] text-primary shrink-0" />
+                                            <span className="px-1.5 py-0.5 rounded-md bg-surface-card-subtle font-semibold border border-border-subtle">Automation</span>
+                                            <AppIcon name="arrow_forward" className="text-[11px] text-primary shrink-0" />
+                                            <span className="px-1.5 py-0.5 rounded-md bg-surface-card-subtle font-semibold border border-border-subtle">New Automation</span>
+                                            <AppIcon name="arrow_forward" className="text-[11px] text-primary shrink-0" />
+                                            <span className="px-1.5 py-0.5 rounded-md bg-surface-card-subtle font-semibold border border-border-subtle">Message</span>
+                                        </div>
                                         <p className="text-[11px] text-on-surface-variant leading-relaxed">
-                                            Open <strong>Shortcuts</strong> $\rightarrow$ <strong>Automation</strong> $\rightarrow$ <strong>New Automation</strong> $\rightarrow$ <strong>Message</strong>.
-                                            Set <i>Message Contains</i> to <code className="px-1 py-0.5 rounded bg-surface-card-subtle text-primary font-mono text-[10px]">debited</code> or <code className="px-1 py-0.5 rounded bg-surface-card-subtle text-primary font-mono text-[10px]">UPI</code>.
-                                            Enable <strong>Run Immediately</strong>.
+                                            Set <i>Message Contains</i> to <code className="px-1 py-0.5 rounded bg-surface-card-subtle text-primary font-mono text-[10px]">debited</code> or <code className="px-1 py-0.5 rounded bg-surface-card-subtle text-primary font-mono text-[10px]">UPI</code>. Toggle <strong>Run Immediately</strong> to ON.
                                         </p>
                                     </div>
                                 </div>
@@ -510,7 +579,7 @@ export const UPIAutomationModal: React.FC<UPIAutomationModalProps> = ({
                                             On-Device 1-Tap Category Prompt
                                         </span>
                                         <p className="text-[11px] text-on-surface-variant leading-relaxed">
-                                            Shortcut parses the amount & payee locally, then presents a quick action sheet on your lockscreen:
+                                            Shortcut parses the amount & payee locally, syncs live room categories, then presents a quick action sheet on your lockscreen:
                                         </p>
 
                                         {/* Mini Lockscreen Action Sheet Preview */}
@@ -520,7 +589,7 @@ export const UPIAutomationModal: React.FC<UPIAutomationModalProps> = ({
                                                     <AppIcon name="bolt" className="text-[12px]" />
                                                     iPhone Lockscreen Action Sheet
                                                 </span>
-                                                <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-primary/10 text-primary">Pre-Filled</span>
+                                                <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-primary/10 text-primary">Live Synced</span>
                                             </div>
                                             <div className="p-1.5 rounded-lg bg-surface-card border border-primary/25 font-semibold text-primary flex items-center justify-between text-[11px]">
                                                 <span>✓ Confirm: ₹250 (Food & Dining)</span>
@@ -528,7 +597,7 @@ export const UPIAutomationModal: React.FC<UPIAutomationModalProps> = ({
                                             </div>
                                             <div className="p-1.5 rounded-lg bg-surface-card border border-border-subtle text-on-surface-variant flex items-center justify-between text-[11px]">
                                                 <span>🔄 Change Category...</span>
-                                                <span className="text-[9px] text-on-surface-variant">List</span>
+                                                <span className="text-[9px] text-on-surface-variant">Live List</span>
                                             </div>
                                             <div className="p-1.5 rounded-lg bg-surface-card border border-border-subtle text-on-surface-variant flex items-center justify-between text-[11px]">
                                                 <span>✕ Dismiss (Personal / Ignore)</span>
@@ -545,10 +614,10 @@ export const UPIAutomationModal: React.FC<UPIAutomationModalProps> = ({
                                     </span>
                                     <div className="space-y-1 min-w-0">
                                         <span className="font-bold text-on-surface block">
-                                            Post to SplitNest Webhook
+                                            One-Time Ingest Setup Questions
                                         </span>
                                         <p className="text-[11px] text-on-surface-variant leading-relaxed">
-                                            Dispatches an HTTP POST request to your personal ingest endpoint with header <code className="px-1 py-0.5 rounded bg-surface-card-subtle font-mono text-[10px]">x-webhook-token</code>.
+                                            When importing the shortcut, iOS will prompt you for your <strong>Webhook URL</strong> and <strong>Secret Token</strong>. Copy them using the 1-tap copy buttons above.
                                         </p>
                                     </div>
                                 </div>
