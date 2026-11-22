@@ -33,6 +33,7 @@ interface ProfileModalProps {
     onLogoutUser?: () => void;
     onOpenPrivacy?: () => void;
     onOpenTerms?: () => void;
+    onOpenUpiAutomation?: () => void;
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({
@@ -60,6 +61,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     onLogoutUser,
     onOpenPrivacy,
     onOpenTerms,
+    onOpenUpiAutomation,
 }) => {
     const [passcodeInput, setPasscodeInput] = useState('');
     const [unlockError, setUnlockError] = useState(false);
@@ -654,6 +656,38 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                                 className="h-8 px-2.5 rounded-xl bg-primary text-on-primary text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors hover:bg-primary-dark"
                             >
                                 <span>Open</span>
+                                <AppIcon name="arrow_forward" className="text-[14px]" />
+                            </button>
+                        </div>
+                    )}
+
+                    {onOpenUpiAutomation && (
+                        <div className="flex items-center justify-between text-xs px-0.5 pb-1 border-b border-outline-variant/15">
+                            <div className="flex items-center gap-1.5 text-on-surface-variant min-w-0">
+                                <AppIcon name="bolt" className="text-primary text-[17px] shrink-0" />
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="font-bold text-on-surface block text-[11px] leading-tight">
+                                            UPI & Shortcuts Automation
+                                        </span>
+                                        <span className="text-[9px] px-1 py-0.2 rounded-md bg-primary/10 text-primary font-bold">
+                                            New
+                                        </span>
+                                    </div>
+                                    <span className="text-[10px] text-on-surface-variant block truncate">
+                                        Auto-log payments from GPay, PhonePe, Paytm
+                                    </span>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    handleClose();
+                                    onOpenUpiAutomation();
+                                }}
+                                className="h-8 px-2.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors active:scale-95"
+                            >
+                                <span>Setup</span>
                                 <AppIcon name="arrow_forward" className="text-[14px]" />
                             </button>
                         </div>

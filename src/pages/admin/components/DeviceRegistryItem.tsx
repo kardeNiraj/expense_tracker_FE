@@ -113,9 +113,10 @@ export const DeviceRegistryItem: React.FC<DeviceRegistryItemProps> = ({
                 <button
                     type="button"
                     onClick={() => setIsEditingLabel((prev) => !prev)}
-                    className="px-2 py-1 rounded-lg bg-surface-card border border-border-subtle text-[11px] font-semibold text-on-surface-variant hover:text-on-surface cursor-pointer shrink-0"
+                    className="h-7 px-2.5 rounded-lg bg-surface-card hover:bg-surface-card-subtle border border-border-subtle text-[11px] font-semibold text-on-surface-variant hover:text-on-surface cursor-pointer shrink-0 transition-colors flex items-center gap-1"
                 >
-                    {isEditingLabel ? 'Cancel' : 'Label'}
+                    <AppIcon name={isEditingLabel ? 'close' : 'edit'} className="text-[12px]" />
+                    <span>{isEditingLabel ? 'Cancel' : 'Label'}</span>
                 </button>
             </div>
 

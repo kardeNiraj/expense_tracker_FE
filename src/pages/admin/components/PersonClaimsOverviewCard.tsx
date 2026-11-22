@@ -140,9 +140,9 @@ export const PersonClaimsOverviewCard: React.FC<PersonClaimsOverviewCardProps> =
                                             return (
                                                 <div
                                                     key={dev.deviceId}
-                                                    className="p-2.5 rounded-xl bg-surface-card border border-border-subtle flex items-center justify-between gap-2"
+                                                    className="p-2.5 rounded-xl bg-surface-card border border-border-subtle flex flex-col sm:flex-row sm:items-center justify-between gap-2"
                                                 >
-                                                    <div className="min-w-0">
+                                                    <div className="min-w-0 flex-1">
                                                         <div className="flex items-center gap-1.5 flex-wrap">
                                                             <span className="text-xs font-bold text-on-surface truncate">
                                                                 {dev.label || dev.platform || 'Device'}
@@ -173,14 +173,14 @@ export const PersonClaimsOverviewCard: React.FC<PersonClaimsOverviewCardProps> =
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        <span className="text-[10px] text-on-surface-variant block">
+                                                        <span className="text-[10px] text-on-surface-variant block mt-0.5">
                                                             {dev.platform || 'Unknown OS'} · Seen{' '}
                                                             {dev.lastSeenAt || 'N/A'}
                                                         </span>
                                                     </div>
 
                                                     {!isSelf && (
-                                                        <div className="flex items-center gap-1 shrink-0">
+                                                        <div className="flex items-center gap-1.5 self-end sm:self-auto shrink-0 pt-0.5 sm:pt-0">
                                                             <button
                                                                 type="button"
                                                                 disabled={isDevBusy}
@@ -189,7 +189,7 @@ export const PersonClaimsOverviewCard: React.FC<PersonClaimsOverviewCardProps> =
                                                                         revokeClaim: true,
                                                                     })
                                                                 }
-                                                                className="px-2 py-1 rounded-lg bg-surface-card-subtle text-[10px] font-semibold text-on-surface-variant hover:text-on-surface border border-border-subtle cursor-pointer disabled:opacity-50"
+                                                                className="h-7 px-2.5 rounded-lg bg-surface-card-subtle text-[11px] font-semibold text-on-surface-variant hover:text-on-surface border border-border-subtle cursor-pointer disabled:opacity-50 transition-colors"
                                                             >
                                                                 Revoke
                                                             </button>
@@ -201,7 +201,7 @@ export const PersonClaimsOverviewCard: React.FC<PersonClaimsOverviewCardProps> =
                                                                         blockPerson: stat.person,
                                                                     })
                                                                 }
-                                                                className="px-2 py-1 rounded-lg bg-error-container text-negative text-[10px] font-bold cursor-pointer disabled:opacity-50"
+                                                                className="h-7 px-2.5 rounded-lg bg-error-container text-negative text-[11px] font-bold hover:bg-error-container/80 cursor-pointer disabled:opacity-50 transition-colors"
                                                                 title={`Block this device from using ${stat.person}'s ID`}
                                                             >
                                                                 Block ID

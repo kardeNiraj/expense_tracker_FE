@@ -10,6 +10,7 @@ import type {
     PersonDetail,
     PushDeviceStatusResponse,
     PushPublicConfig,
+    QuickExpenseIntegrationConfig,
     Split,
     SpendingsData,
     TripMetaItem,
@@ -273,3 +274,18 @@ export function usePushStatus(enabled = true) {
         retry: 1,
     });
 }
+
+// 15. Quick Expense Webhook Integration Query
+export function useQuickExpenseIntegration(groupId?: string | null, enabled = true) {
+    const activeGroupId = groupId !== undefined ? groupId : getActiveGroupId();
+    const queryParam = activeGroupId ? `?groupId=${encodeURIComponent(activeGroupId)}` : '';
+    return useQuery<QuickExpenseIntegrationConfig>({
+        queryKey: ['quick-expense-integration', activeGroupId || '__default__'],
+        queryFn: () => apiFetch<QuickExpenseIntegrationConfig>(`/integrations/quick-expense${queryParam}`),
+        enabled,
+        staleTime: 1000 * 60 * 5,
+        networkMode: 'online',
+        retry: 1,
+    });
+}
+

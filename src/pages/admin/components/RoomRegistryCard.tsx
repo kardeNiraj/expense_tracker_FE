@@ -130,8 +130,8 @@ export const RoomRegistryCard: React.FC<RoomRegistryCardProps> = ({
                                         : 'bg-surface-card-subtle/50 border-border-subtle hover:border-primary/30'
                                 }`}
                             >
-                                <div className="flex items-start justify-between gap-2">
-                                    <div className="flex items-start gap-2.5 min-w-0">
+                                <div className="flex items-start justify-between gap-2 flex-wrap sm:flex-nowrap">
+                                    <div className="flex items-start gap-2.5 min-w-0 flex-1">
                                         <span className="w-9 h-9 rounded-xl bg-surface-card border border-border-subtle flex items-center justify-center text-primary shrink-0">
                                             <AppIcon name={room.icon || 'groups'} className="text-[20px]" />
                                         </span>
@@ -149,7 +149,7 @@ export const RoomRegistryCard: React.FC<RoomRegistryCardProps> = ({
                                                     </span>
                                                 )}
                                             </div>
-                                            <p className="text-[11px] text-on-surface-variant mt-0.5">
+                                            <p className="text-[11px] text-on-surface-variant mt-0.5 truncate">
                                                 Owner: <strong className="text-on-surface">{room.createdByName}</strong>
                                                 {room.createdAt && ` · Created ${room.createdAt.slice(0, 10)}`}
                                             </p>
@@ -159,10 +159,10 @@ export const RoomRegistryCard: React.FC<RoomRegistryCardProps> = ({
                                     <button
                                         type="button"
                                         onClick={() => onSelectRoom(isSelected ? 'ALL' : room.groupId)}
-                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-colors shrink-0 ${
+                                        className={`h-8 px-3 rounded-xl text-xs font-bold cursor-pointer transition-colors shrink-0 self-end sm:self-start ${
                                             isSelected
                                                 ? 'bg-surface-card border border-border-subtle text-on-surface-variant hover:text-on-surface'
-                                                : 'bg-primary text-on-primary hover:bg-primary-dark'
+                                                : 'bg-primary text-on-primary hover:bg-primary-dark shadow-2xs'
                                         }`}
                                     >
                                         {isSelected ? 'View All' : 'Inspect'}
@@ -170,27 +170,27 @@ export const RoomRegistryCard: React.FC<RoomRegistryCardProps> = ({
                                 </div>
 
                                 <div className="grid grid-cols-3 gap-2 pt-1 border-t border-border-subtle/70 text-center">
-                                    <div className="p-2 rounded-xl bg-surface-card border border-border-subtle/60">
+                                    <div className="p-2 rounded-xl bg-surface-card border border-border-subtle/60 min-w-0">
                                         <span className="text-[10px] text-on-surface-variant block uppercase font-medium">
                                             Members
                                         </span>
-                                        <span className="text-xs font-bold text-on-surface font-mono">
+                                        <span className="text-xs font-bold text-on-surface font-mono truncate block">
                                             {room.claimedMemberCount}/{room.memberCount}
                                         </span>
                                     </div>
-                                    <div className="p-2 rounded-xl bg-surface-card border border-border-subtle/60">
+                                    <div className="p-2 rounded-xl bg-surface-card border border-border-subtle/60 min-w-0">
                                         <span className="text-[10px] text-on-surface-variant block uppercase font-medium">
                                             Spend
                                         </span>
-                                        <span className="text-xs font-bold text-on-surface font-mono">
+                                        <span className="text-[11px] sm:text-xs font-bold text-on-surface font-mono truncate block" title={formatCurrency(room.totalSpend)}>
                                             {formatCurrency(room.totalSpend)}
                                         </span>
                                     </div>
-                                    <div className="p-2 rounded-xl bg-surface-card border border-border-subtle/60">
+                                    <div className="p-2 rounded-xl bg-surface-card border border-border-subtle/60 min-w-0">
                                         <span className="text-[10px] text-on-surface-variant block uppercase font-medium">
                                             In-Flight Debt
                                         </span>
-                                        <span className={`text-xs font-bold font-mono ${room.pendingSettlementsAmount > 0 ? 'text-status-pending-text' : 'text-on-surface'}`}>
+                                        <span className={`text-[11px] sm:text-xs font-bold font-mono truncate block ${room.pendingSettlementsAmount > 0 ? 'text-status-pending-text' : 'text-on-surface'}`} title={formatCurrency(room.pendingSettlementsAmount)}>
                                             {formatCurrency(room.pendingSettlementsAmount)}
                                         </span>
                                     </div>

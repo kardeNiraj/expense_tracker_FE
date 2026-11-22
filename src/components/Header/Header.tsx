@@ -7,6 +7,7 @@ import { ProfileModal } from './ProfileModal';
 import { JoinTripModal } from './JoinTripModal';
 import { SyncStatusModal } from '../SyncModal/SyncStatusModal';
 import { SpendHistoryModal } from '../SpendHistory/SpendHistoryModal';
+import { UPIAutomationModal } from '../UPIAutomation';
 import { useOfflineSync } from '../../utils/useOfflineSync';
 import { triggerHaptic } from '../../utils/haptics';
 import { AppIcon } from '../Icon/AppIcon';
@@ -48,6 +49,7 @@ export const Header: React.FC = () => {
     const [showJoinModal, setShowJoinModal] = useState(false);
     const [showSyncModal, setShowSyncModal] = useState(false);
     const [showSpendHistory, setShowSpendHistory] = useState(false);
+    const [showUpiAutomationModal, setShowUpiAutomationModal] = useState(false);
 
     useEffect(() => {
         if (!showRoomMenu) return;
@@ -512,6 +514,10 @@ export const Header: React.FC = () => {
                     setActiveTab('terms');
                     pushTabPath('terms');
                 }}
+                onOpenUpiAutomation={() => {
+                    setShowSwitcher(false);
+                    setShowUpiAutomationModal(true);
+                }}
             />
 
             {/* Join Trip / Invite Members QR Modal */}
@@ -536,6 +542,12 @@ export const Header: React.FC = () => {
                 onClose={() => setShowSpendHistory(false)}
                 initialPerson={activePerson}
                 claimedPerson={claimedPerson}
+            />
+
+            {/* UPI & Shortcuts Automation Management Modal */}
+            <UPIAutomationModal
+                isOpen={showUpiAutomationModal}
+                onClose={() => setShowUpiAutomationModal(false)}
             />
         </>
     );

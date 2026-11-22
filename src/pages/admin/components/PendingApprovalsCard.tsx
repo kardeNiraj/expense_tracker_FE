@@ -69,40 +69,45 @@ export const PendingApprovalsCard: React.FC<PendingApprovalsCardProps> = ({
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-2 flex-wrap">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-1">
                                 <button
                                     type="button"
                                     disabled={isBusy}
                                     onClick={() =>
                                         onUpdateDevice(dev.deviceId, { approvePending: true })
                                     }
-                                    className="flex-1 min-w-[130px] h-9 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary-dark cursor-pointer transition-colors disabled:opacity-50"
+                                    className="w-full sm:flex-1 h-9 px-3 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary-dark cursor-pointer transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-2xs"
                                 >
-                                    Approve {dev.pendingPerson}
+                                    <AppIcon name="check" className="text-[16px]" />
+                                    <span>Approve {dev.pendingPerson}</span>
                                 </button>
-                                <button
-                                    type="button"
-                                    disabled={isBusy}
-                                    onClick={() =>
-                                        onUpdateDevice(dev.deviceId, { rejectPending: true })
-                                    }
-                                    className="h-9 px-3.5 rounded-xl bg-surface-card text-on-surface-variant hover:text-on-surface text-xs font-semibold border border-border-subtle cursor-pointer transition-colors disabled:opacity-50"
-                                >
-                                    Reject
-                                </button>
-                                <button
-                                    type="button"
-                                    disabled={isBusy}
-                                    onClick={() =>
-                                        onUpdateDevice(dev.deviceId, {
-                                            status: 'BLOCKED',
-                                            rejectPending: true,
-                                        })
-                                    }
-                                    className="h-9 px-3.5 rounded-xl bg-error-container text-negative text-xs font-bold cursor-pointer transition-colors disabled:opacity-50"
-                                >
-                                    Block Device
-                                </button>
+                                <div className="flex items-center gap-2 w-full sm:w-auto">
+                                    <button
+                                        type="button"
+                                        disabled={isBusy}
+                                        onClick={() =>
+                                            onUpdateDevice(dev.deviceId, { rejectPending: true })
+                                        }
+                                        className="flex-1 sm:flex-none h-9 px-3.5 rounded-xl bg-surface-card text-on-surface-variant hover:text-on-surface text-xs font-semibold border border-border-subtle cursor-pointer transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
+                                    >
+                                        <AppIcon name="close" className="text-[14px]" />
+                                        <span>Reject</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={isBusy}
+                                        onClick={() =>
+                                            onUpdateDevice(dev.deviceId, {
+                                                status: 'BLOCKED',
+                                                rejectPending: true,
+                                            })
+                                        }
+                                        className="flex-1 sm:flex-none h-9 px-3.5 rounded-xl bg-error-container text-negative text-xs font-bold hover:bg-error-container/80 cursor-pointer transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
+                                    >
+                                        <AppIcon name="block" className="text-[14px]" />
+                                        <span>Block Device</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     );
