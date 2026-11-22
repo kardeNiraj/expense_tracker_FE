@@ -103,7 +103,7 @@ export const AdminHeroSummary: React.FC<AdminHeroSummaryProps> = ({
                 </div>
 
                 {/* Global Claim Lock Action Strip */}
-                <div className="p-3 rounded-2xl bg-black/20 flex items-center justify-between gap-3">
+                <div className="p-3 rounded-2xl bg-black/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                     <div className="min-w-0">
                         <span className="text-xs font-bold text-on-primary block">
                             {allLocked
@@ -118,13 +118,14 @@ export const AdminHeroSummary: React.FC<AdminHeroSummaryProps> = ({
                         type="button"
                         disabled={isBusy}
                         onClick={() => onBulkLock(!allLocked)}
-                        className={`h-8 px-3 rounded-xl text-xs font-bold shrink-0 cursor-pointer transition-colors disabled:opacity-50 ${
+                        className={`w-full sm:w-auto h-8.5 px-3.5 rounded-xl text-xs font-bold shrink-0 cursor-pointer transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5 ${
                             allLocked
                                 ? 'bg-on-primary text-primary hover:bg-primary-fixed'
                                 : 'bg-primary-light text-on-primary-fixed hover:bg-primary-fixed'
                         }`}
                     >
-                        {allLocked ? 'Unlock All' : 'Lock All IDs'}
+                        <AppIcon name={allLocked ? 'lock_open' : 'lock'} className="text-[14px]" />
+                        <span>{allLocked ? 'Unlock All' : 'Lock All IDs'}</span>
                     </button>
                 </div>
             </div>

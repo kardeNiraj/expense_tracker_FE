@@ -753,5 +753,55 @@ export interface AddGroupMemberPayload {
     upiId?: string;
 }
 
+export interface QuickExpenseIntegrationData {
+    token: string;
+    groupId: string | null;
+    memberName: string;
+    defaultCategory: string;
+    createdAt?: string;
+    lastUsedAt?: string | null;
+    usageCount?: number;
+}
+
+export interface QuickExpenseIntegrationConfig {
+    configured: boolean;
+    integration: QuickExpenseIntegrationData | null;
+    groupId: string | null;
+    categories: string[];
+}
+
+export interface GenerateQuickExpenseTokenPayload {
+    groupId?: string;
+    memberName?: string;
+    defaultCategory?: string;
+}
+
+export interface QuickExpensePayload {
+    amount: number;
+    description?: string;
+    category?: string;
+    payee?: string;
+    expenseId?: string;
+    timestamp?: string;
+    source?: string;
+}
+
+export interface QuickExpenseResponse {
+    success: boolean;
+    message: string;
+    data: {
+        expenseId: string | null;
+        amount: number;
+        category: string;
+        description: string;
+        payee: string;
+        groupId: string | null;
+        timestamp: string;
+        source?: string;
+        idempotentReplay?: boolean;
+    };
+}
+
+
 
 

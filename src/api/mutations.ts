@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiFetch } from './client';
 import { queryKeys } from './queries';
 import { getActiveGroupId } from '../utils/authStorage';
 import {
@@ -23,6 +24,10 @@ import type {
     Split,
     SpendingsData,
     ExpenseRecord,
+    GenerateQuickExpenseTokenPayload,
+    QuickExpenseIntegrationData,
+    QuickExpensePayload,
+    QuickExpenseResponse,
 } from './types';
 
 function createClientId(prefix: string): string {
@@ -561,6 +566,100 @@ export function useUpdateSplitMutation() {
         },
         onSuccess: () => {
             // Handled when processOfflineQueue invalidates queries
+        },
+    });
+}
+
+// 7. Generate or fetch personal Webhook token for UPI Quick Expense
+export function useGenerateQuickExpenseTokenMutation() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (payload: GenerateQuickExpenseTokenPayload) =>
+            apiFetch<QuickExpenseIntegrationData>('/integrations/quick-expense/token', {
+                method: 'POST',
+                body: JSON.stringify(payload),
+            }),
+        onSuccess: (_data, variables) => {
+            const activeGroupId = variables.groupId || getActiveGroupId();
+            queryClient.invalidateQueries({
+                queryKey: ['quick-expense-integration', activeGroupId || '__default__'],
+            });
+        },
+    });
+}
+
+// 8. Rotate Webhook token
+export function useRotateQuickExpenseTokenMutation() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (payload: GenerateQuickExpenseTokenPayload) =>
+            apiFetch<QuickExpenseIntegrationData>('/integrations/quick-expense/rotate', {
+                method: 'POST',
+                body: JSON.stringify(payload),
+            }),
+        onSuccess: (_data, variables) => {
+            const activeGroupId = variables.groupId || getActiveGroupId();
+            queryClient.invalidateQueries({
+                queryKey: ['quick-expense-integration', activeGroupId || '__default__'],
+            });
+        },
+    });
+}
+
+// 9. Revoke Webhook token
+export function useRevokeQuickExpenseTokenMutation() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (payload: { groupId?: string }) =>
+            apiFetch<{ success: boolean; message: string }>('/integrations/quick-expense/revoke', {
+                method: 'POST',
+                body: JSON.stringify(payload),
+            }),
+        onSuccess: (_data, variables) => {
+            const activeGroupId = variables.groupId || getActiveGroupId();
+            queryClient.invalidateQueries({
+                queryKey: ['quick-expense-integration', activeGroupId || '__default__'],
+            });
+        },
+    });
+}
+
+// 10. Test Quick Expense webhook
+export function useTestQuickExpenseMutation() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ token, payload }: { token: string; payload: QuickExpensePayload }) =>
+            apiFetch<QuickExpenseResponse>('/quick-expense', {
+                method: 'POST',
+                headers: {
+                    'x-webhook-token': token,
+                },
+                body: JSON.stringify(payload),
+            }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['spends'] });
+            queryClient.invalidateQueries({ queryKey: ['analytics'] });
+            queryClient.invalidateQueries({ queryKey: ['tripInfo'] });
+        },
+    });
+}
+
+// 11. Undo Quick Expense webhook transaction
+export function useUndoQuickExpenseMutation() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ token, expenseId }: { token: string; expenseId: string }) =>
+            apiFetch<{ success: boolean; message: string }>('/quick-expense/undo', {
+                method: 'POST',
+                headers: {
+                    'x-webhook-token': token,
+                },
+                body: JSON.stringify({ expenseId }),
+            }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['spends'] });
+            queryClient.invalidateQueries({ queryKey: ['analytics'] });
+            queryClient.invalidateQueries({ queryKey: ['tripInfo'] });
         },
     });
 }
