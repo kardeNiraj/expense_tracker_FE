@@ -374,26 +374,6 @@ export const UPIAutomationModal: React.FC<UPIAutomationModalProps> = ({
                     ) : (
                         /* Configured State: Sleek Credentials & Controls Card */
                         <div className="p-3.5 rounded-2xl bg-surface-card border border-border-subtle space-y-3">
-                            {/* Endpoint URL Row */}
-                            <div>
-                                <div className="flex items-center justify-between mb-1">
-                                    <span className="text-[10px] font-bold font-mono text-on-surface-variant uppercase tracking-wider">
-                                        Webhook Ingest Endpoint
-                                    </span>
-                                    <button
-                                        type="button"
-                                        onClick={() => handleCopy(webhookUrl, 'url')}
-                                        className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
-                                    >
-                                        <AppIcon name={copiedField === 'url' ? 'check' : 'content_copy'} className="text-[12px]" />
-                                        <span>{copiedField === 'url' ? 'Copied' : 'Copy URL'}</span>
-                                    </button>
-                                </div>
-                                <div className="h-8 px-2.5 rounded-xl bg-surface-card-subtle border border-border-subtle flex items-center text-xs font-mono text-on-surface select-all truncate">
-                                    {webhookUrl}
-                                </div>
-                            </div>
-
                             {/* Ingest Token Row */}
                             <div>
                                 <div className="flex items-center justify-between mb-1">
@@ -415,7 +395,7 @@ export const UPIAutomationModal: React.FC<UPIAutomationModalProps> = ({
                                             className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
                                         >
                                             <AppIcon name={copiedField === 'token' ? 'check' : 'content_copy'} className="text-[12px]" />
-                                            <span>{copiedField === 'token' ? 'Copied' : 'Copy'}</span>
+                                            <span>{copiedField === 'token' ? 'Copied' : 'Copy Token'}</span>
                                         </button>
                                     </div>
                                 </div>
@@ -614,10 +594,10 @@ export const UPIAutomationModal: React.FC<UPIAutomationModalProps> = ({
                                     </span>
                                     <div className="space-y-1 min-w-0">
                                         <span className="font-bold text-on-surface block">
-                                            One-Time Ingest Setup Questions
+                                            One-Time Ingest Setup Question
                                         </span>
                                         <p className="text-[11px] text-on-surface-variant leading-relaxed">
-                                            When importing the shortcut, iOS will prompt you for your <strong>Webhook URL</strong> and <strong>Secret Token</strong>. Copy them using the 1-tap copy buttons above.
+                                            When importing the shortcut, iOS will prompt you for your <strong>Personal Secret Token</strong>. Copy it using the 1-tap copy button above.
                                         </p>
                                     </div>
                                 </div>

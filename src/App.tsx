@@ -151,24 +151,24 @@ function MainApp() {
                 navigator.serviceWorker.ready.then((reg) => reg.update()).catch(() => {});
             }
 
-            const refreshPromises: Promise<unknown>[] = [
-                refreshAuthAndGroups(),
-                refreshDeviceStatus(),
-            ];
-            if (getActiveGroupId() || isSwitcherUnlocked) {
-                refreshPromises.push(
-                    apiFetch('/people?refresh=true'),
-                    apiFetch('/categories?refresh=true'),
-                    apiFetch('/trip-info?refresh=true'),
-                    apiFetch('/people/details?refresh=true')
-                );
-            }
-
-            await Promise.allSettled(refreshPromises);
-            // Also flush any pending queued operations in the background
+            // Flush any pending queued operations in the background
             processOfflineQueue(queryClient).catch(() => {});
-            await queryClient.invalidateQueries();
-            await queryClient.refetchQueries({ type: 'active' });
+
+            // Trigger non-blocking auth & device heartbeats
+            void refreshAuthAndGroups();
+            void refreshDeviceStatus();
+
+            // Refetch all active screen queries directly in parallel
+            const activeRefreshPromise = queryClient.invalidateQueries({
+                refetchType: 'active',
+            });
+
+            // Cap the pull-to-refresh hold time to 1.5s for instant snappy feel
+            await Promise.race([
+                activeRefreshPromise,
+                new Promise((resolve) => setTimeout(resolve, 1500)),
+            ]);
+
             showToast('Refreshed latest SplitNest data!', 'sync');
         } catch {
             showToast('Refreshed!', 'sync');
