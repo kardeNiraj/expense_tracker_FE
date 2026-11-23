@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useMemo, useEffect } from 'react';
+import { lazy, Suspense, useState, useMemo, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useExpense } from '../../context';
 import {
@@ -87,9 +87,20 @@ export function Dashboard() {
     const [showIosPushGuide, setShowIosPushGuide] = useState(false);
     const [pushEnabledLocally, setPushEnabledLocally] = useState(false);
 
+    const activePersonRef = useRef(activePerson);
+    const peopleDetailsRef = useRef(peopleDetails);
+
+    useEffect(() => {
+        activePersonRef.current = activePerson;
+    }, [activePerson]);
+
+    useEffect(() => {
+        peopleDetailsRef.current = peopleDetails;
+    }, [peopleDetails]);
+
     useEffect(() => {
         const handleConfirmReceivedParam = () => {
-            if (typeof window === 'undefined') return;
+            if (typeof window === 'undefined' || !window.location.search.includes('confirm-received')) return;
             const params = new URLSearchParams(window.location.search);
             const action = params.get('action');
             if (action === 'confirm-received') {
@@ -101,8 +112,9 @@ export function Dashboard() {
                 const description = params.get('description')?.trim() || '';
 
                 if (from && amount > 0) {
-                    if (to && activePerson.toLowerCase() !== to.toLowerCase()) {
-                        const matchedPerson = peopleDetails.find(
+                    const currentActive = activePersonRef.current;
+                    if (to && currentActive.toLowerCase() !== to.toLowerCase()) {
+                        const matchedPerson = peopleDetailsRef.current.find(
                             (p) => p.name.toLowerCase() === to.toLowerCase()
                         );
                         if (matchedPerson) {
@@ -142,7 +154,7 @@ export function Dashboard() {
         return () => {
             window.removeEventListener('popstate', handleConfirmReceivedParam);
         };
-    }, [activePerson, peopleDetails, setActivePerson]);
+    }, [setActivePerson]);
 
     const visibleSplits = useMemo(
         () => allSplits.filter((s) => (s.status || 'ACTIVE').toUpperCase() !== 'DELETED'),

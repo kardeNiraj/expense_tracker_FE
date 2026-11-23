@@ -63,9 +63,20 @@ export function SplitsPage() {
     const lastScrolledSplitRef = useRef<string | null>(null);
     const { data: peopleDetails = [] } = usePeopleDetails();
 
+    const activePersonRef = useRef(activePerson);
+    const peopleDetailsRef = useRef(peopleDetails);
+
+    useEffect(() => {
+        activePersonRef.current = activePerson;
+    }, [activePerson]);
+
+    useEffect(() => {
+        peopleDetailsRef.current = peopleDetails;
+    }, [peopleDetails]);
+
     useEffect(() => {
         const handleConfirmReceivedParam = () => {
-            if (typeof window === 'undefined') return;
+            if (typeof window === 'undefined' || !window.location.search.includes('confirm-received')) return;
             const params = new URLSearchParams(window.location.search);
             const action = params.get('action');
             if (action === 'confirm-received') {
@@ -77,8 +88,9 @@ export function SplitsPage() {
                 const description = params.get('description')?.trim() || '';
 
                 if (from && amount > 0) {
-                    if (to && activePerson.toLowerCase() !== to.toLowerCase()) {
-                        const matchedPerson = peopleDetails.find(
+                    const currentActive = activePersonRef.current;
+                    if (to && currentActive.toLowerCase() !== to.toLowerCase()) {
+                        const matchedPerson = peopleDetailsRef.current.find(
                             (p) => p.name.toLowerCase() === to.toLowerCase()
                         );
                         if (matchedPerson) {
@@ -118,7 +130,7 @@ export function SplitsPage() {
         return () => {
             window.removeEventListener('popstate', handleConfirmReceivedParam);
         };
-    }, [activePerson, peopleDetails, setActivePerson]);
+    }, [setActivePerson]);
 
     const { data: focusedSplitDetail } = useSplitDetails(focusedSplitId || undefined);
     const focusedStatus =
