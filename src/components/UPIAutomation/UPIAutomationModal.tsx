@@ -499,7 +499,7 @@ export const UPIAutomationModal: React.FC<UPIAutomationModalProps> = ({
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
                                             <AppIcon name="bolt" className="text-[16px]" />
-                                            <span>Pre-Built Apple Shortcut</span>
+                                            <span>Smart Screen-Reading &amp; Manual Shortcut</span>
                                         </div>
                                         <button
                                             type="button"
@@ -511,7 +511,7 @@ export const UPIAutomationModal: React.FC<UPIAutomationModalProps> = ({
                                         </button>
                                     </div>
                                     <p className="text-[11px] text-on-surface-variant leading-relaxed">
-                                        Includes live room category sync, 1-tap lockscreen prompt, and automatic bank SMS extraction.
+                                        Reads payment screens via <strong>Double-Tap Back of iPhone</strong> or <strong>Action Button</strong> with native Apple Live Text OCR, plus an instant <strong>Manual Fallback</strong> when run from Home Screen or Control Center.
                                     </p>
                                     <a
                                         href={iosShortcutUrl}
@@ -525,59 +525,64 @@ export const UPIAutomationModal: React.FC<UPIAutomationModalProps> = ({
                                     </a>
                                 </div>
 
-                                {/* Step 1 */}
+                                {/* Step 1: Trigger via Back Tap or Action Button */}
                                 <div className="flex items-start gap-2.5">
                                     <span className="w-5 h-5 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">
                                         1
                                     </span>
                                     <div className="space-y-1.5 min-w-0">
                                         <span className="font-bold text-on-surface block">
-                                            Create SMS Automation in Shortcuts
+                                            Trigger: Back Tap or Action Button (Zero SMS Delays)
                                         </span>
-                                        <div className="flex items-center flex-wrap gap-1 text-[11px] text-on-surface py-0.5">
-                                            <span className="px-1.5 py-0.5 rounded-md bg-surface-card-subtle font-semibold border border-border-subtle">Shortcuts</span>
-                                            <AppIcon name="arrow_forward" className="text-[11px] text-primary shrink-0" />
-                                            <span className="px-1.5 py-0.5 rounded-md bg-surface-card-subtle font-semibold border border-border-subtle">Automation</span>
-                                            <AppIcon name="arrow_forward" className="text-[11px] text-primary shrink-0" />
-                                            <span className="px-1.5 py-0.5 rounded-md bg-surface-card-subtle font-semibold border border-border-subtle">New Automation</span>
-                                            <AppIcon name="arrow_forward" className="text-[11px] text-primary shrink-0" />
-                                            <span className="px-1.5 py-0.5 rounded-md bg-surface-card-subtle font-semibold border border-border-subtle">Message</span>
-                                        </div>
                                         <p className="text-[11px] text-on-surface-variant leading-relaxed">
-                                            Set <i>Message Contains</i> to <code className="px-1 py-0.5 rounded bg-surface-card-subtle text-primary font-mono text-[10px]">debited</code> or <code className="px-1 py-0.5 rounded bg-surface-card-subtle text-primary font-mono text-[10px]">UPI</code>. Toggle <strong>Run Immediately</strong> to ON.
+                                            Bind the shortcut to your iPhone&apos;s back or Action button so you don&apos;t rely on delayed bank SMS:
+                                        </p>
+                                        <div className="flex items-center flex-wrap gap-1 text-[11px] text-on-surface py-0.5">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-surface-card-subtle font-semibold border border-border-subtle">Settings</span>
+                                            <AppIcon name="arrow_forward" className="text-[11px] text-primary shrink-0" />
+                                            <span className="px-1.5 py-0.5 rounded-md bg-surface-card-subtle font-semibold border border-border-subtle">Accessibility</span>
+                                            <AppIcon name="arrow_forward" className="text-[11px] text-primary shrink-0" />
+                                            <span className="px-1.5 py-0.5 rounded-md bg-surface-card-subtle font-semibold border border-border-subtle">Touch</span>
+                                            <AppIcon name="arrow_forward" className="text-[11px] text-primary shrink-0" />
+                                            <span className="px-1.5 py-0.5 rounded-md bg-surface-card-subtle font-semibold border border-border-subtle">Back Tap</span>
+                                            <AppIcon name="arrow_forward" className="text-[11px] text-primary shrink-0" />
+                                            <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary font-bold border border-primary/20">Double Tap &rarr; Log to SplitNest</span>
+                                        </div>
+                                        <p className="text-[10px] text-on-surface-variant italic">
+                                            (iPhone 15 Pro / 16: You can also choose <strong>Settings &rarr; Action Button &rarr; Shortcut &rarr; Log to SplitNest</strong>)
                                         </p>
                                     </div>
                                 </div>
 
-                                {/* Step 2 */}
+                                {/* Step 2: Screen Read & Intelligent Parsing */}
                                 <div className="flex items-start gap-2.5">
                                     <span className="w-5 h-5 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">
                                         2
                                     </span>
                                     <div className="space-y-1.5 min-w-0 w-full">
                                         <span className="font-bold text-on-surface block">
-                                            On-Device 1-Tap Category Prompt
+                                            How It Works: Screen OCR &amp; Instant Confirmation
                                         </span>
                                         <p className="text-[11px] text-on-surface-variant leading-relaxed">
-                                            Shortcut parses the amount & payee locally, syncs live room categories, then presents a quick action sheet on your lockscreen:
+                                            Whenever you finish paying in Google Pay, PhonePe, Paytm, or CRED, double-tap the back of your phone. The shortcut captures your screen, runs Apple Live Text OCR, and asks for 1-tap confirmation:
                                         </p>
 
                                         {/* Mini Lockscreen Action Sheet Preview */}
                                         <div className="p-2.5 rounded-xl bg-surface-card-subtle border border-border-subtle space-y-1 font-sans">
                                             <div className="flex items-center justify-between text-[10px] font-bold text-primary mb-1">
                                                 <span className="flex items-center gap-1">
-                                                    <AppIcon name="bolt" className="text-[12px]" />
-                                                    iPhone Lockscreen Action Sheet
+                                                    <AppIcon name="document_scanner" className="text-[13px]" />
+                                                    Screen OCR Mode (Payment Detected)
                                                 </span>
-                                                <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-primary/10 text-primary">Live Synced</span>
+                                                <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-primary/10 text-primary">Live OCR</span>
                                             </div>
                                             <div className="p-1.5 rounded-lg bg-surface-card border border-primary/25 font-semibold text-primary flex items-center justify-between text-[11px]">
-                                                <span>✓ Confirm: ₹250 (Food & Dining)</span>
+                                                <span>✓ Confirm: ₹350 (Food &amp; Dining)</span>
                                                 <span className="text-[9px] bg-primary/10 px-1 py-0.5 rounded font-bold">1 Tap</span>
                                             </div>
                                             <div className="p-1.5 rounded-lg bg-surface-card border border-border-subtle text-on-surface-variant flex items-center justify-between text-[11px]">
                                                 <span>🔄 Change Category...</span>
-                                                <span className="text-[9px] text-on-surface-variant">Live List</span>
+                                                <span className="text-[9px] text-on-surface-variant">Live Room List</span>
                                             </div>
                                             <div className="p-1.5 rounded-lg bg-surface-card border border-border-subtle text-on-surface-variant flex items-center justify-between text-[11px]">
                                                 <span>✕ Dismiss (Personal / Ignore)</span>
@@ -587,17 +592,38 @@ export const UPIAutomationModal: React.FC<UPIAutomationModalProps> = ({
                                     </div>
                                 </div>
 
-                                {/* Step 3 */}
+                                {/* Step 3: Built-in Manual Fallback */}
                                 <div className="flex items-start gap-2.5">
                                     <span className="w-5 h-5 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">
                                         3
                                     </span>
-                                    <div className="space-y-1 min-w-0">
+                                    <div className="space-y-1.5 min-w-0 w-full">
                                         <span className="font-bold text-on-surface block">
-                                            One-Time Ingest Setup Question
+                                            Smart Fallback: 1-Tap Manual Entry
                                         </span>
                                         <p className="text-[11px] text-on-surface-variant leading-relaxed">
-                                            When importing the shortcut, iOS will prompt you for your <strong>Personal Secret Token</strong>. Copy it using the 1-tap copy button above.
+                                            If no payment screen is detected, or if you tap the shortcut from your <strong>Home Screen</strong>, <strong>Control Center</strong>, or <strong>Lock Screen</strong>, it automatically falls back to manual entry:
+                                        </p>
+                                        <div className="grid grid-cols-2 gap-2 text-[11px]">
+                                            <div className="p-2 rounded-xl bg-surface-card-subtle border border-border-subtle space-y-0.5">
+                                                <span className="font-bold text-primary flex items-center gap-1">
+                                                    <AppIcon name="pin" className="text-[12px]" />
+                                                    Prompt 1
+                                                </span>
+                                                <span className="text-on-surface font-medium block">Ask for Amount</span>
+                                                <span className="text-[10px] text-on-surface-variant font-mono">e.g. 250</span>
+                                            </div>
+                                            <div className="p-2 rounded-xl bg-surface-card-subtle border border-border-subtle space-y-0.5">
+                                                <span className="font-bold text-primary flex items-center gap-1">
+                                                    <AppIcon name="edit_note" className="text-[12px]" />
+                                                    Prompt 2
+                                                </span>
+                                                <span className="text-on-surface font-medium block">Ask for Payee</span>
+                                                <span className="text-[10px] text-on-surface-variant font-mono">e.g. Chai / Dinner</span>
+                                            </div>
+                                        </div>
+                                        <p className="text-[10px] text-on-surface-variant">
+                                            To add to Home Screen: Open <strong>Shortcuts</strong> &rarr; tap the <strong className="text-on-surface">&middot;&middot;&middot;</strong> on <i>Log to SplitNest</i> &rarr; tap Share &rarr; <strong>Add to Home Screen</strong>.
                                         </p>
                                     </div>
                                 </div>
