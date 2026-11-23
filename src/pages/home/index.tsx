@@ -108,8 +108,8 @@ export function Dashboard() {
     };
 
     // 1. Direct personal expenses logged by activePerson (excluding auto-recorded split rows)
-    const directExpenseList = spendings?.allExpenses || spendings?.recentExpenses || [];
     const { personalDirectExpenses, recordedSplitsSum, recordedSplitsTodaySum } = useMemo(() => {
+        const directExpenseList = spendings?.allExpenses || spendings?.recentExpenses || [];
         const personal = directExpenseList.filter(
             (exp) => !exp.description?.toLowerCase().includes('(split:')
         );
@@ -125,7 +125,7 @@ export function Dashboard() {
             recordedSplitsSum: sum,
             recordedSplitsTodaySum: todaySum,
         };
-    }, [directExpenseList]);
+    }, [spendings]);
 
     // 2. Split expenses where activePerson participated or paid upfront (excluding deleted splits)
     const userSplitItems = useMemo(() => {
