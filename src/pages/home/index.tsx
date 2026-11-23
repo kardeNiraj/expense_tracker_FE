@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect } from 'react';
+import { lazy, Suspense, useState, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useExpense } from '../../context';
 import {
@@ -9,7 +9,6 @@ import {
     useSplits,
     useSettleParticipantMutation,
     useTripInfo,
-    usePeople,
     usePeopleDetails,
     usePushConfig,
     usePushStatus,
@@ -62,24 +61,10 @@ export function Dashboard() {
     const { data: spendings, isLoading: isSpendingsLoading } = useSpendings(activePerson);
     const { data: allSplits = [], isLoading: isSplitsLoading } = useSplits();
     const { data: tripInfo } = useTripInfo();
-    const { data: people = [], refetch: refetchPeople } = usePeople();
-    const { data: peopleDetails = [], refetch: refetchPeopleDetails } = usePeopleDetails();
+    const { data: peopleDetails = [] } = usePeopleDetails();
     const { data: pushConfig } = usePushConfig(isDeviceClaimed);
     const { data: pushStatus } = usePushStatus(isDeviceClaimed);
     const [showSpendHistory, setShowSpendHistory] = useState(false);
-
-    // Proactively fetch people and UPI details if not present on initial dashboard mount
-    // Ensures UPI IDs and QR codes are ready offline even if user never visits the People tab
-    useEffect(() => {
-        if (typeof navigator !== 'undefined' && navigator.onLine) {
-            if (people.length === 0) {
-                refetchPeople().catch(() => {});
-            }
-            if (peopleDetails.length === 0) {
-                refetchPeopleDetails().catch(() => {});
-            }
-        }
-    }, [people.length, peopleDetails.length, refetchPeople, refetchPeopleDetails]);
 
     const canAddExpense = !isFormerActiveGroup && !isRoomArchived && !isRoomClosed;
     const canSettle = !isFormerActiveGroup && !isRoomClosed;
@@ -101,8 +86,14 @@ export function Dashboard() {
     const [showIosPushGuide, setShowIosPushGuide] = useState(false);
     const [pushEnabledLocally, setPushEnabledLocally] = useState(false);
 
-    const visibleSplits = allSplits.filter((s) => (s.status || 'ACTIVE').toUpperCase() !== 'DELETED');
-    const activeSplits = visibleSplits.filter((s) => (s.status || 'ACTIVE').toUpperCase() === 'ACTIVE');
+    const visibleSplits = useMemo(
+        () => allSplits.filter((s) => (s.status || 'ACTIVE').toUpperCase() !== 'DELETED'),
+        [allSplits]
+    );
+    const activeSplits = useMemo(
+        () => visibleSplits.filter((s) => (s.status || 'ACTIVE').toUpperCase() === 'ACTIVE'),
+        [visibleSplits]
+    );
 
     // Date checker for today
     const isTodayDate = (dateStr?: string) => {
@@ -118,134 +109,160 @@ export function Dashboard() {
 
     // 1. Direct personal expenses logged by activePerson (excluding auto-recorded split rows)
     const directExpenseList = spendings?.allExpenses || spendings?.recentExpenses || [];
-    const personalDirectExpenses = directExpenseList.filter(
-        (exp) => !exp.description?.toLowerCase().includes('(split:')
-    );
-
-    // Sum of any auto-recorded split rows inside spendings to prevent double-counting
-    const recordedSplitsInSheet = directExpenseList.filter((exp) =>
-        exp.description?.toLowerCase().includes('(split:')
-    );
-    const recordedSplitsSum = recordedSplitsInSheet.reduce((sum, e) => sum + (e.amount || 0), 0);
-    const recordedSplitsTodaySum = recordedSplitsInSheet
-        .filter((e) => isTodayDate(e.timestamp))
-        .reduce((sum, e) => sum + (e.amount || 0), 0);
+    const { personalDirectExpenses, recordedSplitsSum, recordedSplitsTodaySum } = useMemo(() => {
+        const personal = directExpenseList.filter(
+            (exp) => !exp.description?.toLowerCase().includes('(split:')
+        );
+        const recorded = directExpenseList.filter((exp) =>
+            exp.description?.toLowerCase().includes('(split:')
+        );
+        const sum = recorded.reduce((t, e) => t + (e.amount || 0), 0);
+        const todaySum = recorded
+            .filter((e) => isTodayDate(e.timestamp))
+            .reduce((t, e) => t + (e.amount || 0), 0);
+        return {
+            personalDirectExpenses: personal,
+            recordedSplitsSum: sum,
+            recordedSplitsTodaySum: todaySum,
+        };
+    }, [directExpenseList]);
 
     // 2. Split expenses where activePerson participated or paid upfront (excluding deleted splits)
-    const userSplitItems = allSplits
-        .filter((split) =>
-            split.status?.toUpperCase() !== 'DELETED' &&
-            (split.participants?.some(
-                (p) => p.toLowerCase() === activePerson.toLowerCase()
-            ) ||
-            split.paidBy?.toLowerCase() === activePerson.toLowerCase())
-        )
-        .map((split) => {
-            const isParticipant = split.participants?.some(
-                (p) => p.toLowerCase() === activePerson.toLowerCase()
-            );
-            const count = split.participants?.length || 1;
-            // Check if there is an explicit settlement for activePerson (e.g. custom shares or pairwise dues)
-            const mySettlement = split.settlements?.find(
-                (s) => s.from.toLowerCase() === activePerson.toLowerCase()
-            );
-            let myShare = 0;
-            if (mySettlement) {
-                myShare = mySettlement.amount;
-            } else if (isParticipant) {
-                if (split.paidBy?.toLowerCase() === activePerson.toLowerCase() && split.settlements?.length > 0) {
-                    const othersOwe = split.settlements.reduce((sum, s) => sum + s.amount, 0);
-                    myShare = Math.max(0, Math.round((split.totalAmount - othersOwe) * 100) / 100);
-                } else {
-                    myShare = Math.round((split.totalAmount / count) * 100) / 100;
+    const userSplitItems = useMemo(() => {
+        const lowerActive = activePerson.toLowerCase();
+        return allSplits
+            .filter((split) =>
+                split.status?.toUpperCase() !== 'DELETED' &&
+                (split.participants?.some(
+                    (p) => p.toLowerCase() === lowerActive
+                ) ||
+                split.paidBy?.toLowerCase() === lowerActive)
+            )
+            .map((split) => {
+                const isParticipant = split.participants?.some(
+                    (p) => p.toLowerCase() === lowerActive
+                );
+                const count = split.participants?.length || 1;
+                // Check if there is an explicit settlement for activePerson (e.g. custom shares or pairwise dues)
+                const mySettlement = split.settlements?.find(
+                    (s) => s.from.toLowerCase() === lowerActive
+                );
+                let myShare = 0;
+                if (mySettlement) {
+                    myShare = mySettlement.amount;
+                } else if (isParticipant) {
+                    if (split.paidBy?.toLowerCase() === lowerActive && split.settlements && split.settlements.length > 0) {
+                        const othersOwe = split.settlements.reduce((sum, s) => sum + s.amount, 0);
+                        myShare = Math.max(0, Math.round((split.totalAmount - othersOwe) * 100) / 100);
+                    } else {
+                        myShare = Math.round((split.totalAmount / count) * 100) / 100;
+                    }
                 }
-            }
 
-            return {
-                id: split.splitId,
-                timestamp: split.timestamp,
-                description: split.description,
-                category: split.category,
-                totalAmount: split.totalAmount,
-                paidBy: split.paidBy,
-                myShare,
-                isToday: isTodayDate(split.timestamp),
-            };
-        });
+                return {
+                    id: split.splitId,
+                    timestamp: split.timestamp,
+                    description: split.description,
+                    category: split.category,
+                    totalAmount: split.totalAmount,
+                    paidBy: split.paidBy,
+                    myShare,
+                    isToday: isTodayDate(split.timestamp),
+                };
+            });
+    }, [allSplits, activePerson]);
 
     // 3. User's Personal Spend Totals
     // Deduct any auto-recorded split rows from spendings.total to isolate pure personal direct expenses
-    const directTotal = typeof spendings?.directTotal === 'number'
-        ? spendings.directTotal
-        : typeof spendings?.total === 'number'
-        ? Math.max(0, Math.round((spendings.total - recordedSplitsSum) * 100) / 100)
-        : personalDirectExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+    const {
+        splitsTotal,
+        userTotalSpend,
+        userTodaySpend,
+        userMonthSpend,
+        totalUserExpensesCount,
+        upfrontPaidByActiveUser,
+    } = useMemo(() => {
+        const dTotal = typeof spendings?.directTotal === 'number'
+            ? spendings.directTotal
+            : typeof spendings?.total === 'number'
+            ? Math.max(0, Math.round((spendings.total - recordedSplitsSum) * 100) / 100)
+            : personalDirectExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
 
-    const splitsTotal = userSplitItems.reduce((sum, s) => sum + s.myShare, 0);
-    const userTotalSpend = Math.round((directTotal + splitsTotal) * 100) / 100;
+        const sTotal = userSplitItems.reduce((sum, s) => sum + s.myShare, 0);
+        const uTotalSpend = Math.round((dTotal + sTotal) * 100) / 100;
 
-    const directToday = typeof spendings?.directToday === 'number'
-        ? spendings.directToday
-        : typeof spendings?.today === 'number'
-        ? Math.max(0, Math.round((spendings.today - recordedSplitsTodaySum) * 100) / 100)
-        : personalDirectExpenses
-            .filter((e) => isTodayDate(e.timestamp))
-            .reduce((sum, e) => sum + (e.amount || 0), 0);
+        const dToday = typeof spendings?.directToday === 'number'
+            ? spendings.directToday
+            : typeof spendings?.today === 'number'
+            ? Math.max(0, Math.round((spendings.today - recordedSplitsTodaySum) * 100) / 100)
+            : personalDirectExpenses
+                .filter((e) => isTodayDate(e.timestamp))
+                .reduce((sum, e) => sum + (e.amount || 0), 0);
 
-    const splitsToday = userSplitItems
-        .filter((s) => s.isToday)
-        .reduce((sum, s) => sum + s.myShare, 0);
-    const userTodaySpend = Math.round((directToday + splitsToday) * 100) / 100;
+        const sToday = userSplitItems
+            .filter((s) => s.isToday)
+            .reduce((sum, s) => sum + s.myShare, 0);
+        const uTodaySpend = Math.round((dToday + sToday) * 100) / 100;
 
-    const userMonthSpend = userTotalSpend;
-    const totalDirectCount = typeof spendings?.directExpensesCount === 'number'
-        ? spendings.directExpensesCount
-        : personalDirectExpenses.length;
-    const totalUserExpensesCount = totalDirectCount + userSplitItems.length;
+        const uMonthSpend = uTotalSpend;
+        const tDirectCount = typeof spendings?.directExpensesCount === 'number'
+            ? spendings.directExpensesCount
+            : personalDirectExpenses.length;
+        const tUserExpensesCount = tDirectCount + userSplitItems.length;
 
-    // Upfront bill coverage (if user covered bills upfront for the group, excluding deleted splits)
-    const upfrontPaidByActiveUser = allSplits
-        .filter((s) => s.status?.toUpperCase() !== 'DELETED' && s.paidBy?.toLowerCase() === activePerson.toLowerCase())
-        .reduce((sum, s) => sum + s.totalAmount, 0);
+        const upfrontPaid = allSplits
+            .filter((s) => s.status?.toUpperCase() !== 'DELETED' && s.paidBy?.toLowerCase() === activePerson.toLowerCase())
+            .reduce((sum, s) => sum + s.totalAmount, 0);
+
+        return {
+            splitsTotal: sTotal,
+            userTotalSpend: uTotalSpend,
+            userTodaySpend: uTodaySpend,
+            userMonthSpend: uMonthSpend,
+            totalUserExpensesCount: tUserExpensesCount,
+            upfrontPaidByActiveUser: upfrontPaid,
+        };
+    }, [spendings, recordedSplitsSum, recordedSplitsTodaySum, personalDirectExpenses, userSplitItems, allSplits, activePerson]);
 
     // Combined activity items for activePerson
-    const allPersonalItems = [
-        ...personalDirectExpenses.map((e, idx) => ({
-            id: `direct-${idx}`,
-            description: e.description,
-            category: e.category,
-            amount: e.amount,
-            timestamp: e.timestamp,
-            isSplitShare: false,
-            badge: 'Personal',
-            paidBy: activePerson,
-            totalBill: e.amount,
-        })),
-        ...userSplitItems.map((s) => ({
-            id: s.id,
-            description: `${s.description} (Your Share)`,
-            category: s.category,
-            amount: s.myShare,
-            timestamp: s.timestamp,
-            isSplitShare: true,
-            badge: 'Split Share',
-            paidBy: s.paidBy,
-            totalBill: s.totalAmount,
-        })),
-    ].sort((a, b) => {
-        const timeA = parseCustomDate(a.timestamp)?.getTime() || 0;
-        const timeB = parseCustomDate(b.timestamp)?.getTime() || 0;
-        return timeB - timeA;
-    });
+    const allPersonalItems = useMemo(() => {
+        return [
+            ...personalDirectExpenses.map((e, idx) => ({
+                id: `direct-${idx}`,
+                description: e.description,
+                category: e.category,
+                amount: e.amount,
+                timestamp: e.timestamp,
+                isSplitShare: false,
+                badge: 'Personal',
+                paidBy: activePerson,
+                totalBill: e.amount,
+            })),
+            ...userSplitItems.map((s) => ({
+                id: s.id,
+                description: `${s.description} (Your Share)`,
+                category: s.category,
+                amount: s.myShare,
+                timestamp: s.timestamp,
+                isSplitShare: true,
+                badge: 'Split Share',
+                paidBy: s.paidBy,
+                totalBill: s.totalAmount,
+            })),
+        ].sort((a, b) => {
+            const timeA = parseCustomDate(a.timestamp)?.getTime() || 0;
+            const timeB = parseCustomDate(b.timestamp)?.getTime() || 0;
+            return timeB - timeA;
+        });
+    }, [personalDirectExpenses, userSplitItems, activePerson]);
 
     // Recent 10 items for the home overview dashboard
-    const combinedRecentItems = allPersonalItems.slice(0, 10);
+    const combinedRecentItems = useMemo(() => allPersonalItems.slice(0, 10), [allPersonalItems]);
 
     // Calculate pairwise-netted personal settlements across active splits
-    const pairwiseBalances = computePersonalPairwiseBalances(
-        activeSplits,
-        activePerson,
-        peopleDetails
+    const pairwiseBalances = useMemo(
+        () => computePersonalPairwiseBalances(activeSplits, activePerson, peopleDetails),
+        [activeSplits, activePerson, peopleDetails]
     );
     const {
         receivables: groupedOwedToMeList,
