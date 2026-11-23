@@ -182,7 +182,7 @@ export function getDevicePlatformLabel(): string {
     else if (/fxios|firefox/i.test(ua)) browser = 'Firefox';
     else if (/safari/i.test(ua)) browser = 'Safari';
 
-    return `${os} · ${browser}`;
+    return `${os} - ${browser}`;
 }
 
 export function getStoredClaimedPerson(): string | null {

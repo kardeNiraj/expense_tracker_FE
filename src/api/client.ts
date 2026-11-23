@@ -144,7 +144,7 @@ function buildRequestHeaders(customHeaders?: HeadersInit): Record<string, string
 
     const claimed = getStoredClaimedPerson();
     if (claimed) {
-        headers['x-claimed-person'] = claimed;
+        headers['x-claimed-person'] = encodeURIComponent(claimed);
     }
 
     const userToken = getUserToken();
