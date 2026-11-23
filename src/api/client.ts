@@ -3,6 +3,7 @@ import {
     getActiveGroupId,
     getUserToken,
     notifyUserAuthExpired,
+    setActiveGroupIdStorage,
 } from '../utils/authStorage';
 import {
     getActiveAdminToken,
@@ -120,6 +121,9 @@ async function parseErrorResponse(response: Response): Promise<ApiError> {
     ) {
         notifyUserAuthExpired();
     } else if (response.status === 401 || response.status === 403) {
+        if (code === 'GROUP_ACCESS_DENIED') {
+            setActiveGroupIdStorage(null);
+        }
         notifyAccessError({
             status: response.status,
             code,

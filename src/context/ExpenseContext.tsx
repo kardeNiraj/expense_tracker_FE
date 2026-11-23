@@ -34,6 +34,7 @@ import {
     clearActiveAdminToken,
     getActiveAdminToken,
     setActiveAdminToken,
+    subscribeToAccessErrors,
 } from '../utils/deviceIdentity';
 import { resetPushSyncSession, syncExistingPushSubscription } from '../utils/pushNotifications';
 import {
@@ -158,13 +159,21 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
             setActiveGroupIdStorage(null);
             return;
         }
-        if (groups.length === 0 && formerGroups.length === 0) return;
+        if (groupsQuery.isFetched && groups.length === 0 && formerGroups.length === 0) {
+            setActiveGroupIdStorage(null);
+            setSelectedGroupId(null);
+            return;
+        }
         if (
             selectedGroupId &&
             !groups.some((g) => g.groupId === selectedGroupId) &&
-            !formerGroups.some((g) => g.groupId === selectedGroupId) &&
-            !groupsQuery.isFetched
+            !formerGroups.some((g) => g.groupId === selectedGroupId)
         ) {
+            if (groupsQuery.isFetched) {
+                const fallbackId = groups[0]?.groupId || null;
+                setSelectedGroupId(fallbackId);
+                setActiveGroupIdStorage(fallbackId);
+            }
             return;
         }
         setActiveGroupIdStorage(activeGroupId);
@@ -176,6 +185,16 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
         activeGroupId,
         groupsQuery.isFetched,
     ]);
+
+    useEffect(() => {
+        return subscribeToAccessErrors((event) => {
+            if (event.code === 'GROUP_ACCESS_DENIED') {
+                setActiveGroupIdStorage(null);
+                setSelectedGroupId(null);
+                void queryClient.invalidateQueries({ queryKey: groupQueryKeys.all() });
+            }
+        });
+    }, [queryClient]);
 
     const isAuthenticated = Boolean(hasUserSession && user);
     const isAuthLoading =
