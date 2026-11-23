@@ -35,6 +35,7 @@ import {
 export function SplitsPage() {
     const {
         activePerson,
+        setActivePerson,
         activeGroup,
         isFormerActiveGroup,
         isRoomArchived,
@@ -60,6 +61,64 @@ export function SplitsPage() {
     const [settlingKey, setSettlingKey] = useState<string | null>(null);
     const [remindingKey, setRemindingKey] = useState<string | null>(null);
     const lastScrolledSplitRef = useRef<string | null>(null);
+    const { data: peopleDetails = [] } = usePeopleDetails();
+
+    useEffect(() => {
+        const handleConfirmReceivedParam = () => {
+            if (typeof window === 'undefined') return;
+            const params = new URLSearchParams(window.location.search);
+            const action = params.get('action');
+            if (action === 'confirm-received') {
+                const from = params.get('from')?.trim() || '';
+                const to = params.get('to')?.trim() || '';
+                const amount = Number(params.get('amount') || 0);
+                const splitId = params.get('splitId')?.trim() || '';
+                const splitIdsParam = params.get('splitIds')?.trim() || '';
+                const description = params.get('description')?.trim() || '';
+
+                if (from && amount > 0) {
+                    if (to && activePerson.toLowerCase() !== to.toLowerCase()) {
+                        const matchedPerson = peopleDetails.find(
+                            (p) => p.name.toLowerCase() === to.toLowerCase()
+                        );
+                        if (matchedPerson) {
+                            setActivePerson(matchedPerson.name);
+                        }
+                    }
+
+                    const splitIds = splitIdsParam ? splitIdsParam.split(',').filter(Boolean) : undefined;
+                    setCollectSettlement({
+                        debtorName: from,
+                        amount,
+                        splitId: splitId || undefined,
+                        splitIds,
+                        description: description || undefined,
+                        isPaymentVerification: true,
+                    });
+
+                    const cleanUrl = new URL(window.location.href);
+                    cleanUrl.searchParams.delete('action');
+                    cleanUrl.searchParams.delete('from');
+                    cleanUrl.searchParams.delete('to');
+                    cleanUrl.searchParams.delete('amount');
+                    cleanUrl.searchParams.delete('splitId');
+                    cleanUrl.searchParams.delete('splitIds');
+                    cleanUrl.searchParams.delete('description');
+                    window.history.replaceState(
+                        {},
+                        '',
+                        cleanUrl.pathname + (cleanUrl.searchParams.toString() ? `?${cleanUrl.searchParams.toString()}` : '')
+                    );
+                }
+            }
+        };
+
+        handleConfirmReceivedParam();
+        window.addEventListener('popstate', handleConfirmReceivedParam);
+        return () => {
+            window.removeEventListener('popstate', handleConfirmReceivedParam);
+        };
+    }, [activePerson, peopleDetails, setActivePerson]);
 
     const { data: focusedSplitDetail } = useSplitDetails(focusedSplitId || undefined);
     const focusedStatus =
@@ -95,7 +154,6 @@ export function SplitsPage() {
         return visibleSplits;
     }, [effectiveStatusFilter, activeSplits, settledSplits, visibleSplits]);
     const { data: tripInfo } = useTripInfo();
-    const { data: peopleDetails = [] } = usePeopleDetails();
     const settleMutation = useSettleParticipantMutation();
     const contributeMutation = useAddContributionMutation();
     const deleteMutation = useDeleteSplitMutation();

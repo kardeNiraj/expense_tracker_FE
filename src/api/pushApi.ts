@@ -5,6 +5,8 @@ import {
     getStoredClaimedPerson,
 } from '../utils/deviceIdentity';
 import type {
+    NotifyPaymentSentPayload,
+    NotifyPaymentSentResponse,
     PushDeviceStatusResponse,
     PushPublicConfig,
     PushSubscribeResponse,
@@ -76,5 +78,26 @@ export async function remindSplitDebtorApi(
             }),
         }
     );
+}
+
+export async function notifyPaymentSentApi(
+    payload: NotifyPaymentSentPayload
+): Promise<NotifyPaymentSentResponse> {
+    const splitIdPath = payload.splitId
+        ? `/splits/${encodeURIComponent(payload.splitId)}/notify-payment-sent`
+        : '/splits/notify-payment-sent';
+    return apiFetch<NotifyPaymentSentResponse>(splitIdPath, {
+        method: 'POST',
+        body: JSON.stringify({
+            splitId: payload.splitId,
+            splitIds: payload.splitIds,
+            groupId: payload.groupId,
+            from: payload.from,
+            to: payload.to,
+            amount: payload.amount,
+            description: payload.description,
+            requestedBy: payload.requestedBy,
+        }),
+    });
 }
 

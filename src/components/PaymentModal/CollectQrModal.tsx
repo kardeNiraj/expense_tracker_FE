@@ -28,6 +28,7 @@ export interface CollectQrModalData {
     splitIds?: string[];
     settlementRefs?: CollectQrSettlementRef[];
     description?: string;
+    isPaymentVerification?: boolean;
 }
 
 export interface CollectQrModalProps {
@@ -137,15 +138,35 @@ const CollectQrContent: React.FC<CollectQrContentProps> = ({
                     )
                 );
             } else {
-                const targetSplitIds =
+                let targetSplitIds =
                     data.splitIds && data.splitIds.length > 0
-                        ? data.splitIds
+                        ? [...data.splitIds]
                         : data.splitId
                           ? [data.splitId]
                           : [];
 
                 if (targetSplitIds.length === 0) {
-                    throw new Error('No split ID provided for settlement');
+                    const cachedLists = queryClient.getQueriesData<Split[]>({ queryKey: ['splits'] });
+                    const flatSplits = cachedLists.flatMap(([, list]) => list || []);
+                    const debtorLower = data.debtorName.toLowerCase();
+                    const activeLower = activePerson.toLowerCase();
+                    const matchingSplits = flatSplits.filter(
+                        (s) =>
+                            (s.status || 'ACTIVE').toUpperCase() === 'ACTIVE' &&
+                            (s.settlements || []).some(
+                                (st) =>
+                                    st.status !== 'SETTLED' &&
+                                    st.from.toLowerCase() === debtorLower &&
+                                    st.to.toLowerCase() === activeLower
+                            )
+                    );
+                    if (matchingSplits.length > 0) {
+                        targetSplitIds = matchingSplits.map((s) => s.splitId);
+                    }
+                }
+
+                if (targetSplitIds.length === 0) {
+                    throw new Error('No pending split found to mark as settled');
                 }
 
                 await Promise.all(
@@ -267,11 +288,16 @@ const CollectQrContent: React.FC<CollectQrContentProps> = ({
                         <div className="flex items-center gap-3 min-w-0">
                             <Avatar name={data.debtorName} size="md" />
                             <div className="min-w-0">
-                                <h3 className="font-bold text-base text-on-surface truncate">
-                                    Collect from {data.debtorName}
+                                <h3 className="font-bold text-base text-on-surface truncate flex items-center gap-1.5">
+                                    <span>{data.isPaymentVerification ? `Payment from ${data.debtorName}` : `Collect from ${data.debtorName}`}</span>
+                                    {data.isPaymentVerification && (
+                                        <AppIcon name="verified" className="text-status-settled-text text-[18px] shrink-0" />
+                                    )}
                                 </h3>
                                 <p className="text-xs text-on-surface-variant truncate">
-                                    {data.description || 'Split dues'}
+                                    {data.isPaymentVerification
+                                        ? 'Verify and confirm receipt'
+                                        : (data.description || 'Split dues')}
                                 </p>
                             </div>
                         </div>
@@ -287,6 +313,19 @@ const CollectQrContent: React.FC<CollectQrContentProps> = ({
 
                     {/* Body Content */}
                     <div className="p-5 overflow-y-auto space-y-4">
+                        {data.isPaymentVerification && (
+                            <div className="flex items-start gap-2.5 p-3 rounded-2xl bg-status-settled-bg/40 border border-status-settled-text/30 text-xs text-on-surface animate-in fade-in duration-200">
+                                <AppIcon name="task_alt" className="text-[20px] text-status-settled-text shrink-0 mt-0.5" />
+                                <div className="space-y-0.5">
+                                    <span className="font-bold text-status-settled-text block">
+                                        {data.debtorName} notified payment sent
+                                    </span>
+                                    <p className="text-on-surface-variant leading-relaxed">
+                                        Check your bank or UPI app for ₹{data.amount.toLocaleString('en-IN')}{data.description ? ` for "${data.description}"` : ''}. Once received, tap below to mark settled.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
                         {/* Amount Banner + Fixed/Open QR Toggle */}
                         <div className="bg-primary/5 border border-primary/20 rounded-2xl p-3.5 text-center space-y-2.5">
                             <div>
@@ -478,11 +517,13 @@ const CollectQrContent: React.FC<CollectQrContentProps> = ({
                             onClick={() => void handleConfirmReceived()}
                             className="w-full h-12 rounded-xl bg-primary text-on-primary font-bold text-sm shadow-sm hover:bg-primary/90 active:scale-[0.98] transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                         >
-                            <AppIcon name={isSettling ? 'hourglass_top' : 'done_all'} className="text-[20px]" />
+                            <AppIcon name={isSettling ? 'hourglass_top' : data.isPaymentVerification ? 'check_circle' : 'done_all'} className="text-[20px]" />
                             <span>
                                 {isSettling
                                     ? 'Confirming...'
-                                    : `Confirm Received ₹${data.amount.toLocaleString('en-IN')} from ${data.debtorName}`}
+                                    : data.isPaymentVerification
+                                      ? `Verify & Confirm Received ₹${data.amount.toLocaleString('en-IN')}`
+                                      : `Confirm Received ₹${data.amount.toLocaleString('en-IN')} from ${data.debtorName}`}
                             </span>
                         </button>
                     </div>

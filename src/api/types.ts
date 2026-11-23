@@ -524,6 +524,28 @@ export interface RemindParticipantResponse {
     message: string;
 }
 
+export interface NotifyPaymentSentPayload {
+    splitId?: string;
+    splitIds?: string[];
+    groupId?: string | null;
+    from: string;
+    to: string;
+    amount: number;
+    description?: string;
+    requestedBy?: string;
+}
+
+export interface NotifyPaymentSentResponse {
+    configured: boolean;
+    targetPerson: string;
+    subscribedDevices?: number;
+    delivered: number;
+    failed?: number;
+    pruned?: number;
+    amount: number;
+    message: string;
+}
+
 export interface TestPushResponse {
     configured: boolean;
     targeted: number;

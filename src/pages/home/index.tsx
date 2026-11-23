@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useMemo } from 'react';
+import { lazy, Suspense, useState, useMemo, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useExpense } from '../../context';
 import {
@@ -52,6 +52,7 @@ export function Dashboard() {
         isRoomArchived,
         isRoomClosed,
         activePerson,
+        setActivePerson,
         claimedPerson,
         isDeviceClaimed,
         setActiveTab,
@@ -85,6 +86,63 @@ export function Dashboard() {
     const [isEnablingPush, setIsEnablingPush] = useState(false);
     const [showIosPushGuide, setShowIosPushGuide] = useState(false);
     const [pushEnabledLocally, setPushEnabledLocally] = useState(false);
+
+    useEffect(() => {
+        const handleConfirmReceivedParam = () => {
+            if (typeof window === 'undefined') return;
+            const params = new URLSearchParams(window.location.search);
+            const action = params.get('action');
+            if (action === 'confirm-received') {
+                const from = params.get('from')?.trim() || '';
+                const to = params.get('to')?.trim() || '';
+                const amount = Number(params.get('amount') || 0);
+                const splitId = params.get('splitId')?.trim() || '';
+                const splitIdsParam = params.get('splitIds')?.trim() || '';
+                const description = params.get('description')?.trim() || '';
+
+                if (from && amount > 0) {
+                    if (to && activePerson.toLowerCase() !== to.toLowerCase()) {
+                        const matchedPerson = peopleDetails.find(
+                            (p) => p.name.toLowerCase() === to.toLowerCase()
+                        );
+                        if (matchedPerson) {
+                            setActivePerson(matchedPerson.name);
+                        }
+                    }
+
+                    const splitIds = splitIdsParam ? splitIdsParam.split(',').filter(Boolean) : undefined;
+                    setCollectSettlement({
+                        debtorName: from,
+                        amount,
+                        splitId: splitId || undefined,
+                        splitIds,
+                        description: description || undefined,
+                        isPaymentVerification: true,
+                    });
+
+                    const cleanUrl = new URL(window.location.href);
+                    cleanUrl.searchParams.delete('action');
+                    cleanUrl.searchParams.delete('from');
+                    cleanUrl.searchParams.delete('to');
+                    cleanUrl.searchParams.delete('amount');
+                    cleanUrl.searchParams.delete('splitId');
+                    cleanUrl.searchParams.delete('splitIds');
+                    cleanUrl.searchParams.delete('description');
+                    window.history.replaceState(
+                        {},
+                        '',
+                        cleanUrl.pathname + (cleanUrl.searchParams.toString() ? `?${cleanUrl.searchParams.toString()}` : '')
+                    );
+                }
+            }
+        };
+
+        handleConfirmReceivedParam();
+        window.addEventListener('popstate', handleConfirmReceivedParam);
+        return () => {
+            window.removeEventListener('popstate', handleConfirmReceivedParam);
+        };
+    }, [activePerson, peopleDetails, setActivePerson]);
 
     const visibleSplits = useMemo(
         () => allSplits.filter((s) => (s.status || 'ACTIVE').toUpperCase() !== 'DELETED'),

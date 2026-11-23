@@ -109,6 +109,8 @@ function MainApp() {
                     if (targetSplitId) {
                         setFocusedSplitId(targetSplitId);
                     }
+                    window.history.pushState({}, '', parsed.pathname + parsed.search);
+                    window.dispatchEvent(new Event('popstate'));
                 } catch {
                     if (msg.splitId) {
                         setActiveTab('splits');

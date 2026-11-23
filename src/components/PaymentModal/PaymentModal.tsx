@@ -11,6 +11,8 @@ import {
     type ParsedUpiQr,
 } from '../../utils/qr';
 import { AppIcon } from '../Icon/AppIcon';
+import { notifyPaymentSentApi } from '../../api/pushApi';
+import { ApiError } from '../../api/client';
 
 const QrScannerModal = lazy(() => import('../QRScanner/QrScannerModal'));
 
@@ -40,7 +42,7 @@ const PaymentModalContent: React.FC<PaymentModalContentProps> = ({
     onClose,
     settlement,
 }) => {
-    const { showToast, activePerson } = useExpense();
+    const { showToast, activePerson, claimedPerson } = useExpense();
     const hasPositiveAmount = settlement.amount > 0;
     const [includeAmountInQr, setIncludeAmountInQr] = useState(hasPositiveAmount);
     const [copiedUpi, setCopiedUpi] = useState(false);
@@ -48,6 +50,8 @@ const PaymentModalContent: React.FC<PaymentModalContentProps> = ({
     const [isSharingQr, setIsSharingQr] = useState(false);
     const [showScanner, setShowScanner] = useState(false);
     const [scannedQr, setScannedQr] = useState<ParsedUpiQr | null>(null);
+    const [isNotifyingInApp, setIsNotifyingInApp] = useState(false);
+    const [hasNotifiedInApp, setHasNotifiedInApp] = useState(false);
 
     const savedUpiId = useMemo(() => {
         const direct = settlement.toUpiId?.trim();
@@ -155,6 +159,44 @@ const PaymentModalContent: React.FC<PaymentModalContentProps> = ({
         triggerHaptic('light');
         const text = `Hey ${settlement.to}, confirming payment details for ${settlement.description || 'our split'}:\n💰 Amount: ₹${settlement.amount}\n💳 Payee UPI: ${activeUpiId || 'Ask payee'}`;
         window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+    };
+
+    const handleNotifyPaidInApp = async () => {
+        if (isNotifyingInApp || hasNotifiedInApp) return;
+        const payer = settlement.from || activePerson;
+        if (!payer || !settlement.to) return;
+
+        setIsNotifyingInApp(true);
+        try {
+            triggerHaptic('medium');
+            const res = await notifyPaymentSentApi({
+                splitId: settlement.splitId,
+                splitIds: settlement.splitIds,
+                from: payer,
+                to: settlement.to,
+                amount: settlement.amount,
+                description: settlement.description,
+                requestedBy: claimedPerson || payer,
+            });
+
+            if (res.delivered > 0) {
+                triggerHaptic('success');
+                setHasNotifiedInApp(true);
+                showToast(res.message || `Payment alert sent to ${settlement.to}!`, 'check_circle');
+            } else {
+                triggerHaptic('warning');
+                showToast(
+                    res.message || `${settlement.to} hasn't enabled push notifications on their device yet.`,
+                    'info'
+                );
+            }
+        } catch (err: unknown) {
+            triggerHaptic('warning');
+            const msg = err instanceof ApiError ? err.message : String(err);
+            showToast(msg || 'Failed to send payment alert', 'error');
+        } finally {
+            setIsNotifyingInApp(false);
+        }
     };
 
     const handleNotifyPaidOnWhatsapp = () => {
@@ -374,15 +416,38 @@ const PaymentModalContent: React.FC<PaymentModalContentProps> = ({
                         </div>
                     )}
 
-                    {/* Payment Confirmation / WhatsApp Actions */}
+                    {/* Payment Confirmation / In-App Notification Actions */}
                     <div className="space-y-2">
                         <button
                             type="button"
-                            onClick={handleNotifyPaidOnWhatsapp}
-                            className="w-full h-11 px-3.5 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-colors active:scale-[0.98] cursor-pointer"
+                            disabled={isNotifyingInApp || hasNotifiedInApp}
+                            onClick={() => void handleNotifyPaidInApp()}
+                            className={`w-full h-11 px-3.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-colors active:scale-[0.98] cursor-pointer ${
+                                hasNotifiedInApp
+                                    ? 'bg-status-settled-bg text-status-settled-text border border-status-settled-text/30 cursor-default'
+                                    : 'bg-primary hover:bg-primary/90 text-on-primary'
+                            } disabled:opacity-75`}
                         >
-                            <AppIcon name="task_alt" className="text-[18px]" />
-                            <span>I&apos;ve Paid — Notify {settlement.to} on WhatsApp</span>
+                            <AppIcon
+                                name={hasNotifiedInApp ? 'check_circle' : isNotifyingInApp ? 'hourglass_top' : 'notifications_active'}
+                                className="text-[18px]"
+                            />
+                            <span>
+                                {hasNotifiedInApp
+                                    ? `Notified ${settlement.to} in SplitNest ✓`
+                                    : isNotifyingInApp
+                                      ? 'Sending Payment Alert...'
+                                      : `I've Paid — Notify ${settlement.to} in SplitNest`}
+                            </span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={handleNotifyPaidOnWhatsapp}
+                            className="w-full h-10 px-3.5 rounded-xl bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#1b8e45] dark:text-[#25D366] font-bold text-xs flex items-center justify-center gap-1.5 border border-[#25D366]/30 transition-colors active:scale-[0.98] cursor-pointer"
+                        >
+                            <AppIcon name="chat" className="text-[17px]" />
+                            <span>Notify {settlement.to} via WhatsApp</span>
                         </button>
 
                         {activeUpiId && (
