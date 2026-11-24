@@ -427,21 +427,21 @@ async function executeSingleMutation(item: QueuedItem): Promise<void> {
         }
 
         case 'ADD_CONTRIBUTION': {
-            const { splitId, person, amount } = item.payload as AddContributionPayload;
+            const { splitId, person, userId, amount } = item.payload as AddContributionPayload;
             await apiFetch<Split>(`/split/${splitId}/contributions`, {
                 method: 'POST',
                 headers: groupHeaders,
-                body: JSON.stringify({ person, amount }),
+                body: JSON.stringify({ person, userId, amount }),
             });
             break;
         }
 
         case 'SETTLE_PARTICIPANT': {
-            const { splitId, from, to, settled, confirmedBy } = item.payload as SettleParticipantPayload;
+            const { splitId, from, fromUserId, to, toUserId, settled, confirmedBy } = item.payload as SettleParticipantPayload;
             await apiFetch<Split>(`/split/${splitId}/settle`, {
                 method: 'PATCH',
                 headers: groupHeaders,
-                body: JSON.stringify({ from, to, settled, confirmedBy }),
+                body: JSON.stringify({ from, fromUserId, to, toUserId, settled, confirmedBy }),
             });
             break;
         }

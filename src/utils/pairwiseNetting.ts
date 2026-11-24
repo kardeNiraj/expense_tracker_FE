@@ -9,7 +9,9 @@ export interface PairwiseSettlementRef {
     description: string;
     amount: number;
     from: string;
+    fromUserId?: string | null;
     to: string;
+    toUserId?: string | null;
     direction: 'OWED_TO_ME' | 'I_OWE';
     toUpiId?: string | null;
     upiIntent?: string;
@@ -224,7 +226,9 @@ export function computePersonalPairwiseBalances(
                     description: split.description,
                     amount,
                     from: fromTrimmed,
+                    fromUserId: st.fromUserId || null,
                     to: toTrimmed,
+                    toUserId: st.toUserId || null,
                     direction: 'I_OWE',
                     toUpiId: resolvedUpi,
                     upiIntent: st.upiIntent,
@@ -237,7 +241,9 @@ export function computePersonalPairwiseBalances(
                     description: split.description,
                     amount,
                     from: fromTrimmed,
+                    fromUserId: st.fromUserId || null,
                     to: toTrimmed,
+                    toUserId: st.toUserId || null,
                     direction: 'OWED_TO_ME',
                 });
             }

@@ -18,11 +18,14 @@ const QrScannerModal = lazy(() => import('../QRScanner/QrScannerModal'));
 export interface CollectQrSettlementRef {
     splitId: string;
     from: string;
+    fromUserId?: string | null;
     to: string;
+    toUserId?: string | null;
 }
 
 export interface CollectQrModalData {
     debtorName: string;
+    debtorUserId?: string | null;
     amount: number;
     splitId?: string;
     splitIds?: string[];
@@ -125,13 +128,21 @@ const CollectQrContent: React.FC<CollectQrContentProps> = ({
     const handleConfirmReceived = async () => {
         setIsSettling(true);
         try {
+            const debtorDetail = peopleDetails.find(
+                (p) => p.name.toLowerCase() === data.debtorName.toLowerCase()
+            );
+            const debtorUserId = data.debtorUserId || debtorDetail?.userId || null;
+            const myUserId = myDetail?.userId || null;
+
             if (data.settlementRefs && data.settlementRefs.length > 0) {
                 await Promise.all(
                     data.settlementRefs.map((ref) =>
                         settleMutation.mutateAsync({
                             splitId: resolveCachedSplitId(ref.splitId),
                             from: ref.from,
+                            fromUserId: ref.fromUserId || debtorUserId || null,
                             to: ref.to,
+                            toUserId: ref.toUserId || myUserId || null,
                             confirmedBy: activePerson,
                             settled: true,
                         })
@@ -174,7 +185,9 @@ const CollectQrContent: React.FC<CollectQrContentProps> = ({
                         settleMutation.mutateAsync({
                             splitId: resolveCachedSplitId(sId),
                             from: data.debtorName,
+                            fromUserId: debtorUserId,
                             to: activePerson,
+                            toUserId: myUserId,
                             confirmedBy: activePerson,
                             settled: true,
                         })

@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useExpense } from '../../context';
 import {
     apiFetch,
     useCategories,
     usePeople,
+    usePeopleDetails,
     useAddExpenseMutation,
     useAddSplitMutation,
 } from '../../api';
@@ -502,6 +503,7 @@ function detectCategory(description: string, availableCategories: string[]): str
 
 export function AddPage() {
     const {
+        user,
         activePerson,
         activeGroup,
         isFormerActiveGroup,
@@ -515,6 +517,30 @@ export function AddPage() {
     const { data: rawCategories = [] } = useCategories();
     const categories = rawCategories.length > 0 ? rawCategories : DEFAULT_CATEGORIES;
     const { data: people = [], refetch: refetchPeople, isFetching: isPeopleFetching } = usePeople();
+    const { data: peopleDetails = [] } = usePeopleDetails();
+
+    const userMap = useMemo(() => {
+        const map = new Map<string, string>();
+        for (const p of peopleDetails) {
+            if (p.name && p.userId) {
+                map.set(p.name.trim().toLowerCase(), p.userId);
+            }
+        }
+        return map;
+    }, [peopleDetails]);
+
+    const resolveUserId = (name?: string | null): string | null => {
+        if (!name) return null;
+        const lower = name.trim().toLowerCase();
+        if (
+            user?.userId &&
+            ((user.name && user.name.trim().toLowerCase() === lower) ||
+                (activePerson && activePerson.trim().toLowerCase() === lower))
+        ) {
+            return user.userId;
+        }
+        return userMap.get(lower) || null;
+    };
 
     // Quick Expense Form States
     const [expensePayee, setExpensePayee] = useState(activePerson);
@@ -657,6 +683,7 @@ export function AddPage() {
         try {
             const res = await addExpenseMutation.mutateAsync({
                 payee: activeExpensePayee,
+                userId: resolveUserId(activeExpensePayee),
                 category: activeExpenseCategory,
                 amount: amt,
                 description: expenseDesc,
@@ -702,8 +729,24 @@ export function AddPage() {
 
         const contributions =
             hasContribution && contributionAmt && activeContributionPerson
-                ? [{ person: activeContributionPerson, amount: parseFloat(contributionAmt) }]
+                ? [
+                      {
+                          person: activeContributionPerson,
+                          userId: resolveUserId(activeContributionPerson),
+                          amount: parseFloat(contributionAmt),
+                      },
+                  ]
                 : [];
+
+        const paidByUserId = resolveUserId(activeSplitPaidBy);
+        const createdByUserId = resolveUserId(activePerson) || user?.userId || null;
+
+        const enrichedCustomShares = customShares
+            ? customShares.map((cs) => ({
+                  ...cs,
+                  userId: resolveUserId(cs.person),
+              }))
+            : undefined;
 
         try {
             await addSplitMutation.mutateAsync({
@@ -711,12 +754,14 @@ export function AddPage() {
                 description: splitDesc,
                 category: activeSplitCategory,
                 paidBy: activeSplitPaidBy,
+                paidByUserId,
                 createdBy: activePerson,
+                createdByUserId,
                 participants: participatingPeople,
                 contributions,
                 recordExpense,
                 splitMode: isSharesMode ? 'CUSTOM' : 'EQUAL',
-                customShares,
+                customShares: enrichedCustomShares,
             });
             triggerHaptic('success');
             if (typeof navigator !== 'undefined' && !navigator.onLine) {

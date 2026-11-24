@@ -8,16 +8,20 @@ export interface ApiResponse<T> {
 export interface PersonDetail {
     name: string;
     upiId: string | null;
+    userId?: string | null;
 }
 
 export interface Contribution {
     person: string;
+    userId?: string | null;
     amount: number;
 }
 
 export interface Settlement {
     from: string;
+    fromUserId?: string | null;
     to: string;
+    toUserId?: string | null;
     amount: number;
     toUpiId?: string | null;
     upiIntent?: string;
@@ -42,7 +46,9 @@ export interface Split {
     category: string;
     totalAmount: number;
     paidBy: string;
+    paidByUserId?: string | null;
     createdBy?: string;
+    createdByUserId?: string | null;
     contributions: Contribution[];
     participants: string[];
     settlements: Settlement[];
@@ -111,6 +117,7 @@ export interface AddExpensePayload {
     expenseId?: string;
     groupId?: string | null;
     payee: string;
+    userId?: string | null;
     category: string;
     amount: number;
     description: string;
@@ -124,19 +131,22 @@ export interface AddSplitPayload {
     description: string;
     category: string;
     paidBy: string;
+    paidByUserId?: string | null;
     createdBy: string;
+    createdByUserId?: string | null;
     timestamp?: string;
     contributions?: Contribution[];
     participants: string[];
     recordExpense?: boolean;
     splitMode?: 'EQUAL' | 'CUSTOM';
-    customShares?: { person: string; share: number }[];
+    customShares?: { person: string; share: number; userId?: string | null }[];
 }
 
 export interface AddContributionPayload {
     splitId: string;
     groupId?: string | null;
     person: string;
+    userId?: string | null;
     amount: number;
 }
 
@@ -144,7 +154,9 @@ export interface SettleParticipantPayload {
     splitId: string;
     groupId?: string | null;
     from: string;
+    fromUserId?: string | null;
     to?: string;
+    toUserId?: string | null;
     settled?: boolean;
     confirmedBy?: string;
 }
@@ -507,7 +519,9 @@ export interface PushSubscribeResponse {
 export interface RemindParticipantPayload {
     splitId: string;
     from: string;
+    fromUserId?: string | null;
     to?: string;
+    toUserId?: string | null;
     requestedBy?: string;
     consolidatedAmount?: number;
     consolidatedCount?: number;
@@ -529,7 +543,9 @@ export interface NotifyPaymentSentPayload {
     splitIds?: string[];
     groupId?: string | null;
     from: string;
+    fromUserId?: string | null;
     to: string;
+    toUserId?: string | null;
     amount: number;
     description?: string;
     requestedBy?: string;

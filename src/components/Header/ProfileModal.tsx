@@ -111,10 +111,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             triggerHaptic('success');
             setIsEditingProfile(false);
             showToast(`Display name updated to ${result.user.name}`, 'badge');
-            if (claimedPerson && user?.name && claimedPerson.toLowerCase() === user.name.toLowerCase()) {
-                setActivePerson(result.user.name);
-                void claimProfile(result.user.name);
-            }
+            setActivePerson(result.user.name);
+            void claimProfile(result.user.name);
         } catch (err) {
             triggerHaptic('warning');
             setProfileEditError(err instanceof Error ? err.message : 'Failed to update profile');

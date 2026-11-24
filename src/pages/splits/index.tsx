@@ -34,6 +34,7 @@ import {
 
 export function SplitsPage() {
     const {
+        user,
         activePerson,
         setActivePerson,
         activeGroup,
@@ -233,6 +234,29 @@ export function SplitsPage() {
         return splitId;
     };
 
+    const userMap = useMemo(() => {
+        const map = new Map<string, string>();
+        for (const p of peopleDetails) {
+            if (p.name && p.userId) {
+                map.set(p.name.trim().toLowerCase(), p.userId);
+            }
+        }
+        return map;
+    }, [peopleDetails]);
+
+    const resolveUserId = (name?: string | null): string | null => {
+        if (!name) return null;
+        const lower = name.trim().toLowerCase();
+        if (
+            user?.userId &&
+            ((user.name && user.name.trim().toLowerCase() === lower) ||
+                (activePerson && activePerson.trim().toLowerCase() === lower))
+        ) {
+            return user.userId;
+        }
+        return userMap.get(lower) || null;
+    };
+
     const handleClearMutualOffset = async (pair: MutualZeroOffsetPair) => {
         const key = `offset_${pair.counterparty}`;
         setSettlingKey(key);
@@ -242,7 +266,9 @@ export function SplitsPage() {
                     settleMutation.mutateAsync({
                         splitId: resolveSplitId(ref.splitId),
                         from: ref.from,
+                        fromUserId: ref.fromUserId || resolveUserId(ref.from),
                         to: ref.to,
+                        toUserId: ref.toUserId || resolveUserId(ref.to),
                         confirmedBy: activePerson,
                     })
                 )
@@ -260,7 +286,13 @@ export function SplitsPage() {
         }
     };
 
-    const handleSettle = async (splitId: string, fromPerson: string, toPerson?: string) => {
+    const handleSettle = async (
+        splitId: string,
+        fromPerson: string,
+        toPerson?: string,
+        fromUserId?: string | null,
+        toUserId?: string | null
+    ) => {
         const targetSplitId = resolveSplitId(splitId);
 
         const key = `${splitId}_${fromPerson}`;
@@ -269,7 +301,9 @@ export function SplitsPage() {
             await settleMutation.mutateAsync({
                 splitId: targetSplitId,
                 from: fromPerson,
+                fromUserId: fromUserId || resolveUserId(fromPerson),
                 to: toPerson,
+                toUserId: toUserId || (toPerson ? resolveUserId(toPerson) : null),
                 confirmedBy: activePerson,
             });
             triggerHaptic('success');
@@ -354,6 +388,7 @@ export function SplitsPage() {
             await contributeMutation.mutateAsync({
                 splitId: selectedSplitForContribution.splitId,
                 person: contributionPerson,
+                userId: resolveUserId(contributionPerson),
                 amount: amt,
             });
             triggerHaptic('success');
@@ -1143,7 +1178,7 @@ export function SplitsPage() {
                                                                                     settlingKey === `offset_${s.from}` ||
                                                                                     settlingKey === `offset_${s.to}`
                                                                                 }
-                                                                                onClick={() => handleSettle(split.splitId, s.from, s.to)}
+                                                                                onClick={() => handleSettle(split.splitId, s.from, s.to, s.fromUserId, s.toUserId)}
                                                                                 className="flex-1 h-8.5 px-2.5 rounded-xl bg-primary-fixed hover:bg-primary text-on-primary-fixed hover:text-on-primary text-xs font-bold transition-all flex items-center justify-center gap-1 shadow-2xs disabled:opacity-50 cursor-pointer active:scale-[0.99] whitespace-nowrap"
                                                                                 title={`Confirm you have received ₹${s.amount} from ${s.from}`}
                                                                                 aria-label={`Confirm receipt of ₹${s.amount} from ${s.from}`}

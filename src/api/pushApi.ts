@@ -67,7 +67,9 @@ export async function remindSplitDebtorApi(
             method: 'POST',
             body: JSON.stringify({
                 from: payload.from,
+                fromUserId: payload.fromUserId || null,
                 to: payload.to,
+                toUserId: payload.toUserId || null,
                 requestedBy: payload.requestedBy,
                 ...(payload.consolidatedAmount && payload.consolidatedAmount > 0
                     ? { consolidatedAmount: payload.consolidatedAmount }
@@ -93,7 +95,9 @@ export async function notifyPaymentSentApi(
             splitIds: payload.splitIds,
             groupId: payload.groupId,
             from: payload.from,
+            fromUserId: payload.fromUserId || null,
             to: payload.to,
+            toUserId: payload.toUserId || null,
             amount: payload.amount,
             description: payload.description,
             requestedBy: payload.requestedBy,

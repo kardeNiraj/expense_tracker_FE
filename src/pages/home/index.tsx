@@ -47,6 +47,7 @@ import {
 
 export function Dashboard() {
     const {
+        user,
         activeGroup,
         isFormerActiveGroup,
         isRoomArchived,
@@ -416,7 +417,36 @@ export function Dashboard() {
         return splitId;
     };
 
-    const handleSettle = async (splitId: string, fromPerson: string, toPerson: string) => {
+    const userMap = useMemo(() => {
+        const map = new Map<string, string>();
+        for (const p of peopleDetails) {
+            if (p.name && p.userId) {
+                map.set(p.name.trim().toLowerCase(), p.userId);
+            }
+        }
+        return map;
+    }, [peopleDetails]);
+
+    const resolveUserId = (name?: string | null): string | null => {
+        if (!name) return null;
+        const lower = name.trim().toLowerCase();
+        if (
+            user?.userId &&
+            ((user.name && user.name.trim().toLowerCase() === lower) ||
+                (activePerson && activePerson.trim().toLowerCase() === lower))
+        ) {
+            return user.userId;
+        }
+        return userMap.get(lower) || null;
+    };
+
+    const handleSettle = async (
+        splitId: string,
+        fromPerson: string,
+        toPerson: string,
+        fromUserId?: string | null,
+        toUserId?: string | null
+    ) => {
         const targetSplitId = resolveSplitId(splitId);
         const key = `${splitId}_${fromPerson}`;
         setSettlingKey(key);
@@ -424,7 +454,9 @@ export function Dashboard() {
             await settleMutation.mutateAsync({
                 splitId: targetSplitId,
                 from: fromPerson,
+                fromUserId: fromUserId || resolveUserId(fromPerson),
                 to: toPerson,
+                toUserId: toUserId || resolveUserId(toPerson),
                 confirmedBy: activePerson,
             });
             triggerHaptic('success');
@@ -449,7 +481,9 @@ export function Dashboard() {
                     settleMutation.mutateAsync({
                         splitId: resolveSplitId(ref.splitId),
                         from: ref.from,
+                        fromUserId: ref.fromUserId || resolveUserId(ref.from),
                         to: ref.to,
+                        toUserId: ref.toUserId || resolveUserId(ref.to),
                         confirmedBy: activePerson,
                     })
                 )
@@ -1335,7 +1369,7 @@ export function Dashboard() {
                                                                 type="button"
                                                                 disabled={settlingKey === `${s.splitId}_${group.from}` || settlingKey === `multi_${group.from}`}
                                                                 onClick={() =>
-                                                                    handleSettle(s.splitId, group.from, activePerson)
+                                                                    handleSettle(s.splitId, group.from, activePerson, s.fromUserId, s.toUserId)
                                                                 }
                                                                 className="px-2 py-0.5 rounded-md bg-primary-fixed text-on-primary-fixed hover:bg-primary hover:text-on-primary text-[11px] font-bold cursor-pointer disabled:opacity-50 transition-colors"
                                                             >
@@ -1436,7 +1470,9 @@ export function Dashboard() {
                                                     : void handleSettle(
                                                           group.allSplits[0].splitId,
                                                           group.from,
-                                                          activePerson
+                                                          activePerson,
+                                                          group.allSplits[0].fromUserId,
+                                                          group.allSplits[0].toUserId
                                                       )
                                             }
                                             className="flex-1 h-9 px-2.5 rounded-xl bg-primary-fixed hover:bg-primary text-on-primary-fixed hover:text-on-primary text-xs font-bold transition-colors flex items-center justify-center gap-1 shadow-2xs disabled:opacity-50 cursor-pointer active:scale-[0.99] whitespace-nowrap"

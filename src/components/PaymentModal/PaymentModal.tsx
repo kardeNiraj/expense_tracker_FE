@@ -12,13 +12,16 @@ import {
 } from '../../utils/qr';
 import { AppIcon } from '../Icon/AppIcon';
 import { notifyPaymentSentApi } from '../../api/pushApi';
+import { usePeopleDetails } from '../../api';
 import { ApiError } from '../../api/client';
 
 const QrScannerModal = lazy(() => import('../QRScanner/QrScannerModal'));
 
 export interface PaymentSettlementData {
     to: string;
+    toUserId?: string | null;
     from?: string;
+    fromUserId?: string | null;
     amount: number;
     toUpiId?: string | null;
     upiIntent?: string;
@@ -43,6 +46,7 @@ const PaymentModalContent: React.FC<PaymentModalContentProps> = ({
     settlement,
 }) => {
     const { showToast, activePerson, claimedPerson } = useExpense();
+    const { data: peopleDetails = [] } = usePeopleDetails();
     const hasPositiveAmount = settlement.amount > 0;
     const [includeAmountInQr, setIncludeAmountInQr] = useState(hasPositiveAmount);
     const [copiedUpi, setCopiedUpi] = useState(false);
@@ -166,6 +170,15 @@ const PaymentModalContent: React.FC<PaymentModalContentProps> = ({
         const payer = settlement.from || activePerson;
         if (!payer || !settlement.to) return;
 
+        const payerDetail = peopleDetails.find(
+            (p) => p.name.toLowerCase() === payer.toLowerCase()
+        );
+        const payeeDetail = peopleDetails.find(
+            (p) => p.name.toLowerCase() === settlement.to.toLowerCase()
+        );
+        const fromUserId = settlement.fromUserId || payerDetail?.userId || null;
+        const toUserId = settlement.toUserId || payeeDetail?.userId || null;
+
         setIsNotifyingInApp(true);
         try {
             triggerHaptic('medium');
@@ -173,7 +186,9 @@ const PaymentModalContent: React.FC<PaymentModalContentProps> = ({
                 splitId: settlement.splitId,
                 splitIds: settlement.splitIds,
                 from: payer,
+                fromUserId,
                 to: settlement.to,
+                toUserId,
                 amount: settlement.amount,
                 description: settlement.description,
                 requestedBy: claimedPerson || payer,
