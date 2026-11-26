@@ -57,6 +57,7 @@ export function Dashboard() {
         claimedPerson,
         isDeviceClaimed,
         setActiveTab,
+        setPendingInviteCode,
         showToast,
     } = useExpense();
     const queryClient = useQueryClient();
@@ -889,10 +890,10 @@ export function Dashboard() {
                         </div>
                         <div className="text-left min-w-0">
                             <span className="text-xs font-bold text-on-surface block truncate">
-                                Scan Creditor&apos;s UPI QR
+                                Scan QR Code
                             </span>
                             <span className="text-[11px] text-on-surface-variant block truncate">
-                                Read friend&apos;s QR code via camera or gallery &amp; settle dues
+                                Scan friend&apos;s UPI QR to settle or room QR to join
                             </span>
                         </div>
                     </div>
@@ -1821,9 +1822,14 @@ export function Dashboard() {
                     <QrScannerModal
                         isOpen={showQrScanner}
                         onClose={() => setShowQrScanner(false)}
+                        mode="auto"
                         onScanUpi={handleScannedCreditorQr}
-                        title="Scan Creditor's UPI QR"
-                        subtitle="Matches pending dues or copies UPI ID"
+                        onScanInvite={(code) => {
+                            setShowQrScanner(false);
+                            setPendingInviteCode(code);
+                        }}
+                        title="Scan QR Code"
+                        subtitle="Scan creditor's UPI QR to settle or room QR to join"
                     />
                 </Suspense>
             )}

@@ -44,6 +44,7 @@ export const GroupsPage: React.FC = () => {
         onJoinedOrCreatedGroup,
         refreshAuthAndGroups,
         setActiveTab,
+        setPendingInviteCode,
         showToast,
     } = useExpense();
 
@@ -1746,9 +1747,11 @@ export const GroupsPage: React.FC = () => {
                     mode="invite"
                     onScanInvite={(code) => {
                         setShowInviteScanner(false);
+                        setShowJoinModal(false);
                         setSelectedJoinSlot('__new__');
                         setLookupCode(code);
                         setJoinInput(code);
+                        setPendingInviteCode(code);
                         showToast(`Found invite code ${code}`, 'qr_code_scanner');
                     }}
                 />

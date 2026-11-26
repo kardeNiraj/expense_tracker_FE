@@ -26,6 +26,7 @@ export { default as PwaUpdatePrompt } from './PwaReload/PwaUpdatePrompt.tsx';
 export { SyncStatusModal, type SyncStatusModalProps } from './SyncModal/SyncStatusModal.tsx';
 export { SpendHistoryModal } from './SpendHistory/SpendHistoryModal.tsx';
 export { RoomStatusBadge, type RoomStatusBadgeProps } from './Room/RoomStatusBadge.tsx';
+export { JoinRoomModal } from './JoinRoomModal';
 export { UPIAutomationModal } from './UPIAutomation';
 export {
     RoomLifecycleActions,

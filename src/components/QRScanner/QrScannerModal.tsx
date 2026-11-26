@@ -11,7 +11,7 @@ import { AppIcon } from '../Icon/AppIcon';
 export interface QrScannerModalProps {
     isOpen: boolean;
     onClose: () => void;
-    mode?: 'upi' | 'invite';
+    mode?: 'upi' | 'invite' | 'auto';
     onScanUpi?: (parsed: ParsedUpiQr) => void;
     onScanInvite?: (inviteCode: string) => void;
     title?: string;
@@ -20,7 +20,7 @@ export interface QrScannerModalProps {
 
 interface QrScannerContentProps {
     onClose: () => void;
-    mode: 'upi' | 'invite';
+    mode: 'upi' | 'invite' | 'auto';
     onScanUpi?: (parsed: ParsedUpiQr) => void;
     onScanInvite?: (inviteCode: string) => void;
     title: string;
@@ -167,34 +167,95 @@ const QrScannerContent: React.FC<QrScannerContentProps> = ({
         (rawText: string) => {
             if (handledRef.current) return;
 
+            const inviteCode = parseGroupInviteCode(rawText);
+            const parsedUpi = parseUpiQrPayload(rawText);
+
+            // 1. If explicit invite mode
             if (mode === 'invite') {
-                const code = parseGroupInviteCode(rawText);
-                if (!code) {
+                if (inviteCode) {
+                    handledRef.current = true;
+                    stopCamera();
+                    triggerHaptic('success');
+                    onScanInvite?.(inviteCode);
+                    return;
+                }
+                if (parsedUpi) {
                     triggerHaptic('warning');
                     setScanWarning(
-                        'That QR code does not look like a SplitNest room invite link or code.'
+                        'That QR code contains a UPI payment ID, not a SplitNest room invite.'
                     );
                     return;
                 }
-                handledRef.current = true;
-                stopCamera();
-                triggerHaptic('success');
-                onScanInvite?.(code);
+                triggerHaptic('warning');
+                setScanWarning(
+                    'That QR code does not look like a SplitNest room invite link or code.'
+                );
                 return;
             }
 
-            const parsed = parseUpiQrPayload(rawText);
-            if (!parsed) {
+            // 2. If explicit upi mode without invite handler
+            if (mode === 'upi' && !onScanInvite) {
+                if (parsedUpi) {
+                    handledRef.current = true;
+                    stopCamera();
+                    triggerHaptic('success');
+                    onScanUpi?.(parsedUpi);
+                    return;
+                }
+                if (inviteCode) {
+                    triggerHaptic('warning');
+                    setScanWarning(
+                        `Found room invite "${inviteCode}", but this scanner only accepts UPI payment QRs.`
+                    );
+                    return;
+                }
                 triggerHaptic('warning');
                 setScanWarning(
                     'That QR code does not contain a UPI payment ID. Try a GPay, PhonePe, Paytm, or SplitNest QR.'
                 );
                 return;
             }
-            handledRef.current = true;
-            stopCamera();
-            triggerHaptic('success');
-            onScanUpi?.(parsed);
+
+            // 3. Auto mode or both handlers provided:
+            // Check invite first if code found
+            if (inviteCode && onScanInvite) {
+                handledRef.current = true;
+                stopCamera();
+                triggerHaptic('success');
+                onScanInvite(inviteCode);
+                return;
+            }
+
+            // Check UPI if parsed
+            if (parsedUpi && onScanUpi) {
+                handledRef.current = true;
+                stopCamera();
+                triggerHaptic('success');
+                onScanUpi(parsedUpi);
+                return;
+            }
+
+            // Fallbacks
+            if (inviteCode) {
+                triggerHaptic('warning');
+                setScanWarning(
+                    `Found room invite "${inviteCode}", but no invite handler was configured.`
+                );
+                return;
+            }
+
+            if (parsedUpi) {
+                triggerHaptic('warning');
+                setScanWarning(
+                    'That QR code contains a UPI payment ID, not a room invite.'
+                );
+                return;
+            }
+
+            triggerHaptic('warning');
+            setScanWarning(
+                'Could not detect a valid UPI payment ID or SplitNest room invite in this QR.'
+            );
         },
         [mode, onScanInvite, onScanUpi, stopCamera]
     );
@@ -342,9 +403,12 @@ const QrScannerContent: React.FC<QrScannerContentProps> = ({
     const handleManualSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         setScanWarning(null);
+
+        const inviteCode = parseGroupInviteCode(manualInput);
+        const parsedUpi = parseUpiQrPayload(manualInput);
+
         if (mode === 'invite') {
-            const code = parseGroupInviteCode(manualInput);
-            if (!code) {
+            if (!inviteCode) {
                 triggerHaptic('warning');
                 setScanWarning('Enter a valid invite link or room code (e.g. A1B2C3D4).');
                 return;
@@ -352,19 +416,32 @@ const QrScannerContent: React.FC<QrScannerContentProps> = ({
             handledRef.current = true;
             stopCamera();
             triggerHaptic('success');
-            onScanInvite?.(code);
+            onScanInvite?.(inviteCode);
             return;
         }
-        const parsed = parseUpiQrPayload(manualInput);
-        if (!parsed) {
-            triggerHaptic('warning');
-            setScanWarning('Enter a valid UPI ID (e.g. name@okhdfcbank) or upi://pay link.');
+
+        if (inviteCode && onScanInvite && (!parsedUpi || mode === 'auto')) {
+            handledRef.current = true;
+            stopCamera();
+            triggerHaptic('success');
+            onScanInvite(inviteCode);
             return;
         }
-        handledRef.current = true;
-        stopCamera();
-        triggerHaptic('success');
-        onScanUpi?.(parsed);
+
+        if (parsedUpi && onScanUpi) {
+            handledRef.current = true;
+            stopCamera();
+            triggerHaptic('success');
+            onScanUpi(parsedUpi);
+            return;
+        }
+
+        triggerHaptic('warning');
+        setScanWarning(
+            onScanInvite && onScanUpi
+                ? 'Enter a valid UPI ID (e.g. name@okhdfcbank) or room invite code.'
+                : 'Enter a valid UPI ID (e.g. name@okhdfcbank) or upi://pay link.'
+        );
     };
 
     return (
@@ -526,7 +603,7 @@ const QrScannerContent: React.FC<QrScannerContentProps> = ({
 export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     isOpen,
     onClose,
-    mode = 'upi',
+    mode = 'auto',
     onScanUpi,
     onScanInvite,
     title,
@@ -535,10 +612,19 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     if (!isOpen) return null;
 
     const resolvedTitle =
-        title || (mode === 'invite' ? 'Scan Room Invite QR' : 'Scan UPI QR Code');
+        title ||
+        (mode === 'invite'
+            ? 'Scan Room Invite QR'
+            : mode === 'auto' && onScanInvite && onScanUpi
+              ? 'Scan QR Code'
+              : 'Scan UPI QR Code');
     const resolvedSubtitle =
         subtitle ||
-        (mode === 'invite' ? 'Camera or invite QR photo' : 'Camera or screenshot upload');
+        (mode === 'invite'
+            ? 'Camera or invite QR photo'
+            : mode === 'auto' && onScanInvite && onScanUpi
+              ? 'Scan UPI QR to settle or room QR to join'
+              : 'Camera or screenshot upload');
 
     return (
         <QrScannerContent

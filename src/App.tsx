@@ -10,6 +10,7 @@ import {
     InstallPrompt,
     PullToRefresh,
     PwaUpdatePrompt,
+    JoinRoomModal,
     AppShellSkeleton,
     SplitsSkeleton,
     AddPageSkeleton,
@@ -245,11 +246,13 @@ function MainApp() {
         );
     }
 
-    // Show room setup/join screen when authenticated but without any active/selected room, or joining an invited QR room
+    // Show room setup/join screen when authenticated but without any active/selected room and no pending invite
     if (
         isAuthenticated &&
-        ((groups.length === 0 && !isFormerActiveGroup && activeTab !== 'groups') ||
-            Boolean(pendingInviteCode))
+        groups.length === 0 &&
+        !isFormerActiveGroup &&
+        activeTab !== 'groups' &&
+        !pendingInviteCode
     ) {
         return (
             <div className="min-h-screen w-full bg-surface text-on-surface flex flex-col relative font-sans">
@@ -348,6 +351,9 @@ function MainApp() {
 
             {/* Global Interactive Toast */}
             <Toast />
+
+            {/* Seamless In-App Room Invite Join Dialog */}
+            <JoinRoomModal />
         </div>
     );
 }
