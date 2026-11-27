@@ -12,6 +12,12 @@ import {
 import type { ExpenseRecord } from '../../api/types';
 import { AppIcon } from '../Icon/AppIcon';
 import { SpendHistorySkeleton } from '../Skeleton/AppSkeleton';
+import {
+    SwipeableRow,
+    IOSActionSheet,
+    type ActionSheetItemData,
+    useEdgeSwipe,
+} from '../Gestures';
 
 interface SpendHistoryModalProps {
     isOpen: boolean;
@@ -69,6 +75,7 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
         category: string;
         timestamp?: string;
     } | null>(null);
+    const [actionSheetItem, setActionSheetItem] = useState<ActionSheetItemData | null>(null);
 
     const canDeleteThisProfile =
         !isRoomReadOnly &&
@@ -95,6 +102,11 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
         triggerHaptic('light');
         onClose();
     };
+
+    // Edge-swipe to navigate back gesture
+    const { containerRef, dragX, isSwiping } = useEdgeSwipe({
+        onBack: handleBack,
+    });
 
     // Refresh data
     const handleRefresh = async () => {
@@ -322,11 +334,29 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
 
     return (
         <div
+            ref={containerRef}
+            style={{
+                transform: `translate3d(${dragX}px, 0, 0)`,
+                transition: isSwiping ? 'none' : 'transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
+                boxShadow: dragX > 0 ? '-10px 0 30px rgba(0, 0, 0, 0.22)' : undefined,
+            }}
             className="fixed inset-0 z-60 bg-surface flex flex-col overflow-hidden animate-in fade-in duration-200"
             role="dialog"
             aria-modal="true"
             aria-label={`All Spendings for ${selectedPerson}`}
         >
+            {/* Edge Swipe Back Visual Cue */}
+            {dragX > 4 && (
+                <div
+                    className="fixed inset-y-0 left-0 w-12 flex items-center justify-center z-50 pointer-events-none transition-opacity duration-150"
+                    style={{ opacity: Math.min(1, dragX / 50) }}
+                >
+                    <div className="w-8 h-8 rounded-full bg-surface-container-highest/95 text-primary shadow-lg border border-outline-variant/30 flex items-center justify-center">
+                        <AppIcon name="arrow_back" className="text-[18px]" />
+                    </div>
+                </div>
+            )}
+
             {/* Top Navigation Bar */}
             <header className="sticky top-0 inset-x-0 z-30 pt-safe bg-surface/95 backdrop-blur-xl border-b border-outline-variant/20 shadow-xs shrink-0">
                 <div className="max-w-md mx-auto h-16 px-4 flex items-center justify-between gap-3">
@@ -422,7 +452,7 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
             </header>
 
             {/* Scrollable Content Container */}
-            <main className="flex-1 w-full max-w-md mx-auto px-4 py-4 overflow-y-auto overscroll-contain space-y-4 pb-safe">
+            <main className="flex-1 w-full max-w-md mx-auto px-4 pt-4 pb-16 overflow-y-auto overscroll-contain space-y-4 pb-safe">
                 {/* Grand Total Hero Card for selectedPerson */}
                 <div className="p-4 rounded-3xl bg-linear-to-br from-primary/10 via-surface-container-lowest to-surface-container border border-primary/20 shadow-xs relative overflow-hidden">
                     <div className="flex items-start justify-between gap-3 relative z-10">
@@ -665,12 +695,43 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
                                         const isPaidByMe =
                                             item.paidBy?.toLowerCase() ===
                                             selectedPerson.toLowerCase();
+                                        const isDeletable =
+                                            item.type === 'PERSONAL' &&
+                                            Boolean(item.expenseId) &&
+                                            canDeleteThisProfile;
 
                                         return (
-                                            <div
+                                            <SwipeableRow
                                                 key={item.id}
-                                                className="bg-surface-container-lowest p-3.5 rounded-2xl shadow-2xs border border-outline-variant/30 hover:border-outline-variant/50 transition-all flex flex-col gap-2"
+                                                id={item.id}
+                                                canDelete={isDeletable}
+                                                onDelete={() => {
+                                                    triggerHaptic('light');
+                                                    setExpenseToDelete({
+                                                        id: item.expenseId!,
+                                                        description: item.description,
+                                                        amount: item.amount,
+                                                        category: item.category,
+                                                        timestamp: item.timestamp,
+                                                    });
+                                                }}
+                                                onLongPress={() => {
+                                                    setActionSheetItem({
+                                                        id: item.expenseId || item.id,
+                                                        description: item.description,
+                                                        amount: item.amount,
+                                                        category: item.category,
+                                                        timestamp: item.timestamp,
+                                                        paidBy: item.paidBy,
+                                                        isSplitShare: item.isSplitShare,
+                                                        totalBill: item.totalBill,
+                                                        canDelete: isDeletable,
+                                                    });
+                                                }}
                                             >
+                                                <div
+                                                    className="bg-surface-container-lowest p-3.5 rounded-2xl shadow-2xs border border-outline-variant/30 hover:border-outline-variant/50 transition-all flex flex-col gap-2"
+                                                >
                                                 {/* Top Row: Icon, Description, Category & Badge, and Amount */}
                                                 <div className="flex items-start justify-between gap-3">
                                                     <div className="flex items-start gap-3 min-w-0">
@@ -734,7 +795,7 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
                                                                         timestamp: item.timestamp,
                                                                     });
                                                                 }}
-                                                                className="p-1 text-on-surface-variant/60 hover:text-error hover:bg-error/10 rounded-lg transition-colors cursor-pointer"
+                                                                className="hidden sm:inline-flex p-1 text-on-surface-variant/60 hover:text-error hover:bg-error/10 rounded-lg transition-colors cursor-pointer"
                                                             >
                                                                 <AppIcon name="delete" className="text-[18px]" />
                                                             </button>
@@ -766,6 +827,7 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
                                                     )}
                                                 </div>
                                             </div>
+                                        </SwipeableRow>
                                         );
                                     })}
                                 </div>
@@ -782,7 +844,7 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
                     onClick={() => setExpenseToDelete(null)}
                 >
                     <div
-                        className="w-full max-w-sm bg-surface-container-lowest rounded-t-3xl sm:rounded-2xl border border-outline-variant/30 p-5 pb-safe shadow-2xl space-y-4 animate-in slide-in-from-bottom duration-200"
+                        className="w-full max-w-sm bg-surface-container-lowest rounded-t-3xl sm:rounded-2xl border border-outline-variant/30 p-5 pb-5 pb-safe shadow-2xl space-y-4 animate-in slide-in-from-bottom duration-200"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex items-center gap-3 text-error">
@@ -839,6 +901,24 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
                     </div>
                 </div>
             )}
+            {/* iOS Action Sheet Context Menu */}
+            <IOSActionSheet
+                isOpen={Boolean(actionSheetItem)}
+                onClose={() => setActionSheetItem(null)}
+                item={actionSheetItem}
+                onDelete={() => {
+                    if (actionSheetItem?.canDelete && actionSheetItem.id) {
+                        setExpenseToDelete({
+                            id: actionSheetItem.id,
+                            description: actionSheetItem.description,
+                            amount: actionSheetItem.amount,
+                            category: actionSheetItem.category || 'General',
+                            timestamp: actionSheetItem.timestamp,
+                        });
+                    }
+                }}
+                onCopySuccess={(msg) => showToast(msg, 'content_copy')}
+            />
         </div>
     );
 };

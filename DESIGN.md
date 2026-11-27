@@ -350,3 +350,108 @@ Mapped from Stitch project `projects/17796466189695019339`:
   --space-xl: 2rem;
 }
 ```
+
+---
+
+## 9. Mobile Gestures & iOS Micro-Interactions
+
+SplitNest applies native iOS gesture ergonomics and physics-based transitions to achieve high tactile responsiveness on mobile browsers and progressive web apps (PWA).
+
+### 9.1 Interaction Matrix & Physics Thresholds
+
+| Interaction | Trigger Gesture | Activation Threshold | Haptic Feedback | Transition Curve | Visual Response |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Reveal Delete** | Horizontal drag left | `45px` drag distance | `light` (10ms) on snap | `cubic-bezier(0.16, 1, 0.3, 1)` | Row slides left to `-76px`, exposing solid red destructive button |
+| **Full-Swipe Delete** | Deep horizontal drag left | `175px` or `>50%` card width | `medium` (20ms) on arm; `success` on release | `cubic-bezier(0.16, 1, 0.3, 1)` | Action expands to 100% width; releasing sweeps row off-screen |
+| **Rubber-Band Drag** | Horizontal drag right | Initial drag (`diffX > 0`) | None | Damped `diffX * 0.2` (max 25px) | Elastic resistance resisting unauthorized or rightward sliding |
+| **Context Action Sheet** | Long-press / Touch & Hold | `420ms` hold without move | `medium` (20ms) on trigger | `scale-[0.98]` duration-200 | Row depresses smoothly, then bottom iOS Action Sheet slides up |
+| **Action Sheet Dismiss** | Drag handle downward | `90px` downward drag | `light` (10ms) on dismiss | `cubic-bezier(0.16, 1, 0.3, 1)` | Sheet translates downward following touch; snaps shut if released |
+| **Edge-Swipe Back** | Horizontal drag from left edge | Starts within `32px` of screen edge | `selection` on lock; `light` on dismiss | Real-time 1:1 translation | Entire modal translates right; circular back arrow glows on edge |
+| **Pull-to-Refresh** | Downward scroll at top | `65px` pull distance | `selection` on threshold | Dynamic rotational spring | Frosted glass pill animates rotation; releases to fetch latest data |
+
+---
+
+### 9.2 Swipeable Row (`SwipeableRow.tsx`)
+
+Used on **Dashboard Recent Spendings** and **Spend History Month Groups** to provide standard iOS table-row management.
+
+```
++--------------------------------------------------------+---------+
+|                                                        | DELETE  |
+|  [Icon] Grocery Shopping               ₹1,450.00       | (Trash) |
+|         Food & Dining • Personal       12:30 PM        |         |
++--------------------------------------------------------+---------+
+ <====================================================== [Swipe Left]
+```
+
+#### Behavior & State Rules:
+1. **Scroll-Lock Disambiguation**: When touch begins, the first 6px of movement determines the gesture axis. If `|diffY| > |diffX|`, horizontal swiping is immediately locked out, delegating 100% to native momentum scrolling without stutter.
+2. **Dynamic Damping**: Movement between `0` and `-76px` translates 1:1. Beyond `-76px`, a damping factor of `0.45` is applied (`-76px + (raw - 76px) * 0.45`).
+3. **Armed Full-Swipe Trigger**: When dragged beyond `175px`, `isFullSwipeArmed` turns true, changing background color and firing a `medium` haptic pulse. If released while armed, it sweeps out (`-100vw`) and immediately triggers `onDelete()`.
+4. **Single Row Concurrency**: A singleton listener guarantees that opening any row automatically snaps shut any previously opened row across the screen.
+5. **Tap-Outside Snap**: Tapping an open card snaps it back shut (`0px`) instead of firing item click actions.
+
+---
+
+### 9.3 iOS Action Sheet & Context Menu (`IOSActionSheet.tsx`)
+
+Long-pressing (`420ms`) any transaction card opens an authentic iOS Action Sheet.
+
+```
+       +-------------------------------+
+       |             =====             |  <-- Drag Handle (pull to dismiss)
+       +-------------------------------+
+       | [Icon] Dinner with Friends    |
+       |        ₹850.00 • Food         |  <-- Header Summary Card
+       +-------------------------------+
+       | 📋 Copy Description           |
+       +-------------------------------+
+       | 💳 Copy Amount (₹850)         |  <-- Action Items
+       +-------------------------------+
+       | ↗️ Share Transaction Details   |
+       +-------------------------------+
+       | 🗑️ Delete Transaction (Red)   |  <-- Destructive Action (if personal)
+       +-------------------------------+
+
+       +-------------------------------+
+       |            Cancel             |  <-- Standalone Pill
+       +-------------------------------+
+```
+
+#### Capabilities:
+* **Frosted Glass Backdrop**: `fixed inset-0 z-70 bg-black/45 backdrop-blur-sm`.
+* **Copy Actions**: Instant 1-tap clipboard integration for description and formatted amount with toast confirmation.
+* **Native Web Share**: Invokes `navigator.share()` on iOS/Android for 1-tap sharing to WhatsApp or Messages, with graceful clipboard fallback.
+* **Destructive Permission Check**: "Delete Transaction" action only renders if the transaction is personal and the active user owns it.
+* **Tactile Pull-Down Dismissal**: Users can drag down anywhere on the sheet to dismiss it with smooth spring physics.
+
+---
+
+### 9.4 Edge-Swipe Back Navigation (`useEdgeSwipe.ts`)
+
+Applied to full-screen views (e.g., [SpendHistoryModal.tsx](file:///Users/nirajkarde/Desktop/Personal_Projects/expense_tracker_FE/src/components/SpendHistory/SpendHistoryModal.tsx)):
+
+```
+[Screen Edge <= 32px]
+  |
+  +---> [Touch & Drag Right] ===>
+        - Modal translates: translate3d(dragX, 0, 0)
+        - Circular back arrow glows: opacity = min(1, dragX / 50)
+        - Drag >= 100px: Trigger light haptic -> Slide off right -> onClose()
+        - Drag < 100px: Spring smoothly back to 0px
+```
+
+---
+
+### 9.5 Haptic Feedback Design Standard
+
+SplitNest leverages the Web Vibration API (`navigator.vibrate`) via `triggerHaptic(type)` for mobile immersion:
+
+| Haptic Type | Vibration Pattern | Associated Interactions |
+| :--- | :--- | :--- |
+| `'selection'` | `10ms` | Navigation tab switch, month pill filter change, edge-swipe engagement |
+| `'light'` | `10ms` | Swipe snap-open, pull-to-refresh release, modal dismiss |
+| `'medium'` | `20ms` | Long-press trigger (420ms), full-swipe armed state, destructive action confirm |
+| `'success'` | `[15ms, 40ms, 20ms]` | Transaction deleted, copied to clipboard, UPI settlement confirmed |
+| `'warning'` | `[35ms, 50ms, 35ms]` | Unauthorized action blocked, room locked notice, deletion error |
+

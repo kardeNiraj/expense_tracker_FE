@@ -26,6 +26,9 @@ import {
     GroupCollectQrModal,
     type GroupCollectQrModalData,
     SpendHistoryModal,
+    SwipeableRow,
+    IOSActionSheet,
+    type ActionSheetItemData,
 } from '../../components';
 import { triggerHaptic } from '../../utils/haptics';
 import { parseCustomDate, formatPurchaseTime, getCategoryMeta } from '../../utils/formatters';
@@ -82,6 +85,7 @@ export function Dashboard() {
         category: string;
         timestamp?: string;
     } | null>(null);
+    const [actionSheetItem, setActionSheetItem] = useState<ActionSheetItemData | null>(null);
     const [paymentSettlement, setPaymentSettlement] = useState<PaymentSettlementData | null>(null);
     const [collectSettlement, setCollectSettlement] = useState<CollectQrModalData | null>(null);
     const [groupCollectData, setGroupCollectData] = useState<GroupCollectQrModalData | null>(null);
@@ -1702,12 +1706,40 @@ export function Dashboard() {
                             const catMeta = getCategoryMeta(item.category);
                             const timeInfo = formatPurchaseTime(item.timestamp);
                             const isPaidByMe = item.paidBy?.toLowerCase() === activePerson.toLowerCase();
+                            const isDeletable = !item.isSplitShare && Boolean(item.expenseId) && canAddExpense;
 
                             return (
-                                <div
+                                <SwipeableRow
                                     key={item.id}
-                                    className="bg-surface-container-lowest p-3.5 rounded-2xl shadow-2xs border border-outline-variant/30 hover:border-outline-variant/50 transition-all flex flex-col gap-2.5"
+                                    id={item.id}
+                                    canDelete={isDeletable}
+                                    onDelete={() => {
+                                        triggerHaptic('light');
+                                        setExpenseToDelete({
+                                            id: item.expenseId!,
+                                            description: item.description,
+                                            amount: item.amount,
+                                            category: item.category,
+                                            timestamp: item.timestamp,
+                                        });
+                                    }}
+                                    onLongPress={() => {
+                                        setActionSheetItem({
+                                            id: item.expenseId || item.id,
+                                            description: item.description,
+                                            amount: item.amount,
+                                            category: item.category,
+                                            timestamp: item.timestamp,
+                                            paidBy: item.paidBy,
+                                            isSplitShare: item.isSplitShare,
+                                            totalBill: item.totalBill,
+                                            canDelete: isDeletable,
+                                        });
+                                    }}
                                 >
+                                    <div
+                                        className="bg-surface-container-lowest p-3.5 rounded-2xl shadow-2xs border border-outline-variant/30 hover:border-outline-variant/50 transition-all flex flex-col gap-2.5"
+                                    >
                                     {/* Top Row: Category Icon, Description, Category & Badge, and Amount */}
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex items-start gap-3 min-w-0">
@@ -1769,7 +1801,7 @@ export function Dashboard() {
                                                             timestamp: item.timestamp,
                                                         });
                                                     }}
-                                                    className="p-1.5 -mr-1 text-on-surface-variant/60 hover:text-error hover:bg-error/10 rounded-lg transition-colors cursor-pointer"
+                                                    className="hidden sm:inline-flex p-1.5 -mr-1 text-on-surface-variant/60 hover:text-error hover:bg-error/10 rounded-lg transition-colors cursor-pointer"
                                                 >
                                                     <AppIcon name="delete" className="text-[18px]" />
                                                 </button>
@@ -1806,6 +1838,7 @@ export function Dashboard() {
                                         )}
                                     </div>
                                 </div>
+                            </SwipeableRow>
                             );
                         })}
 
@@ -1850,11 +1883,11 @@ export function Dashboard() {
             {/* Delete Personal Expense Confirmation Modal */}
             {expenseToDelete && (
                 <div
-                    className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
+                    className="fixed inset-0 z-70 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
                     onClick={() => setExpenseToDelete(null)}
                 >
                     <div
-                        className="w-full max-w-sm bg-surface-container-lowest rounded-t-3xl sm:rounded-2xl border border-outline-variant/30 p-5 pb-safe shadow-2xl space-y-4 animate-in slide-in-from-bottom duration-200"
+                        className="w-full max-w-sm bg-surface-container-lowest rounded-t-3xl sm:rounded-2xl border border-outline-variant/30 p-5 pb-5 pb-safe shadow-2xl space-y-4 animate-in slide-in-from-bottom duration-200"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex items-center gap-3 text-error">
@@ -1911,6 +1944,25 @@ export function Dashboard() {
                     </div>
                 </div>
             )}
+
+            {/* iOS Action Sheet Context Menu */}
+            <IOSActionSheet
+                isOpen={Boolean(actionSheetItem)}
+                onClose={() => setActionSheetItem(null)}
+                item={actionSheetItem}
+                onDelete={() => {
+                    if (actionSheetItem?.canDelete && actionSheetItem.id) {
+                        setExpenseToDelete({
+                            id: actionSheetItem.id,
+                            description: actionSheetItem.description,
+                            amount: actionSheetItem.amount,
+                            category: actionSheetItem.category || 'General',
+                            timestamp: actionSheetItem.timestamp,
+                        });
+                    }
+                }}
+                onCopySuccess={(msg) => showToast(msg, 'content_copy')}
+            />
 
             {/* Dedicated Month-wise Spend History Breakdown Modal */}
             <SpendHistoryModal
