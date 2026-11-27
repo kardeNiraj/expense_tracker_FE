@@ -8,6 +8,7 @@ import {
     useSpendings,
     useSplits,
     useSettleParticipantMutation,
+    useDeleteExpenseMutation,
     useTripInfo,
     usePeopleDetails,
     usePushConfig,
@@ -73,6 +74,14 @@ export function Dashboard() {
     const canSettle = !isFormerActiveGroup && !isRoomClosed;
 
     const settleMutation = useSettleParticipantMutation();
+    const deleteExpenseMutation = useDeleteExpenseMutation();
+    const [expenseToDelete, setExpenseToDelete] = useState<{
+        id: string;
+        description: string;
+        amount: number;
+        category: string;
+        timestamp?: string;
+    } | null>(null);
     const [paymentSettlement, setPaymentSettlement] = useState<PaymentSettlementData | null>(null);
     const [collectSettlement, setCollectSettlement] = useState<CollectQrModalData | null>(null);
     const [groupCollectData, setGroupCollectData] = useState<GroupCollectQrModalData | null>(null);
@@ -299,19 +308,26 @@ export function Dashboard() {
     // Combined activity items for activePerson
     const allPersonalItems = useMemo(() => {
         return [
-            ...personalDirectExpenses.map((e, idx) => ({
-                id: `direct-${idx}`,
-                description: e.description,
-                category: e.category,
-                amount: e.amount,
-                timestamp: e.timestamp,
-                isSplitShare: false,
-                badge: 'Personal',
-                paidBy: activePerson,
-                totalBill: e.amount,
-            })),
+            ...personalDirectExpenses.map((e, idx) => {
+                const expId = e.expenseId || e.id || e._id;
+                return {
+                    id: expId || `direct-${idx}`,
+                    expenseId: expId,
+                    userId: e.userId,
+                    description: e.description,
+                    category: e.category,
+                    amount: e.amount,
+                    timestamp: e.timestamp,
+                    isSplitShare: false,
+                    badge: 'Personal',
+                    paidBy: e.payee || activePerson,
+                    totalBill: e.amount,
+                };
+            }),
             ...userSplitItems.map((s) => ({
                 id: s.id,
+                expenseId: undefined as string | undefined,
+                userId: undefined as string | null | undefined,
                 description: `${s.description} (Your Share)`,
                 category: s.category,
                 amount: s.myShare,
@@ -1725,15 +1741,38 @@ export function Dashboard() {
                                             </div>
                                         </div>
 
-                                        {/* Amount & Total Bill Reference */}
-                                        <div className="text-right shrink-0">
-                                            <p className="font-bold text-base font-mono text-on-surface tracking-tight">
-                                                ₹{item.amount.toLocaleString('en-IN')}
-                                            </p>
-                                            {item.isSplitShare && item.totalBill && (
-                                                <span className="text-[10px] text-on-surface-variant font-mono block mt-0.5">
-                                                    of ₹{item.totalBill.toLocaleString('en-IN')} bill
-                                                </span>
+                                        {/* Amount, Total Bill Reference & Personal Delete Action */}
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <div className="text-right">
+                                                <p className="font-bold text-base font-mono text-on-surface tracking-tight">
+                                                    ₹{item.amount.toLocaleString('en-IN')}
+                                                </p>
+                                                {item.isSplitShare && item.totalBill && (
+                                                    <span className="text-[10px] text-on-surface-variant font-mono block mt-0.5">
+                                                        of ₹{item.totalBill.toLocaleString('en-IN')} bill
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {!item.isSplitShare && item.expenseId && canAddExpense && (
+                                                <button
+                                                    type="button"
+                                                    title="Delete personal expense"
+                                                    aria-label="Delete personal expense"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        triggerHaptic('light');
+                                                        setExpenseToDelete({
+                                                            id: item.expenseId!,
+                                                            description: item.description,
+                                                            amount: item.amount,
+                                                            category: item.category,
+                                                            timestamp: item.timestamp,
+                                                        });
+                                                    }}
+                                                    className="p-1.5 -mr-1 text-on-surface-variant/60 hover:text-error hover:bg-error/10 rounded-lg transition-colors cursor-pointer"
+                                                >
+                                                    <AppIcon name="delete" className="text-[18px]" />
+                                                </button>
                                             )}
                                         </div>
                                     </div>
@@ -1807,6 +1846,71 @@ export function Dashboard() {
                 onClose={() => setGroupCollectData(null)}
                 data={groupCollectData}
             />
+
+            {/* Delete Personal Expense Confirmation Modal */}
+            {expenseToDelete && (
+                <div
+                    className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
+                    onClick={() => setExpenseToDelete(null)}
+                >
+                    <div
+                        className="w-full max-w-sm bg-surface-container-lowest rounded-t-3xl sm:rounded-2xl border border-outline-variant/30 p-5 pb-safe shadow-2xl space-y-4 animate-in slide-in-from-bottom duration-200"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center gap-3 text-error">
+                            <div className="w-10 h-10 rounded-full bg-error/10 flex items-center justify-center shrink-0">
+                                <AppIcon name="delete_forever" className="text-[22px]" />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-base text-on-surface">Delete Expense?</h3>
+                                <p className="text-xs text-on-surface-variant">This action cannot be undone.</p>
+                            </div>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-surface-container-low text-xs space-y-1">
+                            <div className="font-semibold text-on-surface truncate">{expenseToDelete.description}</div>
+                            <div className="text-on-surface-variant">
+                                Amount: <span className="font-mono font-bold text-on-surface">₹{expenseToDelete.amount.toLocaleString('en-IN')}</span> • {expenseToDelete.category}
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-1">
+                            <button
+                                type="button"
+                                onClick={() => setExpenseToDelete(null)}
+                                className="flex-1 h-11 rounded-xl border border-outline-variant/40 text-xs font-semibold text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                disabled={deleteExpenseMutation.isPending}
+                                onClick={async () => {
+                                    try {
+                                        await deleteExpenseMutation.mutateAsync({
+                                            expenseId: expenseToDelete.id,
+                                            requestedBy: activePerson,
+                                        });
+                                        triggerHaptic('success');
+                                        showToast('Expense deleted successfully!', 'delete');
+                                        setExpenseToDelete(null);
+                                    } catch (err: unknown) {
+                                        triggerHaptic('warning');
+                                        showToast(`Failed to delete expense: ${String(err)}`, 'error');
+                                    }
+                                }}
+                                className="flex-1 h-11 rounded-xl bg-error text-on-error text-xs font-bold shadow-xs hover:bg-error/90 transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            >
+                                <AppIcon
+                                    name={deleteExpenseMutation.isPending ? 'hourglass_top' : 'delete'}
+                                    className="text-[16px]"
+                                />
+                                <span>{deleteExpenseMutation.isPending ? 'Deleting...' : 'Delete'}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Dedicated Month-wise Spend History Breakdown Modal */}
             <SpendHistoryModal

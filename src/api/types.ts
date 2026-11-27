@@ -59,6 +59,11 @@ export interface Split {
 }
 
 export interface ExpenseRecord {
+    id?: string;
+    expenseId?: string;
+    _id?: string;
+    userId?: string | null;
+    payee?: string;
     timestamp?: string;
     category: string;
     amount: number;

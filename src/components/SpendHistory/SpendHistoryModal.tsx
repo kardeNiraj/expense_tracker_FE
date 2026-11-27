@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useSpendings, useSplits, usePeople } from '../../api';
+import { useSpendings, useSplits, usePeople, useDeleteExpenseMutation } from '../../api';
 import { useExpense } from '../../context';
 import { Avatar } from '../Avatar';
 import { triggerHaptic } from '../../utils/haptics';
@@ -22,6 +22,8 @@ interface SpendHistoryModalProps {
 
 export interface UnifiedTransactionItem {
     id: string;
+    expenseId?: string;
+    userId?: string | null;
     type: 'PERSONAL' | 'SPLIT';
     description: string;
     category: string;
@@ -40,7 +42,14 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
     initialPerson,
     claimedPerson: propClaimedPerson,
 }) => {
-    const { activePerson, claimedPerson: contextClaimed, isSwitcherUnlocked } = useExpense();
+    const {
+        activePerson,
+        claimedPerson: contextClaimed,
+        isSwitcherUnlocked,
+        isRoomArchived,
+        isRoomReadOnly,
+        showToast,
+    } = useExpense();
     const effectiveClaimed = propClaimedPerson || contextClaimed || activePerson;
     // Strict privacy: regular users can ONLY see their claimed profile expenses
     const defaultPerson = isSwitcherUnlocked
@@ -52,6 +61,19 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
     const [selectedMonth, setSelectedMonth] = useState<string>('ALL');
     const [typeFilter, setTypeFilter] = useState<'ALL' | 'PERSONAL' | 'SPLIT'>('ALL');
     const [searchQuery, setSearchQuery] = useState('');
+    const deleteExpenseMutation = useDeleteExpenseMutation();
+    const [expenseToDelete, setExpenseToDelete] = useState<{
+        id: string;
+        description: string;
+        amount: number;
+        category: string;
+        timestamp?: string;
+    } | null>(null);
+
+    const canDeleteThisProfile =
+        !isRoomReadOnly &&
+        !isRoomArchived &&
+        (isSwitcherUnlocked || selectedPerson.toLowerCase() === effectiveClaimed.toLowerCase());
 
     // Fetch spendings for the selected person
     const {
@@ -89,15 +111,18 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
             .filter((exp) => !exp.description?.toLowerCase().includes('(split:'))
             .map((exp, idx) => {
                 const month = exp.sheet || formatMonthYear(exp.timestamp);
+                const expId = exp.expenseId || exp.id || exp._id;
                 return {
-                    id: `direct-${idx}-${exp.timestamp || ''}`,
+                    id: expId || `direct-${idx}-${exp.timestamp || ''}`,
+                    expenseId: expId,
+                    userId: exp.userId,
                     type: 'PERSONAL',
                     description: exp.description || 'Personal Expense',
                     category: exp.category || 'General',
                     amount: exp.amount || 0,
                     timestamp: exp.timestamp,
                     month,
-                    paidBy: selectedPerson,
+                    paidBy: exp.payee || selectedPerson,
                     isSplitShare: false,
                     totalBill: exp.amount || 0,
                 };
@@ -681,15 +706,38 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
                                                         </div>
                                                     </div>
 
-                                                    {/* Amount */}
-                                                    <div className="text-right shrink-0">
-                                                        <div className="font-bold font-mono text-sm text-on-surface">
-                                                            ₹{item.amount.toLocaleString('en-IN')}
-                                                        </div>
-                                                        {item.isSplitShare && item.totalBill && (
-                                                            <div className="text-[10px] font-mono text-on-surface-variant">
-                                                                Bill: ₹{item.totalBill.toLocaleString('en-IN')}
+                                                    {/* Amount & Personal Delete Action */}
+                                                    <div className="flex items-center gap-2 shrink-0">
+                                                        <div className="text-right">
+                                                            <div className="font-bold font-mono text-sm text-on-surface">
+                                                                ₹{item.amount.toLocaleString('en-IN')}
                                                             </div>
+                                                            {item.isSplitShare && item.totalBill && (
+                                                                <div className="text-[10px] font-mono text-on-surface-variant">
+                                                                    Bill: ₹{item.totalBill.toLocaleString('en-IN')}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        {item.type === 'PERSONAL' && item.expenseId && canDeleteThisProfile && (
+                                                            <button
+                                                                type="button"
+                                                                title="Delete personal expense"
+                                                                aria-label="Delete personal expense"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    triggerHaptic('light');
+                                                                    setExpenseToDelete({
+                                                                        id: item.expenseId!,
+                                                                        description: item.description,
+                                                                        amount: item.amount,
+                                                                        category: item.category,
+                                                                        timestamp: item.timestamp,
+                                                                    });
+                                                                }}
+                                                                className="p-1 text-on-surface-variant/60 hover:text-error hover:bg-error/10 rounded-lg transition-colors cursor-pointer"
+                                                            >
+                                                                <AppIcon name="delete" className="text-[18px]" />
+                                                            </button>
                                                         )}
                                                     </div>
                                                 </div>
@@ -726,6 +774,71 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
                     </div>
                 )}
             </main>
+
+            {/* Delete Personal Expense Confirmation Modal */}
+            {expenseToDelete && (
+                <div
+                    className="fixed inset-0 z-70 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
+                    onClick={() => setExpenseToDelete(null)}
+                >
+                    <div
+                        className="w-full max-w-sm bg-surface-container-lowest rounded-t-3xl sm:rounded-2xl border border-outline-variant/30 p-5 pb-safe shadow-2xl space-y-4 animate-in slide-in-from-bottom duration-200"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center gap-3 text-error">
+                            <div className="w-10 h-10 rounded-full bg-error/10 flex items-center justify-center shrink-0">
+                                <AppIcon name="delete_forever" className="text-[22px]" />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-base text-on-surface">Delete Expense?</h3>
+                                <p className="text-xs text-on-surface-variant">This action cannot be undone.</p>
+                            </div>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-surface-container-low text-xs space-y-1">
+                            <div className="font-semibold text-on-surface truncate">{expenseToDelete.description}</div>
+                            <div className="text-on-surface-variant">
+                                Amount: <span className="font-mono font-bold text-on-surface">₹{expenseToDelete.amount.toLocaleString('en-IN')}</span> • {expenseToDelete.category}
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-1">
+                            <button
+                                type="button"
+                                onClick={() => setExpenseToDelete(null)}
+                                className="flex-1 h-11 rounded-xl border border-outline-variant/40 text-xs font-semibold text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                disabled={deleteExpenseMutation.isPending}
+                                onClick={async () => {
+                                    try {
+                                        await deleteExpenseMutation.mutateAsync({
+                                            expenseId: expenseToDelete.id,
+                                            requestedBy: selectedPerson,
+                                        });
+                                        triggerHaptic('success');
+                                        showToast('Expense deleted successfully!', 'delete');
+                                        setExpenseToDelete(null);
+                                    } catch (err: unknown) {
+                                        triggerHaptic('warning');
+                                        showToast(`Failed to delete expense: ${String(err)}`, 'error');
+                                    }
+                                }}
+                                className="flex-1 h-11 rounded-xl bg-error text-on-error text-xs font-bold shadow-xs hover:bg-error/90 transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            >
+                                <AppIcon
+                                    name={deleteExpenseMutation.isPending ? 'hourglass_top' : 'delete'}
+                                    className="text-[16px]"
+                                />
+                                <span>{deleteExpenseMutation.isPending ? 'Deleting...' : 'Delete'}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

@@ -663,3 +663,34 @@ export function useUndoQuickExpenseMutation() {
         },
     });
 }
+
+// 12. Delete Personal Expense Mutation
+export function useDeleteExpenseMutation() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({
+            expenseId,
+            requestedBy,
+        }: {
+            expenseId: string;
+            requestedBy?: string;
+        }) => {
+            const queryParam = requestedBy ? `?requestedBy=${encodeURIComponent(requestedBy)}` : '';
+            return apiFetch<{ success: boolean; message: string }>(
+                `/expenses/${encodeURIComponent(expenseId)}${queryParam}`,
+                {
+                    method: 'DELETE',
+                }
+            );
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['spendings'] });
+            queryClient.invalidateQueries({ queryKey: ['spends'] });
+            queryClient.invalidateQueries({ queryKey: ['analytics'] });
+            queryClient.invalidateQueries({ queryKey: ['trip-info'] });
+            queryClient.invalidateQueries({ queryKey: ['tripInfo'] });
+            queryClient.invalidateQueries({ queryKey: ['people'] });
+        },
+    });
+}
+
