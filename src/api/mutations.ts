@@ -694,3 +694,42 @@ export function useDeleteExpenseMutation() {
     });
 }
 
+// 13. Update Personal Expense Mutation
+export function useUpdateExpenseMutation() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({
+            expenseId,
+            amount,
+            description,
+            category,
+            timestamp,
+            requestedBy,
+        }: {
+            expenseId: string;
+            amount?: number;
+            description?: string;
+            category?: string;
+            timestamp?: string;
+            requestedBy?: string;
+        }) => {
+            const queryParam = requestedBy ? `?requestedBy=${encodeURIComponent(requestedBy)}` : '';
+            return apiFetch<{ success: boolean; message: string; data?: any }>(
+                `/expenses/${encodeURIComponent(expenseId)}${queryParam}`,
+                {
+                    method: 'PUT',
+                    body: JSON.stringify({ amount, description, category, timestamp, requestedBy }),
+                }
+            );
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['spendings'] });
+            queryClient.invalidateQueries({ queryKey: ['spends'] });
+            queryClient.invalidateQueries({ queryKey: ['analytics'] });
+            queryClient.invalidateQueries({ queryKey: ['trip-info'] });
+            queryClient.invalidateQueries({ queryKey: ['tripInfo'] });
+            queryClient.invalidateQueries({ queryKey: ['people'] });
+        },
+    });
+}
+

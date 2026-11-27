@@ -29,6 +29,8 @@ import {
     SwipeableRow,
     IOSActionSheet,
     type ActionSheetItemData,
+    EditExpenseModal,
+    type EditExpenseItem,
 } from '../../components';
 import { triggerHaptic } from '../../utils/haptics';
 import { parseCustomDate, formatPurchaseTime, getCategoryMeta } from '../../utils/formatters';
@@ -86,6 +88,7 @@ export function Dashboard() {
         timestamp?: string;
     } | null>(null);
     const [actionSheetItem, setActionSheetItem] = useState<ActionSheetItemData | null>(null);
+    const [expenseToEdit, setExpenseToEdit] = useState<EditExpenseItem | null>(null);
     const [paymentSettlement, setPaymentSettlement] = useState<PaymentSettlementData | null>(null);
     const [collectSettlement, setCollectSettlement] = useState<CollectQrModalData | null>(null);
     const [groupCollectData, setGroupCollectData] = useState<GroupCollectQrModalData | null>(null);
@@ -1950,6 +1953,18 @@ export function Dashboard() {
                 isOpen={Boolean(actionSheetItem)}
                 onClose={() => setActionSheetItem(null)}
                 item={actionSheetItem}
+                onEdit={() => {
+                    if (actionSheetItem?.canDelete && actionSheetItem.id) {
+                        setExpenseToEdit({
+                            id: actionSheetItem.id,
+                            description: actionSheetItem.description,
+                            amount: actionSheetItem.amount,
+                            category: actionSheetItem.category,
+                            timestamp: actionSheetItem.timestamp,
+                            payee: actionSheetItem.paidBy,
+                        });
+                    }
+                }}
                 onDelete={() => {
                     if (actionSheetItem?.canDelete && actionSheetItem.id) {
                         setExpenseToDelete({
@@ -1962,6 +1977,13 @@ export function Dashboard() {
                     }
                 }}
                 onCopySuccess={(msg) => showToast(msg, 'content_copy')}
+            />
+
+            {/* Edit Expense Modal */}
+            <EditExpenseModal
+                isOpen={Boolean(expenseToEdit)}
+                onClose={() => setExpenseToEdit(null)}
+                expense={expenseToEdit}
             />
 
             {/* Dedicated Month-wise Spend History Breakdown Modal */}

@@ -55,4 +55,9 @@ export {
     useEdgeSwipe,
     type UseEdgeSwipeOptions,
 } from './Gestures';
+export {
+    EditExpenseModal,
+    type EditExpenseModalProps,
+    type EditExpenseItem,
+} from './EditExpenseModal/EditExpenseModal.tsx';
 

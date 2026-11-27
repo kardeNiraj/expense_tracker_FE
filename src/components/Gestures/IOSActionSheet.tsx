@@ -19,6 +19,7 @@ export interface IOSActionSheetProps {
     isOpen: boolean;
     onClose: () => void;
     item: ActionSheetItemData | null;
+    onEdit?: () => void;
     onDelete?: () => void;
     onCopySuccess?: (message: string) => void;
 }
@@ -27,6 +28,7 @@ export const IOSActionSheet: React.FC<IOSActionSheetProps> = ({
     isOpen,
     onClose,
     item,
+    onEdit,
     onDelete,
     onCopySuccess,
 }) => {
@@ -211,7 +213,25 @@ export const IOSActionSheet: React.FC<IOSActionSheetProps> = ({
                         </div>
                     </button>
 
-                    {/* Action 4: Delete Transaction (Red destructive) */}
+                    {/* Action 4: Edit Transaction */}
+                    {item.canDelete && onEdit && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                triggerHaptic('light');
+                                onClose();
+                                onEdit();
+                            }}
+                            className="w-full h-12 px-4 flex items-center justify-between text-xs font-semibold text-on-surface hover:bg-surface-container transition-colors cursor-pointer active:bg-surface-container-high"
+                        >
+                            <div className="flex items-center gap-2.5">
+                                <AppIcon name="edit" className="text-[18px] text-primary" />
+                                <span>Edit Transaction</span>
+                            </div>
+                        </button>
+                    )}
+
+                    {/* Action 5: Delete Transaction (Red destructive) */}
                     {item.canDelete && (
                         <button
                             type="button"

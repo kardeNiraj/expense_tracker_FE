@@ -18,6 +18,7 @@ import {
     type ActionSheetItemData,
     useEdgeSwipe,
 } from '../Gestures';
+import { EditExpenseModal, type EditExpenseItem } from '../EditExpenseModal/EditExpenseModal';
 
 interface SpendHistoryModalProps {
     isOpen: boolean;
@@ -76,6 +77,7 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
         timestamp?: string;
     } | null>(null);
     const [actionSheetItem, setActionSheetItem] = useState<ActionSheetItemData | null>(null);
+    const [expenseToEdit, setExpenseToEdit] = useState<EditExpenseItem | null>(null);
 
     const canDeleteThisProfile =
         !isRoomReadOnly &&
@@ -906,6 +908,18 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
                 isOpen={Boolean(actionSheetItem)}
                 onClose={() => setActionSheetItem(null)}
                 item={actionSheetItem}
+                onEdit={() => {
+                    if (actionSheetItem?.canDelete && actionSheetItem.id) {
+                        setExpenseToEdit({
+                            id: actionSheetItem.id,
+                            description: actionSheetItem.description,
+                            amount: actionSheetItem.amount,
+                            category: actionSheetItem.category,
+                            timestamp: actionSheetItem.timestamp,
+                            payee: selectedPerson,
+                        });
+                    }
+                }}
                 onDelete={() => {
                     if (actionSheetItem?.canDelete && actionSheetItem.id) {
                         setExpenseToDelete({
@@ -918,6 +932,13 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
                     }
                 }}
                 onCopySuccess={(msg) => showToast(msg, 'content_copy')}
+            />
+
+            {/* Edit Expense Modal */}
+            <EditExpenseModal
+                isOpen={Boolean(expenseToEdit)}
+                onClose={() => setExpenseToEdit(null)}
+                expense={expenseToEdit}
             />
         </div>
     );
