@@ -24,6 +24,102 @@ const FULL_SWIPE_THRESHOLD = 165; // px to trigger instant full-swipe delete
 const SLOP_THRESHOLD = 7; // px to establish horizontal swipe intent
 const LONG_PRESS_DURATION = 400; // ms to trigger long press action sheet
 
+interface MorphStyles {
+    containerWidth: number;
+    buttonWidth: string;
+    buttonHeight: string;
+    borderRadius: string;
+    marginRight: string;
+    iconScale: number;
+    iconOpacity: number;
+    labelOpacity: number;
+    isSpherical: boolean;
+}
+
+const getDeleteMorphStyles = (
+    dist: number,
+    actionWidth: number,
+    isFullSwipe: boolean,
+    isCollapsing: boolean
+): MorphStyles => {
+    if (dist <= 0 || isCollapsing) {
+        return {
+            containerWidth: 0,
+            buttonWidth: '0px',
+            buttonHeight: '0px',
+            borderRadius: '9999px',
+            marginRight: '0px',
+            iconScale: 0.5,
+            iconOpacity: 0,
+            labelOpacity: 0,
+            isSpherical: true,
+        };
+    }
+
+    if (isFullSwipe) {
+        return {
+            containerWidth: dist,
+            buttonWidth: '100%',
+            buttonHeight: '100%',
+            borderRadius: '16px',
+            marginRight: '0px',
+            iconScale: 1.25,
+            iconOpacity: 1,
+            labelOpacity: 1,
+            isSpherical: false,
+        };
+    }
+
+    if (dist < 46) {
+        // Pure spherical circle / bubble phase: grows from 16px to 42px
+        const circleSize = Math.min(42, Math.max(16, dist - 4));
+        const iconProgress = Math.min(1, Math.max(0.4, (dist - 8) / 36));
+        return {
+            containerWidth: dist,
+            buttonWidth: `${circleSize}px`,
+            buttonHeight: `${circleSize}px`,
+            borderRadius: '9999px',
+            marginRight: `${Math.max(2, (dist - circleSize) / 2)}px`,
+            iconScale: Math.min(1, Math.max(0.65, iconProgress)),
+            iconOpacity: iconProgress,
+            labelOpacity: 0,
+            isSpherical: true,
+        };
+    }
+
+    if (dist < actionWidth) {
+        // Morphing phase from spherical circle to card rounded rectangle
+        const t = (dist - 46) / (actionWidth - 46); // 0 to 1
+        const rad = (1 - t) * 26 + t * 16; // 26px -> 16px (matches rounded-2xl)
+        const insetY = (1 - t) * 7; // 7px inset -> 0px inset (flush card height)
+        const insetR = (1 - t) * 5; // 5px margin -> 0px margin
+        return {
+            containerWidth: dist,
+            buttonWidth: `calc(100% - ${insetR * 2}px)`,
+            buttonHeight: `calc(100% - ${insetY * 2}px)`,
+            borderRadius: `${rad}px`,
+            marginRight: `${insetR}px`,
+            iconScale: 0.92 + t * 0.08,
+            iconOpacity: 1,
+            labelOpacity: Math.max(0, (t - 0.2) / 0.8),
+            isSpherical: false,
+        };
+    }
+
+    // Fully revealed card shape phase (dist >= actionWidth)
+    return {
+        containerWidth: dist,
+        buttonWidth: '100%',
+        buttonHeight: '100%',
+        borderRadius: '16px',
+        marginRight: '0px',
+        iconScale: 1,
+        iconOpacity: 1,
+        labelOpacity: 1,
+        isSpherical: false,
+    };
+};
+
 export const SwipeableRow: React.FC<SwipeableRowProps> = ({
     id,
     children,
@@ -332,6 +428,10 @@ export const SwipeableRow: React.FC<SwipeableRowProps> = ({
         setIsOpen(false);
     };
 
+    const dragDist = Math.max(0, -offsetX);
+    const isRevealed = canDelete && (dragDist > 0 || isCollapsing);
+    const morph = getDeleteMorphStyles(dragDist, ACTION_WIDTH, isFullSwipeArmed, isCollapsing);
+
     return (
         <div
             ref={rowRef}
@@ -360,56 +460,67 @@ export const SwipeableRow: React.FC<SwipeableRowProps> = ({
             }}
             className={`relative overflow-hidden rounded-2xl will-change-transform ${className}`}
         >
-            {/* Background Action Button (iOS Style Delete) */}
+            {/* Background Action Button (iOS Style Morphing Delete) */}
             {canDelete && (
                 <div
-                    className={`absolute inset-y-0 right-0 z-0 flex items-stretch overflow-hidden rounded-2xl transition-colors duration-250 ${
-                        isFullSwipeArmed
-                            ? 'bg-gradient-to-l from-red-600 via-rose-600 to-rose-700'
-                            : 'bg-gradient-to-l from-red-500 via-rose-500 to-rose-600'
-                    }`}
+                    aria-hidden={!isRevealed}
+                    className="absolute inset-y-0 right-0 z-0 flex items-center justify-end overflow-hidden select-none pointer-events-auto"
                     style={{
-                        width: `${Math.max(ACTION_WIDTH, Math.abs(offsetX))}px`,
+                        width: isRevealed
+                            ? isFullSwipeArmed
+                                ? '100%'
+                                : `${morph.containerWidth}px`
+                            : '0px',
+                        opacity: isRevealed ? 1 : 0,
+                        visibility: isRevealed ? 'visible' : 'hidden',
+                        transition: isDragging
+                            ? 'none'
+                            : 'width 0.32s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease',
                     }}
                 >
                     <button
                         type="button"
                         onClick={handleDeleteClick}
                         aria-label="Delete item"
-                        className="w-full h-full flex flex-col items-center justify-center text-white px-3 font-semibold text-[11px] gap-1 cursor-pointer active:opacity-90 select-none transition-all"
+                        className={`flex flex-col items-center justify-center text-white cursor-pointer select-none overflow-hidden active:opacity-90 transition-colors duration-200 ${
+                            isFullSwipeArmed
+                                ? 'bg-gradient-to-l from-red-600 via-rose-600 to-rose-700 shadow-md'
+                                : 'bg-gradient-to-l from-red-500 via-rose-500 to-rose-600 shadow-xs'
+                        }`}
+                        style={{
+                            width: morph.buttonWidth,
+                            height: morph.buttonHeight,
+                            borderRadius: morph.borderRadius,
+                            marginRight: morph.marginRight,
+                            transition: isDragging
+                                ? 'background-color 0.2s ease'
+                                : 'all 0.32s cubic-bezier(0.16, 1, 0.3, 1)',
+                        }}
                     >
                         <div
-                            className={`transition-all duration-200 flex items-center justify-center ${
-                                isFullSwipeArmed ? 'scale-125' : 'scale-100'
-                            }`}
+                            className="flex items-center justify-center transition-transform duration-150"
                             style={{
-                                transform: `scale(${
-                                    isFullSwipeArmed
-                                        ? 1.25
-                                        : Math.min(1, Math.max(0.75, Math.abs(offsetX) / ACTION_WIDTH))
-                                })`,
-                                opacity: Math.min(
-                                    1,
-                                    Math.max(0.4, Math.abs(offsetX) / (ACTION_WIDTH * 0.7))
-                                ),
+                                transform: `scale(${morph.iconScale})`,
+                                opacity: morph.iconOpacity,
                             }}
                         >
                             <AppIcon
                                 name={isFullSwipeArmed ? 'delete_forever' : 'delete'}
-                                className="text-[21px]"
+                                className={morph.isSpherical ? 'text-[18px]' : 'text-[20px]'}
                             />
                         </div>
-                        <span
-                            className="leading-tight text-[10px] font-bold tracking-tight uppercase"
-                            style={{
-                                opacity: Math.min(
-                                    1,
-                                    Math.max(0, (Math.abs(offsetX) - 20) / (ACTION_WIDTH - 20))
-                                ),
-                            }}
-                        >
-                            {isFullSwipeArmed ? 'Release' : 'Delete'}
-                        </span>
+                        {!morph.isSpherical && (
+                            <span
+                                className="leading-tight text-[10px] font-bold tracking-tight uppercase"
+                                style={{
+                                    opacity: morph.labelOpacity,
+                                    maxHeight: morph.labelOpacity > 0 ? '14px' : '0px',
+                                    transition: isDragging ? 'none' : 'opacity 0.2s ease',
+                                }}
+                            >
+                                {isFullSwipeArmed ? 'Release' : 'Delete'}
+                            </span>
+                        )}
                     </button>
                 </div>
             )}
