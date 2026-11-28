@@ -273,3 +273,49 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
 }
+
+/* Premium Fluid Entrance Animations for Cards, Tables & Rows */
+@keyframes cardEnter {
+    0% {
+        opacity: 0;
+        transform: translate3d(0, 10px, 0) scale(0.985);
+    }
+    100% {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) scale(1);
+    }
+}
+
+@keyframes cardEnterSoft {
+    0% {
+        opacity: 0;
+        transform: translate3d(0, 6px, 0);
+    }
+    100% {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+@keyframes rowEnter {
+    0% {
+        opacity: 0;
+        transform: translate3d(0, 5px, 0);
+    }
+    100% {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+.animate-card-enter {
+    animation: cardEnter 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-card-soft {
+    animation: cardEnterSoft 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-row-enter {
+    animation: rowEnter 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
+}

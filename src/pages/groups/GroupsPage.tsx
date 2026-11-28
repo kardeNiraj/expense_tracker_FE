@@ -18,6 +18,7 @@ import {
 import { AppIcon, Avatar, QRCode, RoomStatusBadge, RoomLifecycleActions } from '../../components';
 import { triggerHaptic } from '../../utils/haptics';
 import { buildGroupInviteUrl, parseGroupInviteCode } from '../../utils/qr';
+import { shouldAnimateCard } from '../../utils/animationSanity';
 
 const QrScannerModal = lazy(() => import('../../components/QRScanner/QrScannerModal'));
 
@@ -491,22 +492,24 @@ export const GroupsPage: React.FC = () => {
                     </div>
                 )}
 
-                {displayedGroups.map((g) => {
+                {displayedGroups.map((g, idx) => {
                     const isActive = g.groupId === activeGroupId;
                     const roomStatus = (g.status || 'ACTIVE').toUpperCase();
                     const isMuted = roomStatus === 'ARCHIVED' || roomStatus === 'CLOSED';
+                    const shouldAnimate = shouldAnimateCard(`group-${g.groupId}`);
 
                     return (
                         <button
                             key={g.groupId}
                             type="button"
+                            style={{ animationDelay: shouldAnimate ? `${Math.min(idx * 35, 240)}ms` : undefined }}
                             onClick={() => {
                                 triggerHaptic('light');
                                 setCreatedTokenResult(null);
                                 setActiveGroupId(g.groupId);
                                 showToast(`Switched to "${g.name}"`, g.icon || 'groups');
                             }}
-                            className={`w-full p-3.5 rounded-2xl border text-left flex items-center justify-between gap-3 transition-all cursor-pointer ${
+                            className={`w-full p-3.5 rounded-2xl border text-left flex items-center justify-between gap-3 transition-all cursor-pointer ${shouldAnimate ? 'animate-card-enter' : ''} ${
                                 isActive
                                     ? 'bg-primary/8 border-primary/45 shadow-xs'
                                     : isMuted
@@ -583,19 +586,21 @@ export const GroupsPage: React.FC = () => {
                         </span>
                     </div>
 
-                    {formerGroups.map((g) => {
+                    {formerGroups.map((g, idx) => {
                         const isActive = g.groupId === activeGroupId;
+                        const shouldAnimate = shouldAnimateCard(`former-group-${g.groupId}`);
                         return (
                             <button
                                 key={g.groupId}
                                 type="button"
+                                style={{ animationDelay: shouldAnimate ? `${Math.min(idx * 35, 240)}ms` : undefined }}
                                 onClick={() => {
                                     triggerHaptic('light');
                                     setCreatedTokenResult(null);
                                     setActiveGroupId(g.groupId);
                                     showToast(`Viewing archived history for "${g.name}"`, 'schedule');
                                 }}
-                                className={`w-full p-3.5 rounded-2xl border text-left flex items-center justify-between gap-3 transition-all cursor-pointer ${
+                                className={`w-full p-3.5 rounded-2xl border text-left flex items-center justify-between gap-3 transition-all cursor-pointer ${shouldAnimate ? 'animate-card-enter' : ''} ${
                                     isActive
                                         ? 'bg-primary/8 border-primary/45 shadow-xs'
                                         : 'bg-surface-container-low/70 border-outline-variant/30 hover:border-outline-variant/60'

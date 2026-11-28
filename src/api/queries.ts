@@ -98,6 +98,7 @@ export function usePeopleDetails(refresh = false) {
     return useQuery<PersonDetail[]>({
         queryKey: queryKeys.peopleDetails(groupScope),
         queryFn: () => apiFetch<PersonDetail[]>(`/people/details?refresh=${refresh}`),
+        placeholderData: keepPreviousData,
         staleTime: 1000 * 60 * 2, // 2 minutes cache
         gcTime: 1000 * 60 * 60 * 24 * 7,
         networkMode: 'offlineFirst',
@@ -119,6 +120,7 @@ export function useSplits(params?: SplitsFilterParams) {
     return useQuery<Split[]>({
         queryKey: queryKeys.splits(params, groupScope),
         queryFn: () => apiFetch<Split[]>(endpoint),
+        placeholderData: keepPreviousData,
         staleTime: DYNAMIC_LIST_STALE_TIME_MS,
         gcTime: 1000 * 60 * 60 * 24 * 7,
         networkMode: 'offlineFirst',
@@ -132,6 +134,7 @@ export function useSplitDetails(splitId?: string) {
         queryKey: queryKeys.splitDetails(splitId || '', groupScope),
         queryFn: () => apiFetch<Split>(`/split/${splitId}`),
         enabled: Boolean(splitId),
+        placeholderData: keepPreviousData,
         staleTime: DYNAMIC_LIST_STALE_TIME_MS,
         gcTime: 1000 * 60 * 60 * 24 * 7,
         networkMode: 'offlineFirst',
@@ -145,6 +148,7 @@ export function useSpendings(payee?: string) {
         queryKey: queryKeys.spendings(payee || '', groupScope),
         queryFn: () => apiFetch<SpendingsData>(`/spend/${encodeURIComponent(payee || '')}`),
         enabled: Boolean(payee),
+        placeholderData: keepPreviousData,
         staleTime: DYNAMIC_LIST_STALE_TIME_MS,
         gcTime: 1000 * 60 * 60 * 24 * 7,
         networkMode: 'offlineFirst',

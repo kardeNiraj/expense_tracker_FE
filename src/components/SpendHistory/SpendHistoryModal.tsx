@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useSpendings, useSplits, usePeople, useDeleteExpenseMutation } from '../../api';
 import { useExpense } from '../../context';
 import { Avatar } from '../Avatar';
@@ -19,6 +19,7 @@ import {
     useEdgeSwipe,
 } from '../Gestures';
 import { EditExpenseModal, type EditExpenseItem } from '../EditExpenseModal/EditExpenseModal';
+import { shouldAnimateCard, resetAnimationSanityRegistry } from '../../utils/animationSanity';
 
 interface SpendHistoryModalProps {
     isOpen: boolean;
@@ -79,6 +80,11 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
     const [actionSheetItem, setActionSheetItem] = useState<ActionSheetItemData | null>(null);
     const [expenseToEdit, setExpenseToEdit] = useState<EditExpenseItem | null>(null);
 
+    // Reset animation sanity on person switch so fresh views cascade smoothly
+    useEffect(() => {
+        resetAnimationSanityRegistry();
+    }, [selectedPerson]);
+
     const canDeleteThisProfile =
         !isRoomReadOnly &&
         !isRoomArchived &&
@@ -127,7 +133,7 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
                 const month = exp.sheet || formatMonthYear(exp.timestamp);
                 const expId = exp.expenseId || exp.id || exp._id;
                 return {
-                    id: expId || `direct-${idx}-${exp.timestamp || ''}`,
+                    id: expId || `direct-${exp.payee || selectedPerson}-${exp.timestamp || ''}-${exp.amount || ''}-${idx}`,
                     expenseId: expId,
                     userId: exp.userId,
                     type: 'PERSONAL',
@@ -653,11 +659,14 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
                     </div>
                 ) : (
                     <div className="space-y-5">
-                        {monthGroups.map((group) => (
-                            <section
-                                key={group.month}
-                                className="space-y-2.5 animate-in fade-in duration-200"
-                            >
+                        {monthGroups.map((group, groupIdx) => {
+                            const shouldAnimate = shouldAnimateCard(`spend-month-${group.month}`);
+                            return (
+                                <section
+                                    key={group.month}
+                                    style={{ animationDelay: shouldAnimate ? `${Math.min(groupIdx * 40, 240)}ms` : undefined }}
+                                    className={`space-y-2.5 ${shouldAnimate ? 'animate-card-enter' : ''}`}
+                                >
                                 {/* Month Section Header with Subtotals */}
                                 <div className="p-3.5 rounded-2xl bg-surface-container-low border border-outline-variant/30 flex items-center justify-between gap-3 shadow-2xs">
                                     <div className="min-w-0">
@@ -691,7 +700,7 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
 
                                 {/* Month Transaction Cards */}
                                 <div className="space-y-2">
-                                    {group.items.map((item) => {
+                                    {group.items.map((item, itemIdx) => {
                                         const catMeta = getCategoryMeta(item.category);
                                         const timeInfo = formatPurchaseTime(item.timestamp);
                                         const isPaidByMe =
@@ -706,6 +715,7 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
                                             <SwipeableRow
                                                 key={item.id}
                                                 id={item.id}
+                                                index={itemIdx}
                                                 canDelete={isDeletable}
                                                 onDelete={() => {
                                                     triggerHaptic('light');
@@ -834,7 +844,8 @@ const SpendHistoryContent: React.FC<Omit<SpendHistoryModalProps, 'isOpen'>> = ({
                                     })}
                                 </div>
                             </section>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </main>

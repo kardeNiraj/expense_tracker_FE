@@ -31,6 +31,7 @@ import {
     computePersonalPairwiseBalances,
     type MutualZeroOffsetPair,
 } from '../../utils/pairwiseNetting';
+import { shouldAnimateCard, resetAnimationSanityRegistry } from '../../utils/animationSanity';
 
 export function SplitsPage() {
     const {
@@ -48,6 +49,11 @@ export function SplitsPage() {
     } = useExpense();
 
     const canSettle = !isFormerActiveGroup && !isRoomClosed;
+
+    // Reset animation sanity registry on context switch (switching room or active person)
+    useEffect(() => {
+        resetAnimationSanityRegistry();
+    }, [activeGroup?.groupId, activePerson]);
     const canEditSplit = !isFormerActiveGroup && !isRoomArchived && !isRoomClosed;
     const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'SETTLED'>('ALL');
     const [paymentSettlement, setPaymentSettlement] = useState<PaymentSettlementData | null>(null);
@@ -698,12 +704,14 @@ export function SplitsPage() {
             {/* Zero-Net Cancelled Mutual Offset Banner */}
             {(effectiveStatusFilter === 'ALL' || effectiveStatusFilter === 'ACTIVE') && pairwiseBalances.mutualZeroOffsets.length > 0 && (
                 <div className="space-y-2">
-                    {pairwiseBalances.mutualZeroOffsets.map((pair) => {
+                    {pairwiseBalances.mutualZeroOffsets.map((pair, idx) => {
                         const isClearing = settlingKey === `offset_${pair.counterparty}`;
+                        const shouldAnimate = shouldAnimateCard(`split-offset-${pair.counterparty}`);
                         return (
                             <div
                                 key={`splits-offset-${pair.counterparty}`}
-                                className="px-3.5 py-2.5 rounded-2xl bg-status-settled-bg/45 border border-primary/25 flex items-center justify-between gap-2.5 shadow-2xs"
+                                style={{ animationDelay: shouldAnimate ? `${Math.min(idx * 35, 240)}ms` : undefined }}
+                                className={`px-3.5 py-2.5 rounded-2xl bg-status-settled-bg/45 border border-primary/25 flex items-center justify-between gap-2.5 shadow-2xs ${shouldAnimate ? 'animate-card-enter' : ''}`}
                             >
                                 <div className="flex items-center gap-2.5 min-w-0">
                                     <div className="w-8 h-8 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
@@ -845,11 +853,14 @@ export function SplitsPage() {
                                 splitCount: 1,
                             }));
 
+                        const shouldAnimate = shouldAnimateCard(`split-${split.splitId}`);
+
                         return (
                             <div
                                 key={split.splitId}
                                 id={`split-card-${split.splitId}`}
-                                className={`bg-surface-container-lowest rounded-2xl border transition-all ${expanded
+                                style={{ animationDelay: shouldAnimate ? `${Math.min(index * 35, 240)}ms` : undefined }}
+                                className={`bg-surface-container-lowest rounded-2xl border transition-all ${shouldAnimate ? 'animate-card-enter' : ''} ${expanded
                                         ? 'p-4 border-outline-variant/40 space-y-3.5 shadow-sm'
                                         : 'p-3.5 border-outline-variant/30 hover:border-primary/40 hover:bg-surface-container-lowest/80 shadow-xs'
                                     } ${focusedSplitId === split.splitId ? 'ring-2 ring-primary/40 border-primary/50' : ''}`}

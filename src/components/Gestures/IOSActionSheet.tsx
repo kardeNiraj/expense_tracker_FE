@@ -48,7 +48,7 @@ export const IOSActionSheet: React.FC<IOSActionSheetProps> = ({
 
     const catMeta = getCategoryMeta(item.category || 'General');
 
-    // Drag down to dismiss gesture
+    // Drag down to dismiss gesture with spring damping
     const handleTouchStart = (e: React.TouchEvent) => {
         startYRef.current = e.touches[0].clientY;
         isDraggingRef.current = true;
@@ -62,9 +62,12 @@ export const IOSActionSheet: React.FC<IOSActionSheetProps> = ({
 
         if (diffY > 0) {
             if (e.cancelable) e.preventDefault();
-            setDragY(diffY);
+            // Elastic damping as drag distance increases
+            const damped = diffY < 80 ? diffY : 80 + (diffY - 80) * 0.55;
+            setDragY(damped);
         } else {
-            setDragY(diffY * 0.2); // upward damping
+            // High upward resistance
+            setDragY(diffY * 0.15);
         }
     };
 
@@ -73,7 +76,7 @@ export const IOSActionSheet: React.FC<IOSActionSheetProps> = ({
         isDraggingRef.current = false;
         setIsDragging(false);
 
-        if (dragY > 90) {
+        if (dragY > 80) {
             triggerHaptic('light');
             onClose();
         } else {
@@ -133,7 +136,7 @@ export const IOSActionSheet: React.FC<IOSActionSheetProps> = ({
 
     return (
         <div
-            className="fixed inset-0 z-70 bg-black/45 backdrop-blur-xs flex items-end justify-center p-0 sm:p-4 animate-in fade-in duration-200"
+            className="fixed inset-0 z-70 bg-black/50 backdrop-blur-sm flex items-end justify-center p-0 sm:p-4 animate-in fade-in duration-200"
             onClick={onClose}
         >
             <div
@@ -144,17 +147,17 @@ export const IOSActionSheet: React.FC<IOSActionSheetProps> = ({
                 onClick={(e) => e.stopPropagation()}
                 style={{
                     transform: `translate3d(0, ${Math.max(0, dragY)}px, 0)`,
-                    transition: isDragging ? 'none' : 'transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
+                    transition: isDragging ? 'none' : 'transform 0.32s cubic-bezier(0.16, 1, 0.3, 1)',
                 }}
-                className="w-full max-w-sm mx-auto px-4 pb-5 pb-safe space-y-2.5 animate-in slide-in-from-bottom duration-250 select-none"
+                className="w-full max-w-sm mx-auto px-4 pb-6 pb-safe space-y-2.5 animate-in slide-in-from-bottom duration-250 select-none"
             >
                 {/* Pull down indicator handle */}
-                <div className="w-10 h-1.5 rounded-full bg-white/40 mx-auto mb-1.5 shadow-2xs" />
+                <div className="w-10 h-1.5 rounded-full bg-white/40 hover:bg-white/60 mx-auto mb-1.5 shadow-2xs transition-colors" />
 
                 {/* Main Action Group Card */}
-                <div className="bg-surface-container-lowest/95 backdrop-blur-xl border border-outline-variant/30 rounded-2xl overflow-hidden shadow-2xl divide-y divide-outline-variant/15">
+                <div className="bg-surface-container-lowest/98 backdrop-blur-2xl border border-outline-variant/35 rounded-2xl overflow-hidden shadow-2xl divide-y divide-outline-variant/15">
                     {/* Header info */}
-                    <div className="p-4 flex items-center gap-3 bg-surface-container-low/50">
+                    <div className="p-4 flex items-center gap-3.5 bg-surface-container-low/40">
                         <div
                             className={`w-11 h-11 rounded-xl ${catMeta.bgClass} flex items-center justify-center shrink-0 shadow-2xs`}
                         >
@@ -181,36 +184,45 @@ export const IOSActionSheet: React.FC<IOSActionSheetProps> = ({
                     <button
                         type="button"
                         onClick={handleCopyDescription}
-                        className="w-full h-12 px-4 flex items-center justify-between text-xs font-semibold text-on-surface hover:bg-surface-container transition-colors cursor-pointer active:bg-surface-container-high"
+                        className="w-full h-12 px-4 flex items-center justify-between text-xs font-semibold text-on-surface hover:bg-surface-container/80 active:bg-surface-container-high active:scale-[0.99] transition-all cursor-pointer"
                     >
-                        <div className="flex items-center gap-2.5">
-                            <AppIcon name="content_copy" className="text-[18px] text-primary" />
+                        <div className="flex items-center gap-3">
+                            <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                                <AppIcon name="content_copy" className="text-[16px]" />
+                            </div>
                             <span>Copy Description</span>
                         </div>
+                        <AppIcon name="chevron_right" className="text-[16px] text-on-surface-variant/40" />
                     </button>
 
                     {/* Action 2: Copy Amount */}
                     <button
                         type="button"
                         onClick={handleCopyAmount}
-                        className="w-full h-12 px-4 flex items-center justify-between text-xs font-semibold text-on-surface hover:bg-surface-container transition-colors cursor-pointer active:bg-surface-container-high"
+                        className="w-full h-12 px-4 flex items-center justify-between text-xs font-semibold text-on-surface hover:bg-surface-container/80 active:bg-surface-container-high active:scale-[0.99] transition-all cursor-pointer"
                     >
-                        <div className="flex items-center gap-2.5">
-                            <AppIcon name="payments" className="text-[18px] text-primary" />
+                        <div className="flex items-center gap-3">
+                            <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                                <AppIcon name="payments" className="text-[16px]" />
+                            </div>
                             <span>Copy Amount</span>
                         </div>
+                        <AppIcon name="chevron_right" className="text-[16px] text-on-surface-variant/40" />
                     </button>
 
                     {/* Action 3: Share Details */}
                     <button
                         type="button"
                         onClick={handleShare}
-                        className="w-full h-12 px-4 flex items-center justify-between text-xs font-semibold text-on-surface hover:bg-surface-container transition-colors cursor-pointer active:bg-surface-container-high"
+                        className="w-full h-12 px-4 flex items-center justify-between text-xs font-semibold text-on-surface hover:bg-surface-container/80 active:bg-surface-container-high active:scale-[0.99] transition-all cursor-pointer"
                     >
-                        <div className="flex items-center gap-2.5">
-                            <AppIcon name="ios_share" className="text-[18px] text-primary" />
+                        <div className="flex items-center gap-3">
+                            <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                                <AppIcon name="ios_share" className="text-[16px]" />
+                            </div>
                             <span>Share Transaction Details</span>
                         </div>
+                        <AppIcon name="chevron_right" className="text-[16px] text-on-surface-variant/40" />
                     </button>
 
                     {/* Action 4: Edit Transaction */}
@@ -222,12 +234,15 @@ export const IOSActionSheet: React.FC<IOSActionSheetProps> = ({
                                 onClose();
                                 onEdit();
                             }}
-                            className="w-full h-12 px-4 flex items-center justify-between text-xs font-semibold text-on-surface hover:bg-surface-container transition-colors cursor-pointer active:bg-surface-container-high"
+                            className="w-full h-12 px-4 flex items-center justify-between text-xs font-semibold text-on-surface hover:bg-surface-container/80 active:bg-surface-container-high active:scale-[0.99] transition-all cursor-pointer"
                         >
-                            <div className="flex items-center gap-2.5">
-                                <AppIcon name="edit" className="text-[18px] text-primary" />
+                            <div className="flex items-center gap-3">
+                                <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                                    <AppIcon name="edit" className="text-[16px]" />
+                                </div>
                                 <span>Edit Transaction</span>
                             </div>
+                            <AppIcon name="chevron_right" className="text-[16px] text-on-surface-variant/40" />
                         </button>
                     )}
 
@@ -236,12 +251,15 @@ export const IOSActionSheet: React.FC<IOSActionSheetProps> = ({
                         <button
                             type="button"
                             onClick={handleDelete}
-                            className="w-full h-12 px-4 flex items-center justify-between text-xs font-bold text-error hover:bg-error/10 transition-colors cursor-pointer active:bg-error/15"
+                            className="w-full h-12 px-4 flex items-center justify-between text-xs font-bold text-error hover:bg-error/10 active:bg-error/15 active:scale-[0.99] transition-all cursor-pointer"
                         >
-                            <div className="flex items-center gap-2.5">
-                                <AppIcon name="delete" className="text-[18px] text-error" />
+                            <div className="flex items-center gap-3">
+                                <div className="w-7 h-7 rounded-lg bg-error/15 text-error flex items-center justify-center shrink-0">
+                                    <AppIcon name="delete" className="text-[16px]" />
+                                </div>
                                 <span>Delete Transaction</span>
                             </div>
+                            <AppIcon name="chevron_right" className="text-[16px] text-error/40" />
                         </button>
                     )}
                 </div>

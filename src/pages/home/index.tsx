@@ -39,6 +39,7 @@ import {
     computePersonalPairwiseBalances,
     type PairwiseSettlementRef,
 } from '../../utils/pairwiseNetting';
+import { shouldAnimateCard, resetAnimationSanityRegistry } from '../../utils/animationSanity';
 
 const QrScannerModal = lazy(() => import('../../components/QRScanner/QrScannerModal'));
 import {
@@ -173,6 +174,11 @@ export function Dashboard() {
             window.removeEventListener('popstate', handleConfirmReceivedParam);
         };
     }, [setActivePerson]);
+
+    // Reset animation sanity registry on context switch (switching room or active person)
+    useEffect(() => {
+        resetAnimationSanityRegistry();
+    }, [activeGroup?.groupId, activePerson]);
 
     const visibleSplits = useMemo(
         () => allSplits.filter((s) => (s.status || 'ACTIVE').toUpperCase() !== 'DELETED'),
@@ -318,7 +324,7 @@ export function Dashboard() {
             ...personalDirectExpenses.map((e, idx) => {
                 const expId = e.expenseId || e.id || e._id;
                 return {
-                    id: expId || `direct-${idx}`,
+                    id: expId || `direct-${e.payee || ''}-${e.timestamp || ''}-${e.amount || ''}-${idx}`,
                     expenseId: expId,
                     userId: e.userId,
                     description: e.description,
@@ -1034,6 +1040,7 @@ export function Dashboard() {
                     {groupedOwedList.map((group, idx) => {
                         const isMulti = group.allSplits.length > 1;
                         const isExpanded = !!expandedOwed[group.to];
+                        const shouldAnimate = shouldAnimateCard(`owe-${group.to}`);
                         const netSubtitle = group.hasMutualOffset
                             ? `Net after ₹${group.offsetAmount.toLocaleString('en-IN')} offset (₹${group.grossIOwe.toLocaleString('en-IN')} - ₹${group.grossOwedToMe.toLocaleString('en-IN')})`
                             : group.youOweSplits.length > 1
@@ -1043,7 +1050,8 @@ export function Dashboard() {
                         return (
                             <div
                                 key={`owe-group-${group.to}-${idx}`}
-                                className="bg-surface-container-lowest p-3.5 rounded-2xl shadow-xs border border-outline-variant/30 space-y-3"
+                                style={{ animationDelay: shouldAnimate ? `${Math.min(idx * 38, 240)}ms` : undefined }}
+                                className={`bg-surface-container-lowest p-3.5 rounded-2xl shadow-xs border border-outline-variant/30 space-y-3 ${shouldAnimate ? 'animate-card-enter' : ''}`}
                             >
                                 {/* Top Details Row: Avatar + Name + Subtitle (Left), Amount + Chevron (Right) */}
                                 <div className="flex items-center justify-between gap-3">
@@ -1258,6 +1266,7 @@ export function Dashboard() {
                     {groupedOwedToMeList.map((group, idx) => {
                         const isMulti = group.allSplits.length > 1;
                         const isExpanded = !!expandedOwedToMe[group.from];
+                        const shouldAnimate = shouldAnimateCard(`owed-to-me-${group.from}`);
                         const netSubtitle = group.hasMutualOffset
                             ? `Net after ₹${group.offsetAmount.toLocaleString('en-IN')} offset (₹${group.grossOwedToMe.toLocaleString('en-IN')} - ₹${group.grossIOwe.toLocaleString('en-IN')})`
                             : group.owedToMeSplits.length > 1
@@ -1272,7 +1281,8 @@ export function Dashboard() {
                         return (
                             <div
                                 key={`owed-to-me-group-${group.from}-${idx}`}
-                                className="bg-surface-container-lowest p-3.5 rounded-2xl shadow-xs border border-outline-variant/30 space-y-3"
+                                style={{ animationDelay: shouldAnimate ? `${Math.min(idx * 38, 240)}ms` : undefined }}
+                                className={`bg-surface-container-lowest p-3.5 rounded-2xl shadow-xs border border-outline-variant/30 space-y-3 ${shouldAnimate ? 'animate-card-enter' : ''}`}
                             >
                                 {/* Top Details Row: Avatar + Name + Subtitle (Left), Amount + Chevron (Right) */}
                                 <div className="flex items-center justify-between gap-3">
@@ -1517,15 +1527,17 @@ export function Dashboard() {
                     })}
 
                     {/* Cancelled Mutual Offsets (Zero-Net Pairs, e.g. +50 and -50 = ₹0) */}
-                    {mutualZeroOffsets.map((pair) => {
+                    {mutualZeroOffsets.map((pair, idx) => {
                         const isExpanded = !!expandedOffsets[pair.counterparty];
                         const lockKey = `offset_${pair.counterparty}`;
                         const isClearing = settlingKey === lockKey;
+                        const shouldAnimate = shouldAnimateCard(`offset-${pair.counterparty}`);
 
                         return (
                             <div
                                 key={`mutual-offset-${pair.counterparty}`}
-                                className="bg-status-settled-bg/45 p-3.5 rounded-2xl border border-primary/25 space-y-2.5 shadow-xs"
+                                style={{ animationDelay: shouldAnimate ? `${Math.min(idx * 38, 240)}ms` : undefined }}
+                                className={`bg-status-settled-bg/45 p-3.5 rounded-2xl border border-primary/25 space-y-2.5 shadow-xs ${shouldAnimate ? 'animate-card-enter' : ''}`}
                             >
                                 <div className="flex items-center justify-between gap-2.5">
                                     <div className="flex items-center gap-2.5 min-w-0">
@@ -1705,7 +1717,7 @@ export function Dashboard() {
                     </div>
                 ) : (
                     <div className="space-y-2.5">
-                        {combinedRecentItems.map((item) => {
+                        {combinedRecentItems.map((item, idx) => {
                             const catMeta = getCategoryMeta(item.category);
                             const timeInfo = formatPurchaseTime(item.timestamp);
                             const isPaidByMe = item.paidBy?.toLowerCase() === activePerson.toLowerCase();
@@ -1715,6 +1727,7 @@ export function Dashboard() {
                                 <SwipeableRow
                                     key={item.id}
                                     id={item.id}
+                                    index={idx}
                                     canDelete={isDeletable}
                                     onDelete={() => {
                                         triggerHaptic('light');
